@@ -25,23 +25,31 @@ public partial class MainWindow
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0, "Missing configuration file is an empty setup state");
             var setupDialog = new AddTenantWindow(ConfigSnapshot.Read(path)) { Owner = this };
-            setupDialog.Dispatcher.BeginInvoke(new Action(() =>
+            var saveOperation = setupDialog.Dispatcher.InvokeAsync(() =>
             {
+                try
+                {
                 setupDialog.TenantName.Text = "New tenant";
                 setupDialog.TenantId.Text = "invalid";
                 setupDialog.ClientId.Text = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
                 Assert(!setupDialog.TrySave() && !File.Exists(path), "Invalid form leaves configuration untouched");
                 setupDialog.TenantId.Text = "11111111-2222-3333-4444-555555555555";
                 Assert(setupDialog.TrySave(), "Tenant form saves a valid tenant");
-            }));
-            Assert(setupDialog.ShowDialog() == true, "Tenant dialog closes after successful save");
+                }
+                finally { if (setupDialog.IsVisible) setupDialog.Close(); }
+            });
+            var saved = setupDialog.ShowDialog();
+            await saveOperation.Task;
+            Assert(saved == true, "Tenant dialog closes after successful save");
             await InitializeAsync(root, mockExecutable);
             Assert(_config?.Providers.Single().Name == "New tenant" && Profiles.Items.Count == 1,
                 "First tenant and profile load after setup");
             var beforeCancel = File.ReadAllText(path);
             var cancelDialog = new AddTenantWindow(ConfigSnapshot.Read(path)) { Owner = this };
-            cancelDialog.Dispatcher.BeginInvoke(new Action(() => cancelDialog.Close()));
-            Assert(cancelDialog.ShowDialog() != true && File.ReadAllText(path) == beforeCancel, "Cancel does not change configuration");
+            var cancelOperation = cancelDialog.Dispatcher.InvokeAsync(() => cancelDialog.Close());
+            var cancelled = cancelDialog.ShowDialog();
+            await cancelOperation.Task;
+            Assert(cancelled != true && File.ReadAllText(path) == beforeCancel, "Cancel does not change configuration");
             File.WriteAllText(path, "[broken-secret-marker");
             TraceStartup("Initializing");
             await InitializeAsync(root, "");

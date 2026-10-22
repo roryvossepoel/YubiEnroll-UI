@@ -246,7 +246,7 @@ public partial class MainWindow : Window
         if (File.Exists(ExePath.Text))
         {
             var result = await Runner.CaptureAsync("providers", "show", dialog.SavedTenantName!);
-            if (result.ExitCode != 0)
+            if (result.ExitCode != 0 || !result.Output.Contains(SelectedProvider.TenantId, StringComparison.OrdinalIgnoreCase))
             {
                 StatusText.Text = "Tenant saved locally, but YubiEnroll could not read it. Check Details and the configuration path before logging in.";
                 Details.Text = result.Error + Environment.NewLine + result.Output;
