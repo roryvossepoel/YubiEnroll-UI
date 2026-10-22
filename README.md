@@ -53,7 +53,7 @@ The application reuses existing configuration in these locations (legacy first):
 - `%APPDATA%\Yubico\yubienroll\yubienroll.toml`
 - `%APPDATA%\yubienroll\yubienroll.toml`
 
-A new configuration uses `%APPDATA%\yubienroll\yubienroll.toml`, the location documented by Yubico. The GUI does not redirect the CLI to ProgramData: a shared configuration path is not documented, and authentication remains per Windows account.
+A new configuration uses `%APPDATA%\Yubico\yubienroll\yubienroll.toml`, checked against the native YubiEnroll 1.2.0 CLI in CI. The current Yubico documentation omits the `Yubico` directory; our integration check found that 1.2.0 did not read that alternative path. The GUI does not redirect the CLI to ProgramData: a shared configuration path is not documented, and authentication remains per Windows account.
 
 Configuration must belong to the Windows account running the app. Configure provider app registration, permissions and profiles using the [official Entra setup guide](https://docs.yubico.com/software/yubikey/tools/yubienroll/yubienroll-entra.html). For example, start with `yubienroll providers add <name>` and `yubienroll profiles add <name>` as documented by Yubico. The GUI does not create Entra app registrations or grant tenant permissions.
 

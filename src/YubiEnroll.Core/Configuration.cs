@@ -17,7 +17,7 @@ public static class ConfigReader
         var appData = appDataOverride ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         string[] paths = [System.IO.Path.Combine(appData, "Yubico", "yubienroll", "yubienroll.toml"),
             System.IO.Path.Combine(appData, "yubienroll", "yubienroll.toml")];
-        return paths.FirstOrDefault(File.Exists) ?? paths[1];
+        return paths.FirstOrDefault(File.Exists) ?? paths[0];
     }
 
     public static Configuration Read(string path) => Parse(File.ReadAllText(path), path);

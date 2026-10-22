@@ -18,20 +18,22 @@ $modern = Join-Path $env:APPDATA 'yubienroll/yubienroll.toml'
 $legacy = Join-Path $env:APPDATA 'Yubico/yubienroll/yubienroll.toml'
 if ((Test-Path $modern) -or (Test-Path $legacy)) { throw 'Unexpected existing CLI configuration on CI runner' }
 try {
-    & ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe --write-fixture-config $modern
+    & ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe --write-fixture-config $legacy
     if ($LASTEXITCODE -ne 0) { throw 'Could not write synthetic configuration' }
     $output = & $exe providers show UI-test 2>&1
     $code = $LASTEXITCODE
     $output | Write-Output
-    if ($code -ne 0) { throw "YubiEnroll 1.2.0 did not read the documented configuration path (exit $code)" }
+    if ($code -ne 0) { throw "YubiEnroll 1.2.0 did not read the Yubico configuration path (exit $code)" }
     $text = $output -join "`n"
     if ($text -notmatch '11111111-2222-3333-4444-555555555555' -or $text -notmatch 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee') {
         throw 'CLI provider output does not match the synthetic tenant/client'
     }
-    & $exe profiles list
-    if ($LASTEXITCODE -ne 0) { throw 'CLI could not read the generated enrollment profile' }
+    $profileOutput = & $exe profiles list
+    $profileCode = $LASTEXITCODE
+    $profileOutput | Write-Output
+    if ($profileCode -ne 0 -or ($profileOutput -join "`n") -notmatch 'UI-test-profile') { throw 'CLI could not read the generated enrollment profile' }
     'PASS: native YubiEnroll 1.2.0 reads the GUI-generated provider and profile.'
 } finally {
-    if (Test-Path $modern) { Remove-Item -LiteralPath $modern }
-    if (Test-Path "$modern.ui.lock") { Remove-Item -LiteralPath "$modern.ui.lock" }
+    if (Test-Path $legacy) { Remove-Item -LiteralPath $legacy }
+    if (Test-Path "$legacy.ui.lock") { Remove-Item -LiteralPath "$legacy.ui.lock" }
 }
