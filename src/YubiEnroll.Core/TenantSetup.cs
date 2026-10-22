@@ -92,8 +92,43 @@ public static class TenantConfigWriter
         return result;
     }
 
-    public static string? Save(ConfigSnapshot expected, TenantSetup setup) =>
-        ConfigFileWriter.Save(expected, Build(expected.Text, setup));
+    public static TenantSetup Read(string text, string name)
+    {
+        ConfigReader.Parse(text);
+        var model = Toml.ToModel(text);
+        if (!model.TryGetValue("providers", out var p) || p is not TomlTable providers ||
+            !providers.TryGetValue(name, out var t) || t is not TomlTable table)
+            throw new InvalidOperationException("Tenant no longer exists. Reopen Settings.");
+        string Value(string key) => table.TryGetValue(key, out var value) && value is string v ? v : "";
+        return new(name, Value("tenant_id"), Value("client_id"), Value("redirect_uri"), Value("profile"), false);
+    }
+
+    public static string Edit(string text, TenantSetup request, string name)
+    {
+        var setup = request.Validate();
+        Read(text, name);
+        if (setup.Name != name) throw new ArgumentException("Existing tenants cannot be renamed in this editor.");
+        var model = Toml.ToModel(text);
+        var profiles = model.TryGetValue("profiles", out var p) && p is TomlTable pt ? pt : new TomlTable();
+        if (setup.CreateProfile)
+        {
+            if (profiles.Keys.Any(x => x.Equals(setup.ProfileName, StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException("A profile with this name already exists.");
+            var addition = Toml.ToModel(Build(null, setup));
+            profiles[setup.ProfileName] = ((TomlTable)addition["profiles"])[setup.ProfileName];
+            model["profiles"] = profiles;
+        }
+        else if (!profiles.ContainsKey(setup.ProfileName)) throw new ArgumentException("Choose an existing profile.");
+        var tenant = (TomlTable)((TomlTable)model["providers"])[name];
+        tenant["tenant_id"] = setup.TenantId;
+        tenant["client_id"] = setup.ClientId;
+        tenant["redirect_uri"] = setup.RedirectUri;
+        tenant["profile"] = setup.ProfileName;
+        return Toml.FromModel(model);
+    }
+
+    public static string? Save(ConfigSnapshot expected, TenantSetup setup, string? editName = null) =>
+        ConfigFileWriter.Save(expected, editName == null ? Build(expected.Text, setup) : Edit(expected.Text ?? "", setup, editName));
 }
 
 public static class ConfigFileWriter

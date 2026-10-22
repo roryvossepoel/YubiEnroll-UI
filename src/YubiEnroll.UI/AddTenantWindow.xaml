@@ -2,7 +2,7 @@
  Title="Add Microsoft Entra tenant" Width="640" Height="780" MinWidth="580" MinHeight="600" WindowStartupLocation="CenterOwner" Background="#F3F5F8" FontFamily="Segoe UI" FontSize="13">
  <DockPanel Margin="24">
   <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
-   <TextBlock Text="Add Microsoft Entra tenant" FontSize="24" FontWeight="SemiBold" Foreground="#14263B"/>
+   <TextBlock x:Name="Heading" Text="Add Microsoft Entra tenant" FontSize="24" FontWeight="SemiBold" Foreground="#14263B"/>
    <TextBlock Text="Use the values from your existing Entra app registration (public client / mobile &amp; desktop)." TextWrapping="Wrap" Margin="0,8,0,0"/>
   </StackPanel>
   <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
@@ -29,9 +29,7 @@
      <CheckBox x:Name="ForcePinChange" Content="Require PIN change on first use (YubiKey firmware 5.5+)" Margin="0,0,0,8"/>
      <TextBlock Text="New profile: random PIN enabled; key reset, Always UV and enterprise attestation disabled. Minimum PIN length requires firmware 5.5+." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
     </StackPanel>
-    <TextBlock Text="Configuration is saved for this Windows account:" FontWeight="SemiBold"/>
-    <TextBlock x:Name="StoragePath" TextWrapping="Wrap" Margin="0,4,0,12"/>
-    <TextBlock Text="Saving adds local settings. The Entra app registration, delegated permissions and administrator consent must already be configured. Existing configuration is backed up before saving. Close other YubiEnroll sessions first." TextWrapping="Wrap" Foreground="#42536A"/>
+    <TextBlock Text="Saving updates local settings. The Entra app registration, delegated permissions and administrator consent must already be configured. Existing configuration is backed up before saving. Close other YubiEnroll sessions first." TextWrapping="Wrap" Foreground="#42536A"/>
    </StackPanel>
   </ScrollViewer>
  </DockPanel>

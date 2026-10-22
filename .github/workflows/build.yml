@@ -41,5 +41,12 @@ jobs:
           path: |
             artifacts/win-x64/app/*
             !artifacts/win-x64/app/startup-smoke-test.txt
+            !artifacts/win-x64/app/visual-checks/**
           if-no-files-found: error
           retention-days: 30
+      - uses: actions/upload-artifact@v7
+        with:
+          name: UI-visual-checks
+          path: artifacts/win-x64/app/visual-checks/*.png
+          if-no-files-found: error
+          retention-days: 7

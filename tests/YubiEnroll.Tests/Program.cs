@@ -28,7 +28,9 @@ if (args.FirstOrDefault() == "--write-fixture-config")
         "http://localhost/yubienroll-redirect", "UI-test-profile", true));
     ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), new ProfileSetup("Second profile", MinPinLength: 8, RandomPinLength: 10));
     ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), new ProfileSetup("UI-test-profile", Reset: true, ForcePinChange: true), "UI-test-profile");
-    Console.WriteLine("Synthetic provider and multiple profiles written and edited.");
+    var fixture = ConfigSnapshot.Read(args[1]);
+    ConfigFileWriter.Save(fixture, ConfigTransfer.ValidateImport(ConfigTransfer.Export(fixture.Text!)));
+    Console.WriteLine("Synthetic provider and multiple profiles written, edited and transferred.");
     return 0;
 }
 
@@ -86,10 +88,10 @@ Check(UserSearch.Parse($"{id} Demo\n{id} Demo").Count == 1, "Repeated user IDs d
 Check(UserSearch.Parse("00000000-0000-0000-0000-000000000000 Empty").Count == 0, "Empty GUID rejected");
 
 var command = EnrollmentCommand.Build(id, "Alternative profile", "Demo key", false);
-Check(command.Contains("--no-reset") && !command.Contains("--reset"), "Explicit no-reset overrides profile reset");
+Check(command.Contains("--no-reset") && !command.Contains("--reset"), "Explicit false profile policy sends no-reset");
 Check(command[Array.IndexOf(command, "--profile") + 1] == "Alternative profile", "Chosen profile retained");
 Check(!command.Contains("-f") && !command.Contains("--force"), "Native confirmation prompts retained");
-Check(EnrollmentCommand.Build(id, "Standard", "", true).Contains("--reset"), "Reset requires explicit flag");
+Check(EnrollmentCommand.Build(id, "Standard", "", true).Contains("--reset"), "True profile policy sends reset");
 Reject(() => EnrollmentCommand.Build("name@example.test", "Standard", "", false), "Enrollment requires selected object ID");
 Reject(() => EnrollmentCommand.Build(id, "", "", false), "Enrollment requires explicit profile");
 
@@ -150,6 +152,25 @@ Reject(() => ProfileConfigWriter.Build(multiple, separate with { MinPinLength = 
 var endpoints = shared.Replace("provider = \"ENTRA\"", "provider = \"ENTRA\"\nentra_base_url = \"https://login.microsoftonline.com\"\ngraph_base_url = \"https://graph.microsoft.com\"");
 Check(ConfigReader.Parse(ProfileConfigWriter.Build(endpoints, policy, "Standard")).Providers.SequenceEqual(ConfigReader.Parse(endpoints).Providers),
     "Custom provider endpoints are preserved");
+var unspecifiedReset = EnrollmentCommand.Build(id, "Standard", "", null);
+Check(!unspecifiedReset.Contains("--reset") && !unspecifiedReset.Contains("--no-reset"), "Omitted reset remains controlled by native profile/default prompt");
+var transferable = TenantConfigWriter.Build(null, setup);
+transferable = TenantConfigWriter.Build(transferable, setup with { Name = "Shared tenant", CreateProfile = false });
+var exported = ConfigTransfer.Export(transferable);
+Check(ConfigReader.Parse(exported).Providers.Count == 2 && ConfigReader.Parse(exported).Profiles.Count == 1,
+    "Export/import retains multiple tenants sharing a profile");
+Check(ConfigTransfer.ValidateImport(exported) == exported, "Export is valid import input");
+Check(!ConfigTransfer.Export(transferable + "\n[private_cache]\nsecret = \"marker-token\"\n").Contains("marker-token"), "Export excludes unrelated data and auth fields");
+Reject(() => ConfigTransfer.ValidateImport(exported.Replace("client_id =", "client_secret =")), "Import rejects unsupported secret fields");
+Reject(() => ConfigTransfer.ValidateImport(exported.Replace("profile = \"Fresh profile\"", "profile = \"Missing\"")), "Import rejects dangling profile references");
+Reject(() => ConfigTransfer.ValidateImport("[broken"), "Import rejects malformed input");
+Reject(() => ConfigTransfer.ValidateImport(""), "Empty import cannot wipe configuration");
+var changedTenant = setup with { CreateProfile = false, ProfileName = "Standard" };
+var reassigned = TenantConfigWriter.Edit(shared, changedTenant, setup.Name);
+Check(ConfigReader.Parse(reassigned).Providers.Single(x => x.Name == setup.Name).Profile == "Standard", "Tenant editor can assign an existing profile");
+Check(ConfigReader.Parse(reassigned).Profiles.Count == ConfigReader.Parse(shared).Profiles.Count, "Tenant editing retains shared profiles");
+var changedWithEndpoints = TenantConfigWriter.Edit(endpoints, changedTenant, setup.Name);
+Check(changedWithEndpoints.Contains("graph_base_url") && changedWithEndpoints.Contains("entra_base_url"), "Tenant edit preserves custom cloud endpoints");
 var tempRoot = Path.Combine(Path.GetTempPath(), "YubiEnroll-setup-test-" + Guid.NewGuid().ToString("N"));
 try
 {

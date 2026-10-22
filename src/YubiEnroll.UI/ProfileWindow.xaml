@@ -14,7 +14,7 @@
     <TextBlock Text="Profile name"/><TextBox x:Name="ProfileName" MaxLength="80" Margin="0,4,0,12"/>
     <TextBlock x:Name="UsageText" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,16"/>
     <CheckBox x:Name="ResetProfile" Content="Factory reset key" IsThreeState="True" Margin="0,0,0,10"/>
-    <TextBlock Text="Reset erases existing FIDO credentials. During enrollment, the main window's Reset key checkbox controls whether reset is actually performed." TextWrapping="Wrap" Foreground="#A4262C" Margin="0,0,0,14"/>
+    <TextBlock Text="Reset erases existing FIDO credentials. This profile controls reset during enrollment. You must confirm the destructive action before enrollment starts." TextWrapping="Wrap" Foreground="#A4262C" Margin="0,0,0,14"/>
     <TextBlock Text="Minimum PIN length (4–63; empty = CLI default)"/><TextBox x:Name="MinimumPinLength" Margin="0,4,0,12"/>
     <CheckBox x:Name="AlwaysUv" Content="Require user verification for every operation (Always UV)" IsThreeState="True" Margin="0,0,0,12"/>
     <CheckBox x:Name="EnterpriseAttestation" Content="Require enterprise attestation" IsThreeState="True" Margin="0,0,0,12"/>

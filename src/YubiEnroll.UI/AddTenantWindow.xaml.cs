@@ -8,6 +8,7 @@ namespace YubiEnroll.UI;
 public partial class AddTenantWindow : Window
 {
     private readonly ConfigSnapshot _snapshot;
+    private readonly string? _editName;
     public string? SavedTenantName { get; private set; }
     public string? BackupPath { get; private set; }
 
@@ -16,15 +17,28 @@ public partial class AddTenantWindow : Window
         public override string ToString() => Label;
     }
 
-    public AddTenantWindow(ConfigSnapshot snapshot)
+    public AddTenantWindow(ConfigSnapshot snapshot, string? editName = null)
     {
         _snapshot = snapshot;
+        _editName = editName;
         InitializeComponent();
-        StoragePath.Text = snapshot.Path;
+
         var config = ConfigReader.Parse(snapshot.Text ?? "");
         ProfileChoice.Items.Add(new ProfileOption("Create a new profile", null));
         foreach (var profile in config.Profiles) ProfileChoice.Items.Add(new ProfileOption(profile.Name, profile.Name));
         ProfileChoice.SelectedIndex = config.Profiles.Count > 0 ? 1 : 0;
+        if (editName != null)
+        {
+            var tenant = TenantConfigWriter.Read(snapshot.Text ?? "", editName);
+            Heading.Text = "Edit Microsoft Entra tenant";
+            Title = Heading.Text;
+            TenantName.Text = tenant.Name;
+            TenantName.IsReadOnly = true;
+            TenantId.Text = tenant.TenantId;
+            ClientId.Text = tenant.ClientId;
+            RedirectUri.Text = tenant.RedirectUri;
+            ProfileChoice.SelectedItem = ProfileChoice.Items.Cast<ProfileOption>().FirstOrDefault(x => x.Name == tenant.ProfileName);
+        }
     }
 
     private void ProfileChoice_Changed(object sender, SelectionChangedEventArgs e)
@@ -44,7 +58,7 @@ public partial class AddTenantWindow : Window
             if (create && !int.TryParse(PinLength.Text, out _)) throw new ArgumentException("Enter a numeric PIN length (4–63).");
             var setup = new TenantSetup(TenantName.Text, TenantId.Text, ClientId.Text, RedirectUri.Text,
                 selected?.Name ?? ProfileName.Text, create, create ? int.Parse(PinLength.Text) : 6, ForcePinChange.IsChecked == true).Validate();
-            BackupPath = TenantConfigWriter.Save(_snapshot, setup);
+            BackupPath = TenantConfigWriter.Save(_snapshot, setup, _editName);
             SavedTenantName = setup.Name;
             DialogResult = true;
             return true;

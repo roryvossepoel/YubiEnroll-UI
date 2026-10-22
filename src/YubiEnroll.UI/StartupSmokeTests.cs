@@ -91,6 +91,49 @@ public partial class MainWindow
             Assert(cancelProfile.ShowDialog() != true, "Profile editor cancels");
             await cancelProfileOperation.Task;
             Assert(File.ReadAllText(path) == beforeProfileCancel, "Profile cancellation leaves config unchanged");
+            var settings = new SettingsWindow(path, mockExecutable, "Mock CLI") { Owner = this };
+            var settingsOperation = settings.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    Assert(settings.SettingsTabs.Items.Count == 4 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                        "Settings separates tenants, profiles, system and transfer");
+                    var transfer = ConfigTransfer.Export(File.ReadAllText(path));
+                    var beforePreview = File.ReadAllText(path);
+                    settings.PreviewImport(transfer);
+                    Assert(settings.ImportButton.IsEnabled && File.ReadAllText(path) == beforePreview, "Import preview validates without writing");
+                    settings.ApplyImport();
+                    Assert(settings.Changed && ConfigReader.Read(path).Profiles.Count == 2, "Import applies both tenants and profiles");
+                    CaptureWindow(settings, "settings-tenants.png");
+                    settings.SettingsTabs.SelectedIndex = 1;
+                    CaptureWindow(settings, "settings-profiles.png");
+                    settings.SettingsTabs.SelectedIndex = 2;
+                    CaptureWindow(settings, "settings-system.png");
+                    settings.SettingsTabs.SelectedIndex = 3;
+                    CaptureWindow(settings, "settings-transfer.png");
+                }
+                finally { settings.Close(); }
+            });
+            settings.ShowDialog();
+            await settingsOperation.Task;
+            await InitializeAsync(root, mockExecutable);
+            Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
+            _connectedProvider = SelectedProvider; // Synthetic completed connection; never performs real login.
+            UpdateSummary();
+            Assert(SearchPanel.IsEnabled && !PreparePanel.IsEnabled, "User selection required after connection");
+            Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") };
+            Users.SelectedIndex = 0;
+            Assert(PreparePanel.IsEnabled && EnrollButton.IsEnabled && ResetNotice.Text.Contains("erases"), "Profile reset is visible before enrollment");
+            LogExpander.IsExpanded = false;
+            CaptureWindow(this, "enrollment.png");
+            TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
+            LoadConfiguration(path);
+            _connectedProvider = SelectedProvider;
+            UpdateSummary();
+            Tenants.SelectedIndex = 1;
+            Assert(!IsConnected && !SearchPanel.IsEnabled && !EnrollButton.IsEnabled && Users.SelectedItem == null,
+                "Changing tenants invalidates connection and selected user");
             File.WriteAllText(path, "[broken-secret-marker");
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
@@ -115,7 +158,7 @@ public partial class MainWindow
                 !Diagnostics.Text.Contains("Native error: n/a"), "Windows executable failure includes its native error code");
             TraceStartup("Initializing");
             await InitializeAsync(root, mockExecutable);
-            Assert(StatusText.Text.StartsWith("Ready") && VersionText.Text.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");
+            Assert(StatusText.Text.StartsWith("Ready") && _versionText.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");
             Assert(Diagnostics.Text.Length == 0 && WorkPanel.IsEnabled, "Successful reload clears diagnostics and busy state");
         }
         finally
@@ -123,6 +166,19 @@ public partial class MainWindow
             SetThreadErrorMode(previousErrorMode, out _);
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    private static void CaptureWindow(System.Windows.Window window, string file)
+    {
+        window.UpdateLayout();
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(window);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        var folder = Path.Combine(AppContext.BaseDirectory, "visual-checks");
+        Directory.CreateDirectory(folder);
+        using var stream = File.Create(Path.Combine(folder, file));
+        encoder.Save(stream);
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
