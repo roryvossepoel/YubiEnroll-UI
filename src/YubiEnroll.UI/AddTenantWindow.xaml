@@ -1,0 +1,38 @@
+<Window x:Class="YubiEnroll.UI.AddTenantWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Add Microsoft Entra tenant" Width="640" Height="780" MinWidth="580" MinHeight="600" WindowStartupLocation="CenterOwner" Background="#F3F5F8" FontFamily="Segoe UI" FontSize="13">
+ <DockPanel Margin="24">
+  <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+   <TextBlock Text="Add Microsoft Entra tenant" FontSize="24" FontWeight="SemiBold" Foreground="#14263B"/>
+   <TextBlock Text="Use the values from your existing Entra app registration (public client / mobile &amp; desktop)." TextWrapping="Wrap" Margin="0,8,0,0"/>
+  </StackPanel>
+  <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+   <TextBlock x:Name="ValidationText" Foreground="#A4262C" TextWrapping="Wrap" Margin="0,0,0,10"/>
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+    <Button Content="Cancel" IsCancel="True"/>
+    <Button Content="Save tenant" IsDefault="True" Click="Save_Click"/>
+   </StackPanel>
+  </StackPanel>
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+   <StackPanel>
+    <TextBlock Text="Tenant name"/><TextBox x:Name="TenantName" MaxLength="80" Margin="0,4,0,10"/>
+    <TextBlock Text="Directory (tenant) ID"/><TextBox x:Name="TenantId" Margin="0,4,0,10"/>
+    <TextBlock Text="Application (client) ID"/><TextBox x:Name="ClientId" Margin="0,4,0,10"/>
+    <TextBlock Text="Redirect URI (must match the app registration)"/>
+    <TextBox x:Name="RedirectUri" Text="http://localhost/yubienroll-redirect" Margin="0,4,0,10"/>
+    <TextBlock Text="Enrollment profile"/><ComboBox x:Name="ProfileChoice" SelectionChanged="ProfileChoice_Changed" Margin="0,4,0,10"/>
+    <StackPanel x:Name="NewProfilePanel">
+     <TextBlock Text="New profile name"/><TextBox x:Name="ProfileName" Text="standard" MaxLength="80" Margin="0,4,0,10"/>
+     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+      <TextBlock Text="Minimum and generated PIN length" VerticalAlignment="Center"/>
+      <TextBox x:Name="PinLength" Text="6" Width="60" Margin="12,0,0,0"/>
+     </StackPanel>
+     <CheckBox x:Name="ForcePinChange" Content="Require PIN change on first use (YubiKey firmware 5.5+)" Margin="0,0,0,8"/>
+     <TextBlock Text="New profile: random PIN enabled; key reset, Always UV and enterprise attestation disabled. Minimum PIN length requires firmware 5.5+." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
+    </StackPanel>
+    <TextBlock Text="Configuration is saved for this Windows account:" FontWeight="SemiBold"/>
+    <TextBlock x:Name="StoragePath" TextWrapping="Wrap" Margin="0,4,0,12"/>
+    <TextBlock Text="Saving adds local settings. The Entra app registration, delegated permissions and administrator consent must already be configured. Existing configuration is backed up before saving. Close other YubiEnroll sessions first." TextWrapping="Wrap" Foreground="#42536A"/>
+   </StackPanel>
+  </ScrollViewer>
+ </DockPanel>
+</Window>

@@ -20,7 +20,7 @@ public partial class App : Application
                 await window.RunStartupSmokeTestsAsync(e.Args[1]);
                 window.Close();
                 File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "startup-smoke-test.txt"),
-                    "PASS: missing folder, missing file, malformed TOML, invalid executable, valid config and mock CLI startup.");
+                    "PASS: first-run setup, tenant form validation/save/cancel, malformed TOML, invalid executable and mock CLI startup.");
             }
             catch (Exception ex)
             {

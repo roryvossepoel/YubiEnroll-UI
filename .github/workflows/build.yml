@@ -32,6 +32,9 @@ jobs:
           if ($app.ExitCode -ne 0) { throw "Startup smoke test failed: $($app.ExitCode)" }
           & ./artifacts/win-x64/app/YubiEnroll.ConsoleHost.exe --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Bundled console host could not start' }
+      - name: Verify configuration with YubiEnroll 1.2.0
+        shell: pwsh
+        run: ./tests/Test-YubiEnrollCompatibility.ps1
       - uses: actions/upload-artifact@v7
         with:
           name: YubiEnroll-UI-win-x64

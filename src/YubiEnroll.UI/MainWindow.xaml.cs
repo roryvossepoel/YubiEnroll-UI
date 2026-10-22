@@ -63,7 +63,8 @@ public partial class MainWindow : Window
             LoadConfiguration(ConfigPath.Text);
             return Task.CompletedTask;
         }, "Load configuration", showDialog: false)) issues.Add(StatusText.Text);
-        StatusText.Text = issues.Count == 0 ? ReadyMessage() : string.Join("\n", issues);
+        StatusText.Text = issues.Count == 0 ? SetupOrReadyMessage() : string.Join("\n", issues);
+        if (issues.Count > 0 && _config?.Providers.Count == 0) StatusText.Text += "\n" + SetupOrReadyMessage();
         if (issues.Count > 0)
         {
             StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then Reload configuration.";
@@ -71,7 +72,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.1.1";
+    private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
+        "No Entra tenant configured yet. Click Add tenant to set up this Windows account.";
+
+    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.1.2";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -91,7 +95,10 @@ public partial class MainWindow : Window
         }
         finally { _loading = false; }
         UpdateSummary();
-        var config = ConfigReader.Read(ConfigPath.Text);
+        Configuration config;
+        try { config = ConfigReader.Read(ConfigPath.Text); }
+        catch (FileNotFoundException) { config = ConfigReader.Parse("", ConfigPath.Text); }
+        catch (DirectoryNotFoundException) { config = ConfigReader.Parse("", ConfigPath.Text); }
         _loading = true;
         try
         {
@@ -109,8 +116,7 @@ public partial class MainWindow : Window
         }
         finally { _loading = false; }
         UpdateSummary();
-        if (config.Providers.Count == 0)
-            throw new InvalidOperationException("No Entra provider found. Configure YubiEnroll for this Windows account first.");
+
         Record("Configuration loaded.");
     }
 
@@ -119,7 +125,7 @@ public partial class MainWindow : Window
         var result = await Runner.CaptureAsync("--version");
         RequireSuccess(result, "Version check");
         VersionText.Text = result.Output.Trim();
-        StatusText.Text = _config == null ? "YubiEnroll found. Load configuration to continue." : ReadyMessage();
+        StatusText.Text = _config == null ? "YubiEnroll found. Load configuration to continue." : SetupOrReadyMessage();
     }
 
     private void Tenant_Changed(object sender, SelectionChangedEventArgs e)
@@ -201,7 +207,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, ConfigPath.Text, ExePath.Text);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.1.1\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.1.2\n{report.Diagnostic}\n\n");
             OutputTabs.SelectedIndex = 2;
             Record($"{operation} failed ({ex.GetType().Name}, 0x{ex.HResult:X8}).");
             if (showDialog)
@@ -225,6 +231,29 @@ public partial class MainWindow : Window
         ResetSelection();
         await RunAsync(CheckVersionAsync, "Check YubiEnroll version");
     }
+
+    private async void AddTenant_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
+    {
+        var snapshot = ConfigSnapshot.Read(ConfigPath.Text);
+        var dialog = new AddTenantWindow(snapshot) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        LoadConfiguration(snapshot.Path);
+        Tenants.SelectedItem = _config?.Providers.FirstOrDefault(x => x.Name == dialog.SavedTenantName);
+        Diagnostics.Clear();
+        Record("Tenant added. " + (dialog.BackupPath == null ? "New configuration created." : "Previous configuration backed up to " + dialog.BackupPath));
+        StatusText.Text = "Tenant saved. Use Login to authenticate, then search for a user.";
+        // Confirm the CLI reads the same provider without signing in or changing the active tenant.
+        if (File.Exists(ExePath.Text))
+        {
+            var result = await Runner.CaptureAsync("providers", "show", dialog.SavedTenantName!);
+            if (result.ExitCode != 0)
+            {
+                StatusText.Text = "Tenant saved locally, but YubiEnroll could not read it. Check Details and the configuration path before logging in.";
+                Details.Text = result.Error + Environment.NewLine + result.Output;
+                OutputTabs.SelectedIndex = 0;
+            }
+        }
+    }, "Add tenant");
 
     private async void Reload_Click(object sender, RoutedEventArgs e) =>
         await InitializeAsync(executableOverride: ExePath.Text.Length == 0 ? null : ExePath.Text);

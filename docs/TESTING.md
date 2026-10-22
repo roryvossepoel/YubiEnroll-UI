@@ -1,4 +1,4 @@
-# Manual acceptance checks for preview 0.1.1
+# Manual acceptance checks for preview 0.1.2
 
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 
@@ -6,7 +6,11 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 |---|---|
 | Missing .NET Desktop Runtime 10 x64 | On a clean test machine, the native launcher reports the missing runtime and offers a download before the GUI opens. Install the runtime, then restart. |
 | Missing YubiEnroll | Prerequisite status says it is not located; install it and use Browse. |
-| Missing config | Window stays usable; Diagnostics identifies the missing folder/file and Windows account. |
+| Missing config | Window offers Add tenant without an exception; cancellation leaves the configuration absent. |
+| Add tenant | Invalid IDs/redirect/PIN length stay in the form; valid values save and load the tenant and selected profile. |
+| Existing configuration | Add a second tenant; existing text and active provider remain intact; a backup contains the original. |
+| Concurrent change | Edit configuration after opening Add tenant; saving is refused and external changes remain intact. |
+| Native CLI compatibility | After saving, `yubienroll providers show <name>` and `profiles list` show the same tenant/profile. |
 | Invalid executable | Diagnostics reports the native Windows error; config still loads independently. |
 | Start normally | Existing provider/profile configuration loads; installed CLI version is displayed. |
 | Alternate install folder | Browse selects the installed executable; subsequent commands use that path. |
@@ -25,4 +29,6 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 | Elevated fallback | App relaunches and reloads that Windows account's configuration. Check same-account and different-account scenarios. |
 | PIN handling | PIN appears only in native console; no GUI activity entry/file/clipboard copy contains it. |
 
-Automated checks use synthetic data only. They test TOML names/comments, stale configuration, strict object-ID extraction, safe reset/profile arguments and concurrent output handling. The published WPF startup test covers missing folders/files, malformed TOML, an invalid executable and successful initialization with a mock CLI. The published console helper is also started. Authentication and hardware enrollment remain manual checks.
+Automated checks use synthetic data only. They test TOML names/comments, stale configuration, strict object-ID extraction, safe reset/profile arguments and concurrent output handling. The published WPF startup test covers first-run setup, add-tenant form validation/save/cancel, malformed TOML, an invalid executable and successful initialization with a mock CLI. The published console helper is also started. Authentication and hardware enrollment remain manual checks.
+
+A separate CI integration check uses the official signed YubiEnroll 1.2.0 MSI on a disposable runner, with synthetic local configuration only. It verifies that the native CLI reads the generated provider and profile; it never authenticates or enrolls a key.

@@ -20,6 +20,16 @@ if (args.FirstOrDefault() == "--echo")
     return 0;
 }
 
+if (args.FirstOrDefault() == "--write-fixture-config")
+{
+    // Dedicated CI mode: caller supplies an isolated synthetic path, never reads a real tenant.
+    TenantConfigWriter.Save(ConfigSnapshot.Read(args[1]), new TenantSetup("UI-test",
+        "11111111-2222-3333-4444-555555555555", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "http://localhost/yubienroll-redirect", "UI-test-profile", true));
+    Console.WriteLine("Synthetic provider and profile written.");
+    return 0;
+}
+
 var tests = 0;
 void Check(bool condition, string name)
 {
@@ -96,5 +106,39 @@ var accessDenied = FailureReport.Create(new System.ComponentModel.Win32Exception
 Check(accessDenied.Diagnostic.Contains("Native error: 5") && accessDenied.Summary.Contains("denied"), "Native executable access error identified");
 var unknown = FailureReport.Create(new Exception("secret-marker"), "Startup", "", "");
 Check(!unknown.Diagnostic.Contains("secret-marker") && !unknown.Summary.Contains("secret-marker"), "Unexpected exception text not copied to diagnostics");
+var setup = new TenantSetup("Second tenant", id, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "http://localhost/yubienroll-redirect", "Fresh profile", true);
+var added = TenantConfigWriter.Build(configText, setup);
+Check(added.Contains(configText) && ConfigReader.Parse(added).Providers.Count == 2, "Add tenant preserves existing comments and providers");
+Check(ConfigReader.Parse(added).ActiveProvider == config.ActiveProvider, "Adding a tenant preserves current activation");
+Check(ConfigReader.Parse(added).Profiles.Single(x => x.Name == "Fresh profile").Summary.Contains("reset: False"), "New profile does not reset keys");
+Check(ConfigReader.Parse(TenantConfigWriter.Build(null, setup)).ActiveProvider == setup.Name, "First tenant becomes active in new configuration");
+Check(ConfigReader.Parse(TenantConfigWriter.Build(configText, setup with { CreateProfile = false, ProfileName = "Standard" })).Profiles.Count == 2,
+    "Existing profile reused without modification");
+Reject(() => TenantConfigWriter.Build(configText, setup with { Name = "demo TENANT" }), "Duplicate provider names rejected without overwrite");
+Reject(() => TenantConfigWriter.Build(configText, setup with { ProfileName = "Standard" }), "Duplicate new profile rejected");
+Reject(() => TenantConfigWriter.Build(configText, setup with { CreateProfile = false }), "Missing selected profile rejected");
+Reject(() => TenantConfigWriter.Build("[broken-secret-marker", setup), "Malformed existing configuration is not overwritten");
+Reject(() => (setup with { TenantId = Guid.Empty.ToString() }).Validate(), "Empty tenant ID rejected");
+Reject(() => (setup with { ClientId = "not-a-guid" }).Validate(), "Invalid client ID rejected");
+Reject(() => (setup with { RedirectUri = "http://localhost.evil.test/" }).Validate(), "Redirect URI must use localhost");
+Reject(() => (setup with { PinLength = 3 }).Validate(), "Invalid PIN policy rejected");
+var quoted = TenantConfigWriter.Build(null, setup with { Name = "Name with \"quotes\" and dots.", ProfileName = "Profile.with.dots" });
+Check(ConfigReader.Parse(quoted).Providers.Single().Name == "Name with \"quotes\" and dots.", "Tenant and profile names are TOML-escaped");
+var tempRoot = Path.Combine(Path.GetTempPath(), "YubiEnroll-setup-test-" + Guid.NewGuid().ToString("N"));
+try
+{
+    var tempPath = Path.Combine(tempRoot, "config", "yubienroll.toml");
+    var empty = ConfigSnapshot.Read(tempPath);
+    Check(TenantConfigWriter.Save(empty, setup) == null && File.Exists(tempPath), "First save creates the configuration directory and file");
+    var first = ConfigSnapshot.Read(tempPath);
+    var backup = TenantConfigWriter.Save(first, setup with { Name = "Another", CreateProfile = false });
+    Check(backup != null && File.ReadAllText(backup) == first.Text && ConfigReader.Read(tempPath).Providers.Count == 2,
+        "Second save backs up the exact previous configuration");
+    var after = File.ReadAllText(tempPath);
+    Reject(() => TenantConfigWriter.Save(first, setup with { Name = "Stale", CreateProfile = false }), "Stale dialog cannot overwrite configuration");
+    Check(File.ReadAllText(tempPath) == after, "Rejected stale save leaves file unchanged");
+}
+finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true); }
 Console.WriteLine($"{tests} checks passed.");
 return 0;

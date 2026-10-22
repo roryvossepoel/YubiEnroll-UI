@@ -2,11 +2,11 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.1.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.1.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
-- Reads your existing YubiEnroll tenants and enrollment profiles without rewriting the configuration itself.
+- Reads existing YubiEnroll tenants and profiles, and adds Entra tenants through an Add tenant form. Existing configuration is preserved and backed up before additions.
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Opens a real console for YubiEnroll login and key enrollment, including PIN, touch and reinsertion prompts.
@@ -40,7 +40,7 @@ Application assemblies are bundled into the two executables; the .NET runtime an
 
 If .NET 10 Desktop Runtime x64 is missing, the native .NET launcher reports the missing runtime before the C# window can open and offers a download link. The GUI cannot perform its own check until .NET is available. See [Microsoft startup troubleshooting](https://learn.microsoft.com/en-us/dotnet/core/runtime-discovery/troubleshoot-app-launch).
 
-A missing configuration folder/file is now shown in the main window, without a blocking startup popup. Configuration loading and executable discovery run independently, so you can still browse to YubiEnroll or reload after correcting setup.
+A missing configuration folder/file is a normal first-run state: the window offers **Add tenant**, without a technical error. Configuration loading and executable discovery run independently, so you can still browse to YubiEnroll or reload after correcting setup.
 
 Open **Diagnostics** for the failed step, exception type, HRESULT/native Windows error, Windows account, architecture and attempted paths. This tab excludes configuration contents, arbitrary exception messages and enrollment console output. It does contain local account names and paths; redact those before posting publicly.
 
@@ -48,12 +48,22 @@ If the configuration is missing, start the app under the same Windows account us
 
 ## Existing YubiEnroll configuration
 
-The application looks for the same configuration locations used by the original script, in this order:
+The application reuses existing configuration in these locations (legacy first):
 
 - `%APPDATA%\Yubico\yubienroll\yubienroll.toml`
 - `%APPDATA%\yubienroll\yubienroll.toml`
 
+A new configuration uses `%APPDATA%\yubienroll\yubienroll.toml`, the location documented by Yubico. The GUI does not redirect the CLI to ProgramData: a shared configuration path is not documented, and authentication remains per Windows account.
+
 Configuration must belong to the Windows account running the app. Configure provider app registration, permissions and profiles using the [official Entra setup guide](https://docs.yubico.com/software/yubikey/tools/yubienroll/yubienroll-entra.html). For example, start with `yubienroll providers add <name>` and `yubienroll profiles add <name>` as documented by Yubico. The GUI does not create Entra app registrations or grant tenant permissions.
+
+### Add your first tenant
+
+Click **Add tenant…** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Select an existing enrollment profile or create a new one. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forcing a PIN change require firmware 5.5+.
+
+**Save tenant** validates the fields, creates the directory if necessary, and adds the provider/profile. It preserves original configuration text and makes a timestamped `.bak` file before replacing an existing file. Duplicate names and configuration changes since opening the form are rejected. Cancel makes no changes. Close other YubiEnroll sessions while saving; their external writes cannot be locked by this GUI. The installed CLI is asked to read the new provider without logging in. Then use **Login** to authenticate.
+
+This form targets Microsoft Entra public cloud. For national clouds, use YubiEnroll’s native provider setup to configure the appropriate endpoints.
 
 The executable is detected under Program Files. Use **Browse** if you installed it elsewhere. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
 
@@ -78,7 +88,7 @@ If UAC uses a different Windows administrator account, the new process sees that
 ## Preview limitations
 
 - Entra ID only; other provider types are not shown.
-- Provider/profile creation and editing remain in the official CLI.
+- Tenant creation and a basic new profile are available in the GUI. Editing/deleting existing providers or profiles remains in the official CLI.
 - Search parsing accepts GUID-first table rows and `ID:` blocks. It intentionally rejects unknown formats. The **Details** tab shows the raw search output for diagnosis; real output from the installed YubiEnroll version still needs validation.
 - No bulk enrollment, credential deletion, automatic key detection or automatic PIN delivery.
 - One operation at a time within each GUI window. **Do not use a second GUI instance or another YubiEnroll session concurrently:** the CLI has a shared active provider. Configuration checks detect changes before commands but cannot lock out external tools.
@@ -93,7 +103,7 @@ On Windows, install the .NET 10 SDK, then run:
 ./build.ps1 -Runtime win-x64
 ```
 
-The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with missing folders/files, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. These checks use no real YubiEnroll, tenant access or attached hardware.
+The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with first-run setup, form validation/save/cancel, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. A separate Windows CI check downloads the signed official YubiEnroll 1.2.0 installer, verifies its publisher, and checks that the CLI reads a synthetic provider/profile generated by the GUI writer. No login, tenant access or attached hardware is used; YubiEnroll is not redistributed with the app.
 
 For a quick logic test on any .NET 10 development machine:
 
