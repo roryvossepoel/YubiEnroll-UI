@@ -41,7 +41,11 @@ public partial class MainWindow
             File.WriteAllText(brokenExe, "not a Windows executable");
             TraceStartup("Initializing");
             await InitializeAsync(root, brokenExe);
-            Assert(_config?.Providers.Count == 1 && Diagnostics.Text.Contains("Native error: 193"), "Executable failure does not prevent configuration loading");
+            TraceStartup(Diagnostics.Text); // Synthetic paths/config only in this explicit test mode.
+            Assert(_config?.Providers.Count == 1, "Executable failure does not prevent configuration loading");
+            Assert(Diagnostics.Text.Contains("Win32Exception") &&
+                Diagnostics.Text.Contains("Step: Check YubiEnroll version") &&
+                !Diagnostics.Text.Contains("Native error: n/a"), "Windows executable failure includes its native error code");
             TraceStartup("Initializing");
             await InitializeAsync(root, mockExecutable);
             Assert(StatusText.Text.StartsWith("Ready") && VersionText.Text.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");

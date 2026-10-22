@@ -25,7 +25,7 @@ public partial class App : Application
             catch (Exception ex)
             {
                 code = 1;
-                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "startup-smoke-test.txt"), ex.ToString());
+                File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "startup-smoke-test.txt"), ex.ToString());
             }
             Shutdown(code);
             return;
