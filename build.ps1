@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('win-x64', 'win-arm64')][string]$Runtime = 'win-x64',
+    [ValidateSet('win-x64')][string]$Runtime = 'win-x64',
     [switch]$SkipTests
 )
 $ErrorActionPreference = 'Stop'
@@ -13,11 +13,10 @@ try {
     if (-not $SkipTests) { Invoke-Dotnet run --project tests/YubiEnroll.Tests -c Release }
     $out = Join-Path $PSScriptRoot "artifacts/$Runtime"
     if (Test-Path $out) { Remove-Item -LiteralPath $out -Recurse -Force }
-    $bundle = @('-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true',
-        '-p:EnableCompressionInSingleFile=true', '-p:PublishTrimmed=false', '-p:DebugType=None', '-p:DebugSymbols=false')
-    Invoke-Dotnet publish src/YubiEnroll.UI -c Release -r $Runtime --self-contained true @bundle -o "$out/app"
-    Invoke-Dotnet publish src/YubiEnroll.ConsoleHost -c Release -r $Runtime --self-contained true @bundle -o "$out/host"
-    # Each executable embeds its runtime; no loose runtime DLLs or console-host directory.
+    $bundle = @('-p:PublishSingleFile=true', '-p:PublishTrimmed=false', '-p:DebugType=None', '-p:DebugSymbols=false')
+    Invoke-Dotnet publish src/YubiEnroll.UI -c Release -r $Runtime --self-contained false @bundle -o "$out/app"
+    Invoke-Dotnet publish src/YubiEnroll.ConsoleHost -c Release -r $Runtime --self-contained false @bundle -o "$out/host"
+    # Bundle application assemblies only; .NET 10 Desktop Runtime is a prerequisite.
     Move-Item -LiteralPath "$out/host/YubiEnroll.ConsoleHost.exe" -Destination "$out/app/YubiEnroll.ConsoleHost.exe"
     Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md -Destination "$out/app"
     $files = @(Get-ChildItem -LiteralPath "$out/app" -Recurse -File)

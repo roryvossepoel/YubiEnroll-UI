@@ -9,10 +9,6 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        runtime: [win-x64, win-arm64]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -20,24 +16,27 @@ jobs:
           dotnet-version: '10.0.x'
       - name: Test and publish
         shell: pwsh
-        run: ./build.ps1 -Runtime ${{ matrix.runtime }}
-      - name: Test bundled executables and actual startup paths
-        if: matrix.runtime == 'win-x64'
+        run: ./build.ps1 -Runtime win-x64
+      - name: Test published executables and actual startup paths
         shell: pwsh
         run: |
           $mock = (Resolve-Path ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe).Path
           $testArgs = '--smoke-test "' + $mock + '"'
           $app = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList $testArgs -PassThru
-          if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Startup smoke test timed out' }
+          if (-not $app.WaitForExit(60000)) {
+            $app.Kill()
+            Get-Content ./artifacts/win-x64/app/startup-smoke-test.txt -ErrorAction SilentlyContinue
+            throw 'Startup smoke test timed out'
+          }
           Get-Content ./artifacts/win-x64/app/startup-smoke-test.txt
           if ($app.ExitCode -ne 0) { throw "Startup smoke test failed: $($app.ExitCode)" }
           & ./artifacts/win-x64/app/YubiEnroll.ConsoleHost.exe --self-test
           if ($LASTEXITCODE -ne 0) { throw 'Bundled console host could not start' }
       - uses: actions/upload-artifact@v7
         with:
-          name: YubiEnroll-UI-${{ matrix.runtime }}
+          name: YubiEnroll-UI-win-x64
           path: |
-            artifacts/${{ matrix.runtime }}/app/*
-            !artifacts/${{ matrix.runtime }}/app/startup-smoke-test.txt
+            artifacts/win-x64/app/*
+            !artifacts/win-x64/app/startup-smoke-test.txt
           if-no-files-found: error
           retention-days: 30

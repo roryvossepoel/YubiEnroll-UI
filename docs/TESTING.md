@@ -4,6 +4,8 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 
 | Check | Expected result |
 |---|---|
+| Missing .NET Desktop Runtime 10 x64 | On a clean test machine, the native launcher reports the missing runtime and offers a download before the GUI opens. Install the runtime, then restart. |
+| Missing YubiEnroll | Prerequisite status says it is not located; install it and use Browse. |
 | Missing config | Window stays usable; Diagnostics identifies the missing folder/file and Windows account. |
 | Invalid executable | Diagnostics reports the native Windows error; config still loads independently. |
 | Start normally | Existing provider/profile configuration loads; installed CLI version is displayed. |
@@ -22,6 +24,5 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 | Normal UAC | Native elevation prompt works without elevating the GUI. |
 | Elevated fallback | App relaunches and reloads that Windows account's configuration. Check same-account and different-account scenarios. |
 | PIN handling | PIN appears only in native console; no GUI activity entry/file/clipboard copy contains it. |
-| ARM64 | Repeat core flow on ARM64 with the supported/working CLI installation; ARM64 build alone is insufficient. |
 
-Automated checks use synthetic data only. They test TOML names/comments, stale configuration, strict object-ID extraction, safe reset/profile arguments and concurrent output handling. The bundled WPF startup test covers missing folders/files, malformed TOML, an invalid executable and successful initialization with a mock CLI. The bundled console helper is also started. Authentication and hardware enrollment remain manual checks.
+Automated checks use synthetic data only. They test TOML names/comments, stale configuration, strict object-ID extraction, safe reset/profile arguments and concurrent output handling. The published WPF startup test covers missing folders/files, malformed TOML, an invalid executable and successful initialization with a mock CLI. The published console helper is also started. Authentication and hardware enrollment remain manual checks.

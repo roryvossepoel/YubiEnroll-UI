@@ -4,6 +4,7 @@
   <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
    <TextBlock Text="YubiEnroll UI" FontSize="28" FontWeight="SemiBold" Foreground="#14263B"/>
    <TextBlock Text="Register a YubiKey on behalf of a Microsoft Entra ID user." Margin="0,4,0,8" Foreground="#42536A"/>
+   <TextBlock Text="Prerequisites: .NET 10 Desktop Runtime (x64) and Yubico YubiEnroll, installed separately." TextWrapping="Wrap" Margin="0,0,0,6" Foreground="#42536A"/>
    <TextBlock x:Name="ContextBanner" Text="Load your existing YubiEnroll configuration to begin." FontWeight="SemiBold" TextWrapping="Wrap"/>
   </StackPanel>
   <TextBlock x:Name="StatusText" DockPanel.Dock="Bottom" Margin="0,14,0,0" Text="Starting…" TextWrapping="Wrap"/>

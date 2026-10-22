@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.1.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and ARM64 interoperability require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.1.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -18,12 +18,13 @@ An independent community Windows application for registering YubiKeys on behalf 
 ## Download and start — no C# knowledge required
 
 1. Open the repository's **Actions** tab and choose a successful **Build Windows preview** run.
-2. Under **Artifacts**, download `YubiEnroll-UI-win-x64` for an Intel/AMD PC, or `YubiEnroll-UI-win-arm64` for Windows on ARM. GitHub may require you to sign in.
+2. Under **Artifacts**, download `YubiEnroll-UI-win-x64` for an Intel/AMD Windows PC. GitHub may require you to sign in.
 3. Extract the downloaded artifact once. Keep `YubiEnroll.UI.exe` and `YubiEnroll.ConsoleHost.exe` together.
-4. Install and configure [Yubico YubiEnroll](https://www.yubico.com/products/yubienroll/) separately.
-5. Start `YubiEnroll.UI.exe`. Both executables bundle their .NET runtime; neither Visual Studio nor a separate .NET installation is needed to run them.
+4. Install the **[.NET 10 Desktop Runtime for Windows x64](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**. Choose **Desktop Runtime**, not just the base .NET Runtime. Visual Studio and the SDK are not required.
+5. Install and configure [Yubico YubiEnroll](https://www.yubico.com/products/yubienroll/) separately.
+6. Start `YubiEnroll.UI.exe`. The app displays the prerequisites and checks for YubiEnroll at startup.
 
-The ARM64 build applies to this GUI and its console helper. It does not establish that a given YubiEnroll release or hardware workflow supports ARM64. Builds are unsigned previews and are not automatically published as GitHub Releases.
+Only Windows x64 is built for now. Builds are unsigned previews and are not automatically published as GitHub Releases.
 
 ## Package contents
 
@@ -33,9 +34,11 @@ The download contains only five files:
 - `YubiEnroll.ConsoleHost.exe` — the interactive console for native enrollment prompts.
 - `README.md`, `LICENSE`, and `THIRD-PARTY-NOTICES.md`.
 
-The self-contained executables are still relatively large because they contain their runtime. Native runtime components are extracted by .NET to its per-user temporary cache when needed. Bundling reduces the number of distributed files; it does not remove the runtime or guarantee a smaller total installed footprint. Extract this version to a new folder so old loose DLLs from 0.1.0 do not remain alongside it.
+Application assemblies are bundled into the two executables; the .NET runtime and YubiEnroll are installed separately. Extract this version to a new folder so old loose DLLs from 0.1.0 do not remain alongside it. An installer that checks these prerequisites may be added later; this preview is a ZIP download.
 
 ## Startup troubleshooting
+
+If .NET 10 Desktop Runtime x64 is missing, the native .NET launcher reports the missing runtime before the C# window can open and offers a download link. The GUI cannot perform its own check until .NET is available. See [Microsoft startup troubleshooting](https://learn.microsoft.com/en-us/dotnet/core/runtime-discovery/troubleshoot-app-launch).
 
 A missing configuration folder/file is now shown in the main window, without a blocking startup popup. Configuration loading and executable discovery run independently, so you can still browse to YubiEnroll or reload after correcting setup.
 
@@ -88,11 +91,9 @@ On Windows, install the .NET 10 SDK, then run:
 
 ```powershell
 ./build.ps1 -Runtime win-x64
-# Or:
-./build.ps1 -Runtime win-arm64
 ```
 
-The script runs the core checks and publishes a self-contained app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The bundled WPF app is startup-tested on the x64 GitHub runner with missing folders/files, malformed configuration, an invalid executable, and a mock CLI. The bundled console helper is also started. These checks use no real YubiEnroll, tenant access or attached hardware.
+The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with missing folders/files, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. These checks use no real YubiEnroll, tenant access or attached hardware.
 
 For a quick logic test on any .NET 10 development machine:
 

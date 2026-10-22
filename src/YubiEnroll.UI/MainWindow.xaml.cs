@@ -53,8 +53,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            VersionText.Text = "YubiEnroll not located — use Browse";
-            issues.Add("YubiEnroll not located. Use Browse to select the installed yubienroll.exe.");
+            VersionText.Text = "YubiEnroll required — install it or use Browse";
+            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll, then use Browse to select yubienroll.exe.");
         }
         // Config loading is independent of executable discovery/version probing. An error in one
         // must not hide the other or disable Browse/Reload/the administrator restart option.
