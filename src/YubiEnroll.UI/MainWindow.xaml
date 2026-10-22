@@ -1,0 +1,56 @@
+<Window x:Class="YubiEnroll.UI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="YubiEnroll" Width="1020" Height="820" MinWidth="820" MinHeight="680" Background="#F5F7FA" FontFamily="Segoe UI" FontSize="14" Foreground="#172B41" Loaded="Window_Loaded" Closing="Window_Closing">
+ <DockPanel Margin="24,18">
+  <Grid DockPanel.Dock="Top" Margin="0,0,0,18">
+   <StackPanel><TextBlock Text="YubiEnroll" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Prepare a security key for your user." Foreground="#617084" Margin="0,4,0,0"/></StackPanel>
+   <Button x:Name="SettingsButton" Content="Settings" Click="Settings_Click" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0"/>
+  </Grid>
+  <TextBlock x:Name="StatusText" DockPanel.Dock="Bottom" Margin="0,16,0,0" Text="Starting…" Foreground="#526277" TextWrapping="Wrap"/>
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+   <StackPanel x:Name="WorkPanel">
+    <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+     <StackPanel>
+      <TextBlock Text="1   Connect to a tenant" Style="{StaticResource SectionTitle}"/>
+      <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <ComboBox x:Name="Tenants" DisplayMemberPath="Name" SelectionChanged="Tenant_Changed" VerticalContentAlignment="Center" AutomationProperties.Name="Tenant"/>
+       <Button x:Name="ConnectButton" Grid.Column="1" Content="Connect" Click="Login_Click" Style="{StaticResource PrimaryButton}" Margin="12,0,0,0"/>
+      </Grid>
+      <TextBlock x:Name="ContextBanner" Text="Select a tenant to begin." TextWrapping="Wrap" Foreground="#617084" Margin="0,10,0,0"/>
+     </StackPanel>
+    </Border>
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+     <StackPanel x:Name="SearchPanel" IsEnabled="False">
+      <TextBlock Text="2   Choose a user" Style="{StaticResource SectionTitle}"/>
+      <DockPanel Margin="0,14,0,12"><Button DockPanel.Dock="Right" Content="Search" Click="Search_Click" Margin="12,0,0,0"/><TextBox x:Name="Query" KeyDown="Query_KeyDown" ToolTip="Search by name or username" AutomationProperties.Name="Search users"/></DockPanel>
+      <ListBox x:Name="Users" SelectionChanged="User_Changed" MinHeight="150" MaxHeight="220" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+       <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="8,7"><TextBlock Text="{Binding Label}" TextWrapping="Wrap"/><TextBlock Text="{Binding Id}" Foreground="#7A8796" FontSize="11" Margin="0,4,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle>
+      </ListBox>
+      <TextBlock x:Name="SelectedUserText" Text="Connect to a tenant, then search for a user." Foreground="#617084" TextWrapping="Wrap" Margin="0,10,0,0"/>
+     </StackPanel>
+    </Border>
+    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
+     <StackPanel x:Name="PreparePanel" IsEnabled="False">
+      <TextBlock Text="3   Prepare the YubiKey" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="Enrollment profile" Margin="0,14,0,6"/>
+      <ComboBox x:Name="Profiles" DisplayMemberPath="Name" SelectionChanged="Profile_Changed"/>
+      <TextBlock Text="Key name (optional)" Margin="0,12,0,6"/>
+      <TextBox x:Name="KeyName" MaxLength="100"/>
+      <TextBlock x:Name="ResetNotice" TextWrapping="Wrap" Foreground="#9A4B0A" Margin="0,12,0,0"/>
+      <Expander Header="Profile details" Margin="0,10,0,14"><TextBlock x:Name="ProfileSummary" TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,0"/></Expander>
+      <WrapPanel><Button x:Name="EnrollButton" Content="Prepare YubiKey" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/><Button x:Name="CredentialsButton" Content="View registered keys" Click="Credentials_Click" IsEnabled="False"/></WrapPanel>
+     </StackPanel>
+    </Border>
+    </Grid>
+    <Expander x:Name="LogExpander" Header="Activity and diagnostics" Margin="0,18,0,0">
+     <TabControl x:Name="OutputTabs" Height="190" Margin="0,10,0,0">
+      <TabItem Header="Details"><TextBox x:Name="Details" IsReadOnly="True" AcceptsReturn="True" VerticalContentAlignment="Top" FontFamily="Consolas" FontSize="12" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"/></TabItem>
+      <TabItem Header="Activity"><TextBox x:Name="Activity" IsReadOnly="True" AcceptsReturn="True" VerticalContentAlignment="Top" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/></TabItem>
+      <TabItem Header="Diagnostics"><TextBox x:Name="Diagnostics" IsReadOnly="True" AcceptsReturn="True" VerticalContentAlignment="Top" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/></TabItem>
+     </TabControl>
+    </Expander>
+   </StackPanel>
+  </ScrollViewer>
+ </DockPanel>
+</Window>
