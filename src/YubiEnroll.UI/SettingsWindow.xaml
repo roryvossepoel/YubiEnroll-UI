@@ -26,14 +26,14 @@
     <TextBlock Text="Entra sign-in" FontWeight="SemiBold" Margin="0,24,0,6"/>
     <TextBlock Text="Closing this app is not an Entra logout. YubiEnroll documents logout for Okta only. Connect again after changing tenants. Browser sign-in and any cached authentication remain managed by YubiEnroll and Microsoft." TextWrapping="Wrap" Foreground="#617084"/>
    </StackPanel></ScrollViewer></TabItem>
-   <TabItem Header="Import / export"><StackPanel Margin="18">
+   <TabItem Header="Import / export"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
     <TextBlock Text="Move tenants and profiles together" Style="{StaticResource SectionTitle}"/>
     <TextBlock Text="Export supported Entra tenant settings and all seven profile settings to one TOML file. Sign-in tokens and authentication caches are not included. Other custom fields are excluded." TextWrapping="Wrap" Foreground="#617084" Margin="0,12,0,18"/>
     <WrapPanel><Button Content="Export configuration…" Click="Export_Click"/><Button Content="Choose import file…" Click="ChooseImport_Click"/></WrapPanel>
     <Border Background="#F0F4F8" CornerRadius="6" Padding="16" Margin="0,20,0,16"><TextBlock x:Name="ImportPreview" Text="Choose a TOML file to validate it and preview the tenants and profiles before importing." TextWrapping="Wrap" MaxHeight="180"/></Border>
     <TextBlock Text="Import replaces this Windows account's current configuration. A backup is saved first. Existing sign-in caches are not imported or cleared; reconnect afterward." TextWrapping="Wrap" Foreground="#9A4B0A" Margin="0,0,0,16"/>
     <Button x:Name="ImportButton" Content="Replace configuration…" Click="Import_Click" IsEnabled="False" HorizontalAlignment="Left"/>
-   </StackPanel></TabItem>
+   </StackPanel></ScrollViewer></TabItem>
   </TabControl>
  </DockPanel>
 </Window>

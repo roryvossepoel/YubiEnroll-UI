@@ -68,7 +68,7 @@ public partial class MainWindow : Window
             issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → System → Recheck.");
         }
         // Config loading is independent of executable discovery/version probing. An error in one
-        // must not hide the other or disable Browse/Reload/the administrator restart option.
+        // must not hide the other or disable Settings and prerequisite recovery.
         if (!await RunWithResultAsync(() =>
         {
             LoadConfiguration(_configPath);
@@ -179,7 +179,7 @@ public partial class MainWindow : Window
                 {
                     true => "This profile resets the key and erases its existing FIDO credentials.",
                     false => "This profile keeps existing FIDO credentials (no reset).",
-                    null => "Reset is not specified. Review the native YubiEnroll confirmation."
+                    null => "Reset is unspecified: the native default may erase existing FIDO credentials. Review the confirmation."
                 };
             }
             catch { ResetNotice.Text = "Profile settings changed or cannot be read. Reload in Settings before continuing."; }
@@ -338,7 +338,7 @@ public partial class MainWindow : Window
         var reset = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name).Reset;
         var arguments = EnrollmentCommand.Build(user.Id, profile.Name, KeyName.Text, reset);
         var message = $"Tenant: {provider.Name}\nTenant ID: {provider.TenantId}\n\nUser: {user.Details}\n\nProfile: {profile.Name}\nReset key: {reset?.ToString() ?? "CLI default; review native prompt"}\n\n" +
-            (reset == true ? "WARNING: Reset destroys existing FIDO credentials on the key.\n\n" : "") +
+            (reset != false ? "WARNING: This profile resets the key, or leaves reset to the native default. Existing FIDO credentials may be erased.\n\n" : "") +
             "Register a YubiKey for this user?";
         if (MessageBox.Show(this, message, "Confirm enrollment", MessageBoxButton.YesNo,
             reset != false ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;

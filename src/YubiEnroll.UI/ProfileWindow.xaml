@@ -21,7 +21,7 @@
     <CheckBox x:Name="ForcePinChange" Content="Force PIN change on first use" IsThreeState="True" Margin="0,0,0,12"/>
     <CheckBox x:Name="RandomPin" Content="Generate a random PIN" IsThreeState="True" Margin="0,0,0,12"/>
     <TextBlock Text="Generated PIN length (4–63; empty = CLI default)"/><TextBox x:Name="GeneratedPinLength" Margin="0,4,0,12"/>
-    <TextBlock Text="Checkboxes: checked = enabled, unchecked = disabled, dash = CLI default. Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. Enterprise attestation requires a supporting key and configuration." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
+    <TextBlock Text="Checkboxes: checked = enabled, unchecked = disabled, dash = CLI default (reset may erase existing FIDO credentials). Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. Enterprise attestation requires a supporting key and configuration." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
     <TextBlock Text="Existing configuration is backed up before saving. Close other YubiEnroll sessions while editing." TextWrapping="Wrap" Foreground="#42536A"/>
    </StackPanel>
   </ScrollViewer>

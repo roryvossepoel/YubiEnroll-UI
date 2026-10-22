@@ -91,6 +91,19 @@ public partial class MainWindow
             Assert(cancelProfile.ShowDialog() != true, "Profile editor cancels");
             await cancelProfileOperation.Task;
             Assert(File.ReadAllText(path) == beforeProfileCancel, "Profile cancellation leaves config unchanged");
+            var tenantEditor = new AddTenantWindow(ConfigSnapshot.Read(path), "New tenant") { Owner = this };
+            var tenantEditOperation = tenantEditor.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    Assert(tenantEditor.TenantName.IsReadOnly && tenantEditor.ClientId.Text.Length > 0, "Tenant editor loads existing values and protects name");
+                    tenantEditor.ClientId.Text = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee";
+                    Assert(tenantEditor.TrySave(), "Tenant form edits existing tenant without creating duplicates");
+                }
+                finally { if (tenantEditor.IsVisible) tenantEditor.Close(); }
+            });
+            tenantEditor.ShowDialog();
+            await tenantEditOperation.Task;
             var settings = new SettingsWindow(path, mockExecutable, "Mock CLI") { Owner = this };
             var settingsOperation = settings.Dispatcher.InvokeAsync(() =>
             {
@@ -102,6 +115,10 @@ public partial class MainWindow
                     var beforePreview = File.ReadAllText(path);
                     settings.PreviewImport(transfer);
                     Assert(settings.ImportButton.IsEnabled && File.ReadAllText(path) == beforePreview, "Import preview validates without writing");
+                    File.AppendAllText(path, "\n# external change");
+                    try { settings.ApplyImport(); throw new Exception("Stale import was accepted"); }
+                    catch (InvalidOperationException) { Assert(!settings.Changed, "Stale import cannot overwrite external changes"); }
+                    settings.PreviewImport(transfer);
                     settings.ApplyImport();
                     Assert(settings.Changed && ConfigReader.Read(path).Profiles.Count == 2, "Import applies both tenants and profiles");
                     CaptureWindow(settings, "settings-tenants.png");
@@ -171,8 +188,9 @@ public partial class MainWindow
     private static void CaptureWindow(System.Windows.Window window, string file)
     {
         window.UpdateLayout();
-        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-        bitmap.Render(window);
+        var content = (System.Windows.FrameworkElement)window.Content;
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)content.ActualWidth, (int)content.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(content);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
         encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
         var folder = Path.Combine(AppContext.BaseDirectory, "visual-checks");
