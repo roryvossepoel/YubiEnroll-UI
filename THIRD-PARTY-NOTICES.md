@@ -4,7 +4,7 @@ YubiEnroll is a separately installed Yubico product. No Yubico executable is inc
 
 Tomlyn 0.19.0 is used to read TOML configuration. It is licensed under BSD-2-Clause. See https://github.com/xoofx/Tomlyn and its package license.
 
-Copyright (c) 2020 Alexandre Mutel. All rights reserved.
+Copyright (c) 2019-2022, Alexandre Mutel. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 

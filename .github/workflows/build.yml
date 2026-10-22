@@ -14,8 +14,8 @@ jobs:
       matrix:
         runtime: [win-x64, win-arm64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Test and publish
@@ -28,7 +28,7 @@ jobs:
           $app = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(30000)) { $app.Kill(); throw 'WPF smoke test timed out' }
           if ($app.ExitCode -ne 0) { throw "WPF smoke test failed: $($app.ExitCode)" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: YubiEnroll-UI-${{ matrix.runtime }}
           path: artifacts/${{ matrix.runtime }}/YubiEnroll-UI-${{ matrix.runtime }}.zip
