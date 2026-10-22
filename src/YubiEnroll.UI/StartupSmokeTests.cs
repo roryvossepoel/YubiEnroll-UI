@@ -190,7 +190,14 @@ public partial class MainWindow
         window.UpdateLayout();
         var content = (System.Windows.FrameworkElement)window.Content;
         var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)content.ActualWidth, (int)content.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-        bitmap.Render(content);
+        var drawing = new System.Windows.Media.DrawingVisual();
+        using (var dc = drawing.RenderOpen())
+        {
+            var rect = new System.Windows.Rect(0, 0, content.ActualWidth, content.ActualHeight);
+            dc.DrawRectangle(window.Background, null, rect);
+            dc.DrawRectangle(new System.Windows.Media.VisualBrush(content) { Stretch = System.Windows.Media.Stretch.Fill }, null, rect);
+        }
+        bitmap.Render(drawing);
         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
         encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
         var folder = Path.Combine(AppContext.BaseDirectory, "visual-checks");
