@@ -1,6 +1,11 @@
 using System.Text.Json;
 using YubiEnroll.Core;
 
+if (args.FirstOrDefault() == "--version")
+{
+    Console.WriteLine("Mock YubiEnroll 0.0.0 (CI only)");
+    return 0;
+}
 if (args.FirstOrDefault() == "--probe")
 {
     // More than a pipe buffer on each stream exposes sequential ReadToEnd deadlocks.
@@ -84,5 +89,12 @@ string[] special = ["space in name", "quote\"test", "& whoami", "%PATH%", "trail
 var echo = await runner.CaptureAsync(new[] { "--echo" }.Concat(special).ToArray());
 var roundtrip = JsonSerializer.Deserialize<string[]>(echo.Output);
 Check(echo.ExitCode == 0 && roundtrip != null && roundtrip.SequenceEqual(special), "Arguments round-trip literally without a shell");
+var missingFolder = FailureReport.Create(new DirectoryNotFoundException(), "Load configuration", "test/config.toml", "test/cli.exe");
+Check(missingFolder.Summary.Contains("folder") && missingFolder.Diagnostic.Contains("DirectoryNotFoundException"), "Missing folder has a specific diagnostic");
+Check(missingFolder.Diagnostic.Contains("Step: Load configuration") && missingFolder.Diagnostic.Contains("Configuration path: test/config.toml"), "Diagnostic identifies step and paths");
+var accessDenied = FailureReport.Create(new System.ComponentModel.Win32Exception(5), "Version check", "", "test/cli.exe");
+Check(accessDenied.Diagnostic.Contains("Native error: 5") && accessDenied.Summary.Contains("denied"), "Native executable access error identified");
+var unknown = FailureReport.Create(new Exception("secret-marker"), "Startup", "", "");
+Check(!unknown.Diagnostic.Contains("secret-marker") && !unknown.Summary.Contains("secret-marker"), "Unexpected exception text not copied to diagnostics");
 Console.WriteLine($"{tests} checks passed.");
 return 0;

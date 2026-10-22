@@ -45,7 +45,7 @@ public sealed class CliRunner(string executable)
 
     public async Task<int> InteractiveAsync(params string[] arguments)
     {
-        var host = Path.Combine(AppContext.BaseDirectory, "console-host", "YubiEnroll.ConsoleHost.exe");
+        var host = Path.Combine(AppContext.BaseDirectory, "YubiEnroll.ConsoleHost.exe");
         if (!File.Exists(host)) throw new FileNotFoundException("Console host is missing. Extract the complete download.");
         var info = StartInfo(host, new[] { Executable }.Concat(arguments));
         using var process = Process.Start(info) ?? throw new IOException("Cannot open enrollment console.");

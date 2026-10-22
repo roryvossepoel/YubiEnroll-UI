@@ -1,9 +1,11 @@
-# Manual acceptance checks for preview 0.1.0
+# Manual acceptance checks for preview 0.1.1
 
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 
 | Check | Expected result |
 |---|---|
+| Missing config | Window stays usable; Diagnostics identifies the missing folder/file and Windows account. |
+| Invalid executable | Diagnostics reports the native Windows error; config still loads independently. |
 | Start normally | Existing provider/profile configuration loads; installed CLI version is displayed. |
 | Alternate install folder | Browse selects the installed executable; subsequent commands use that path. |
 | Choose non-default profile | Search and enrollment keep that profile; native CLI shows the same settings. |
@@ -22,4 +24,4 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 | PIN handling | PIN appears only in native console; no GUI activity entry/file/clipboard copy contains it. |
 | ARM64 | Repeat core flow on ARM64 with the supported/working CLI installation; ARM64 build alone is insufficient. |
 
-Automated checks use synthetic data only. They test TOML names/comments, stale configuration, strict object-ID extraction, safe reset/profile arguments and concurrent output handling. The WPF smoke test only loads the window, not authentication or enrollment.
+Automated checks use synthetic data only. They test TOML names/comments, stale configuration, strict object-ID extraction, safe reset/profile arguments and concurrent output handling. The bundled WPF startup test covers missing folders/files, malformed TOML, an invalid executable and successful initialization with a mock CLI. The bundled console helper is also started. Authentication and hardware enrollment remain manual checks.

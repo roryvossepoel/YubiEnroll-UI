@@ -12,9 +12,9 @@ public sealed record Configuration(string Path, string ActiveProvider, IReadOnly
 
 public static class ConfigReader
 {
-    public static string FindPath()
+    public static string FindPath(string? appDataOverride = null)
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var appData = appDataOverride ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         string[] paths = [System.IO.Path.Combine(appData, "Yubico", "yubienroll", "yubienroll.toml"),
             System.IO.Path.Combine(appData, "yubienroll", "yubienroll.toml")];
         return paths.FirstOrDefault(File.Exists) ?? paths[0];

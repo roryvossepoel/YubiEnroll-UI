@@ -1,6 +1,11 @@
 using System.Diagnostics;
 
 // A real console preserves YubiEnroll's native PIN/device prompts. No transcript or PIN storage.
+if (args.Length == 1 && args[0] == "--self-test")
+{
+    Console.WriteLine("Console host started successfully.");
+    return 0;
+}
 if (args.Length < 2 || !File.Exists(args[0])) return 125;
 var code = 125;
 Console.Title = "YubiEnroll UI - interactive operation";

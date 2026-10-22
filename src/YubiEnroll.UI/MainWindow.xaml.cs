@@ -33,26 +33,64 @@ public partial class MainWindow : Window
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_smokeTest) return;
-        ConfigPath.Text = ConfigReader.FindPath();
+        if (!_smokeTest) await InitializeAsync();
+    }
+
+    private async Task InitializeAsync(string? appDataOverride = null, string? executableOverride = null)
+    {
+        Diagnostics.Clear();
+        Details.Clear();
+        var issues = new List<string>();
         string[] candidates = [
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Yubico", "YubiEnroll", "yubienroll.exe"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Yubico", "YubiEnroll", "yubienroll.exe")];
-        ExePath.Text = candidates.FirstOrDefault(File.Exists) ?? "";
-        await RunAsync(async () =>
+        ExePath.Text = executableOverride ?? candidates.FirstOrDefault(File.Exists) ?? "";
+        ConfigPath.Text = ConfigReader.FindPath(appDataOverride);
+        VersionText.Text = "CLI version not checked";
+        if (File.Exists(ExePath.Text))
         {
-            LoadConfiguration();
-            if (File.Exists(ExePath.Text)) await CheckVersionAsync();
-            else StatusText.Text = "Configuration loaded. Browse to the installed yubienroll.exe.";
-        });
+            if (!await RunWithResultAsync(CheckVersionAsync, "Check YubiEnroll version", showDialog: false)) issues.Add(StatusText.Text);
+        }
+        else
+        {
+            VersionText.Text = "YubiEnroll not located — use Browse";
+            issues.Add("YubiEnroll not located. Use Browse to select the installed yubienroll.exe.");
+        }
+        // Config loading is independent of executable discovery/version probing. An error in one
+        // must not hide the other or disable Browse/Reload/the administrator restart option.
+        if (!await RunWithResultAsync(() =>
+        {
+            LoadConfiguration(ConfigPath.Text);
+            return Task.CompletedTask;
+        }, "Load configuration", showDialog: false)) issues.Add(StatusText.Text);
+        StatusText.Text = issues.Count == 0 ? ReadyMessage() : string.Join("\n", issues);
+        if (issues.Count > 0)
+        {
+            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then Reload configuration.";
+            if (Diagnostics.Text.Length > 0) OutputTabs.SelectedIndex = 2;
+        }
     }
 
-    private void LoadConfiguration()
+    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.1.1";
+
+    private void LoadConfiguration(string? configPath = null)
     {
         var oldTenant = (Tenants.SelectedItem as Provider)?.Name;
         var oldProfile = (Profiles.SelectedItem as EnrollmentProfile)?.Name;
         // The CLI uses this Windows user's configuration. Never silently open another tenant config.
-        ConfigPath.Text = ConfigReader.FindPath();
+        ConfigPath.Text = configPath ?? ConfigReader.FindPath();
+        // Invalidate stale selections even if the new config is missing or malformed.
+        _loading = true;
+        try
+        {
+            _config = null;
+            Tenants.ItemsSource = null;
+            Profiles.ItemsSource = null;
+            ResetSelection();
+            ResetKey.IsChecked = false;
+        }
+        finally { _loading = false; }
+        UpdateSummary();
         var config = ConfigReader.Read(ConfigPath.Text);
         _loading = true;
         try
@@ -81,7 +119,7 @@ public partial class MainWindow : Window
         var result = await Runner.CaptureAsync("--version");
         RequireSuccess(result, "Version check");
         VersionText.Text = result.Output.Trim();
-        StatusText.Text = $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.1.0";
+        StatusText.Text = _config == null ? "YubiEnroll found. Load configuration to continue." : ReadyMessage();
     }
 
     private void Tenant_Changed(object sender, SelectionChangedEventArgs e)
@@ -148,23 +186,27 @@ public partial class MainWindow : Window
         throw new InvalidOperationException($"{operation} failed (exit {result.ExitCode}). Inspect Details; login or check permissions before trying again.");
     }
 
-    private async Task RunAsync(Func<Task> action)
+    private async Task RunAsync(Func<Task> action, string operation = "Operation")
     {
-        if (_busy) return;
+        await RunWithResultAsync(action, operation);
+    }
+
+    private async Task<bool> RunWithResultAsync(Func<Task> action, string operation = "Operation", bool showDialog = true)
+    {
+        if (_busy) return false;
         _busy = true;
         WorkPanel.IsEnabled = false;
-        try { await action(); }
+        try { await action(); return true; }
         catch (Exception ex)
         {
-            StatusText.Text = ex switch
-            {
-                FileNotFoundException => "Required file not found. Check the YubiEnroll installation and configuration.",
-                UnauthorizedAccessException => "Access denied. Check file permissions and the Windows account in use.",
-                InvalidOperationException or InvalidDataException or TimeoutException or ArgumentException => ex.Message,
-                _ => "Operation failed. Check the installation and configuration; no automatic retry was performed."
-            };
-            Record("Operation failed (" + ex.GetType().Name + ").");
-            MessageBox.Show(this, StatusText.Text, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var report = FailureReport.Create(ex, operation, ConfigPath.Text, ExePath.Text);
+            StatusText.Text = report.Summary;
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.1.1\n{report.Diagnostic}\n\n");
+            OutputTabs.SelectedIndex = 2;
+            Record($"{operation} failed ({ex.GetType().Name}, 0x{ex.HResult:X8}).");
+            if (showDialog)
+                MessageBox.Show(this, report.Summary, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
         finally { WorkPanel.IsEnabled = true; _busy = false; }
     }
@@ -181,14 +223,11 @@ public partial class MainWindow : Window
         if (picker.ShowDialog(this) != true) return;
         ExePath.Text = picker.FileName;
         ResetSelection();
-        await RunAsync(CheckVersionAsync);
+        await RunAsync(CheckVersionAsync, "Check YubiEnroll version");
     }
 
-    private async void Reload_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
-    {
-        LoadConfiguration();
-        await CheckVersionAsync();
-    });
+    private async void Reload_Click(object sender, RoutedEventArgs e) =>
+        await InitializeAsync(executableOverride: ExePath.Text.Length == 0 ? null : ExePath.Text);
 
     private async void Login_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {

@@ -58,9 +58,10 @@
     <Border Grid.Column="2" Background="White" Padding="16" CornerRadius="8">
      <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
       <TextBlock x:Name="ProfileSummary" Text="Choose a profile." TextWrapping="Wrap" Margin="0,0,0,12"/>
-      <TabControl Grid.Row="1">
+      <TabControl x:Name="OutputTabs" Grid.Row="1">
        <TabItem Header="Details"><TextBox x:Name="Details" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/></TabItem>
        <TabItem Header="Activity"><TextBox x:Name="Activity" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/></TabItem>
+       <TabItem Header="Diagnostics"><TextBox x:Name="Diagnostics" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/></TabItem>
       </TabControl>
      </Grid>
     </Border>

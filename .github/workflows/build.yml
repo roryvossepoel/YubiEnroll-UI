@@ -21,16 +21,23 @@ jobs:
       - name: Test and publish
         shell: pwsh
         run: ./build.ps1 -Runtime ${{ matrix.runtime }}
-      - name: Load WPF window without YubiEnroll or network calls
+      - name: Test bundled executables and actual startup paths
         if: matrix.runtime == 'win-x64'
         shell: pwsh
         run: |
-          $app = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList '--smoke-test' -PassThru
-          if (-not $app.WaitForExit(30000)) { $app.Kill(); throw 'WPF smoke test timed out' }
-          if ($app.ExitCode -ne 0) { throw "WPF smoke test failed: $($app.ExitCode)" }
+          $mock = (Resolve-Path ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe).Path
+          $testArgs = '--smoke-test "' + $mock + '"'
+          $app = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList $testArgs -PassThru
+          if (-not $app.WaitForExit(60000)) { $app.Kill(); throw 'Startup smoke test timed out' }
+          Get-Content ./artifacts/win-x64/app/startup-smoke-test.txt
+          if ($app.ExitCode -ne 0) { throw "Startup smoke test failed: $($app.ExitCode)" }
+          & ./artifacts/win-x64/app/YubiEnroll.ConsoleHost.exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled console host could not start' }
       - uses: actions/upload-artifact@v7
         with:
           name: YubiEnroll-UI-${{ matrix.runtime }}
-          path: artifacts/${{ matrix.runtime }}/YubiEnroll-UI-${{ matrix.runtime }}.zip
+          path: |
+            artifacts/${{ matrix.runtime }}/app/*
+            !artifacts/${{ matrix.runtime }}/app/startup-smoke-test.txt
           if-no-files-found: error
           retention-days: 30
