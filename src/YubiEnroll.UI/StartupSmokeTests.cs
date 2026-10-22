@@ -50,6 +50,47 @@ public partial class MainWindow
             var cancelled = cancelDialog.ShowDialog();
             await cancelOperation.Task;
             Assert(cancelled != true && File.ReadAllText(path) == beforeCancel, "Cancel does not change configuration");
+            var profileDialog = new ProfileWindow(ConfigSnapshot.Read(path)) { Owner = this };
+            var profileOperation = profileDialog.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    profileDialog.ProfileName.Text = "Second profile";
+                    profileDialog.MinimumPinLength.Text = "8";
+                    profileDialog.GeneratedPinLength.Text = "6";
+                    Assert(!profileDialog.TrySave(), "Profile form rejects generated PIN shorter than minimum");
+                    profileDialog.GeneratedPinLength.Text = "10";
+                    Assert(profileDialog.TrySave(), "Independent profile can be created");
+                }
+                finally { if (profileDialog.IsVisible) profileDialog.Close(); }
+            });
+            Assert(profileDialog.ShowDialog() == true, "Profile dialog closes after save");
+            await profileOperation.Task;
+            await InitializeAsync(root, mockExecutable);
+            Assert(Profiles.Items.Count == 2 && _config?.Providers.Count == 1, "Multiple profiles load alongside existing tenant");
+            var linkedProfile = _config!.Providers.Single().Profile;
+            var editDialog = new ProfileWindow(ConfigSnapshot.Read(path), linkedProfile) { Owner = this };
+            var editOperation = editDialog.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    Assert(editDialog.UsageText.Text.Contains("New tenant") && editDialog.ProfileName.IsReadOnly, "Editor shows linked tenants and protects profile name");
+                    editDialog.ResetProfile.IsChecked = true;
+                    editDialog.ForcePinChange.IsChecked = true;
+                    Assert(editDialog.TrySave(), "Existing profile can be edited");
+                }
+                finally { if (editDialog.IsVisible) editDialog.Close(); }
+            });
+            Assert(editDialog.ShowDialog() == true, "Edited profile saved");
+            await editOperation.Task;
+            Assert(ProfileConfigWriter.Read(File.ReadAllText(path), linkedProfile).ForcePinChange == true &&
+                ConfigReader.Read(path).Profiles.Count == 2, "Editing preserves other profiles");
+            var beforeProfileCancel = File.ReadAllText(path);
+            var cancelProfile = new ProfileWindow(ConfigSnapshot.Read(path), linkedProfile) { Owner = this };
+            var cancelProfileOperation = cancelProfile.Dispatcher.InvokeAsync(() => cancelProfile.Close());
+            Assert(cancelProfile.ShowDialog() != true, "Profile editor cancels");
+            await cancelProfileOperation.Task;
+            Assert(File.ReadAllText(path) == beforeProfileCancel, "Profile cancellation leaves config unchanged");
             File.WriteAllText(path, "[broken-secret-marker");
             TraceStartup("Initializing");
             await InitializeAsync(root, "");

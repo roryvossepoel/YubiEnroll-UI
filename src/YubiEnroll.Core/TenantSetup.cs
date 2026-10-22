@@ -92,16 +92,22 @@ public static class TenantConfigWriter
         return result;
     }
 
-    public static string? Save(ConfigSnapshot expected, TenantSetup setup)
+    public static string? Save(ConfigSnapshot expected, TenantSetup setup) =>
+        ConfigFileWriter.Save(expected, Build(expected.Text, setup));
+}
+
+public static class ConfigFileWriter
+{
+    public static string? Save(ConfigSnapshot expected, string result)
     {
-        var result = Build(expected.Text, setup);
+        ConfigReader.Parse(result);
         var path = System.IO.Path.GetFullPath(expected.Path);
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
         // Cooperating GUI writers cannot race; external CLI sessions must still be closed.
         using var writeLock = new FileStream(path + ".ui.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         var current = ConfigSnapshot.Read(path);
         if (!string.Equals(current.Text, expected.Text, StringComparison.Ordinal))
-            throw new InvalidOperationException("Configuration changed while Add tenant was open. Cancel and reopen it before saving.");
+            throw new InvalidOperationException("Configuration changed while this window was open. Cancel and reopen it before saving.");
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         string? backup = null;
         try

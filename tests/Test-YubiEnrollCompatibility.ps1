@@ -32,6 +32,11 @@ try {
     $profileCode = $LASTEXITCODE
     $profileOutput | Write-Output
     if ($profileCode -ne 0 -or ($profileOutput -join "`n") -notmatch 'UI-test-profile') { throw 'CLI could not read the generated enrollment profile' }
+    $profilesText = ($profileOutput -join "`n") -replace '[│┃]', ' '
+    if ($profilesText -notmatch 'UI-test-profile\s+6\s+False\s+False\s+True\s+True\s+True\s+6' -or
+        $profilesText -notmatch 'Second profile\s+8\s+False\s+False\s+False\s+False\s+True\s+10') {
+        throw 'CLI did not read all seven edited profile settings and the independent second profile'
+    }
     'PASS: native YubiEnroll 1.2.0 reads the GUI-generated provider and profile.'
 } finally {
     if (Test-Path $legacy) { Remove-Item -LiteralPath $legacy }

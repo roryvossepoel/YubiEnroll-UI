@@ -1,4 +1,4 @@
-# Manual acceptance checks for preview 0.1.2
+# Manual acceptance checks for preview 0.1.3
 
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 
@@ -9,6 +9,9 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 | Missing config | Window offers Add tenant without an exception; cancellation leaves the configuration absent. |
 | Add tenant | Invalid IDs/redirect/PIN length stay in the form; valid values save and load the tenant and selected profile. |
 | Existing configuration | Add a second tenant; existing text and active provider remain intact; a backup contains the original. |
+| Multiple profiles | Create two profiles with different PIN lengths; both remain selectable, including after restart. |
+| Edit shared profile | Link two tenants to one profile; editor lists both, saves all seven settings and preserves other profiles, endpoints and tenant links. |
+| Cancel profile | Cancel a new/edit profile form; configuration remains unchanged. |
 | Concurrent change | Edit configuration after opening Add tenant; saving is refused and external changes remain intact. |
 | Native CLI compatibility | After saving, `yubienroll providers show <name>` and `profiles list` show the same tenant/profile. |
 | Invalid executable | Diagnostics reports the native Windows error; config still loads independently. |

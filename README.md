@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.1.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.1.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -67,6 +67,14 @@ This form targets Microsoft Entra public cloud. For national clouds, use YubiEnr
 
 The executable is detected under Program Files. Use **Browse** if you installed it elsewhere. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
 
+### Manage multiple profiles
+
+Use **New profile…** to create additional named profiles and **Edit profile…** to change the selected profile. All seven settings are available: reset, minimum PIN length, Always UV, enterprise attestation, forced PIN change, random PIN and random PIN length. Minimum and generated PIN lengths are separate fields. Empty numeric fields and indeterminate checkboxes preserve CLI defaults.
+
+Each tenant can reference a profile; multiple tenants can share the same profile. The editor lists the tenants that use it, since saving changes affects all of them. Choose an existing profile when adding a tenant. Selecting another profile in the main window overrides it for that enrollment without changing the tenant's default. Existing profile names cannot be changed in the editor, preserving tenant references.
+
+Profile saves preserve configuration values, including provider endpoints and other profiles. TOML formatting and comments may change; the exact original file is backed up first. Stale saves and duplicate names are rejected. **Reset key** in the main window still controls actual enrollment: a profile's `reset = true` does not bypass that explicit choice.
+
 ## Register a key
 
 1. Select the tenant and profile. Check the tenant name/ID in the banner and the profile summary.
@@ -88,7 +96,7 @@ If UAC uses a different Windows administrator account, the new process sees that
 ## Preview limitations
 
 - Entra ID only; other provider types are not shown.
-- Tenant creation and a basic new profile are available in the GUI. Editing/deleting existing providers or profiles remains in the official CLI.
+- Multiple tenants and profiles can be created. Profiles can be edited; renaming/deleting profiles and editing/deleting providers remain in the official CLI.
 - Search parsing accepts GUID-first table rows and `ID:` blocks. It intentionally rejects unknown formats. The **Details** tab shows the raw search output for diagnosis; real output from the installed YubiEnroll version still needs validation.
 - No bulk enrollment, credential deletion, automatic key detection or automatic PIN delivery.
 - One operation at a time within each GUI window. **Do not use a second GUI instance or another YubiEnroll session concurrently:** the CLI has a shared active provider. Configuration checks detect changes before commands but cannot lock out external tools.

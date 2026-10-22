@@ -75,7 +75,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No Entra tenant configured yet. Click Add tenant to set up this Windows account.";
 
-    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.1.2";
+    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.1.3";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -151,6 +151,7 @@ public partial class MainWindow : Window
         var provider = Tenants.SelectedItem as Provider;
         ContextBanner.Text = provider == null ? "No tenant selected" : $"Tenant: {provider.Name} · {provider.TenantId}";
         var profile = Profiles.SelectedItem as EnrollmentProfile;
+        EditProfileButton.IsEnabled = profile != null;
         ProfileSummary.Text = profile == null ? "Choose an enrollment profile." :
             $"Profile: {profile.Name}\n{profile.Summary}\n\nReset is overridden by the explicit checkbox; unchecked means no reset.";
         EnrollButton.IsEnabled = Users.SelectedItem != null && profile != null;
@@ -207,7 +208,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, ConfigPath.Text, ExePath.Text);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.1.2\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.1.3\n{report.Diagnostic}\n\n");
             OutputTabs.SelectedIndex = 2;
             Record($"{operation} failed ({ex.GetType().Name}, 0x{ex.HResult:X8}).");
             if (showDialog)
@@ -231,6 +232,23 @@ public partial class MainWindow : Window
         ResetSelection();
         await RunAsync(CheckVersionAsync, "Check YubiEnroll version");
     }
+
+    private async void NewProfile_Click(object sender, RoutedEventArgs e) => await EditProfileAsync(null);
+    private async void EditProfile_Click(object sender, RoutedEventArgs e) =>
+        await EditProfileAsync((Profiles.SelectedItem as EnrollmentProfile)?.Name);
+
+    private Task EditProfileAsync(string? name) => RunAsync(() =>
+    {
+        var dialog = new ProfileWindow(ConfigSnapshot.Read(ConfigPath.Text), name) { Owner = this };
+        if (dialog.ShowDialog() == true)
+        {
+            LoadConfiguration(ConfigPath.Text);
+            Profiles.SelectedItem = _config?.Profiles.FirstOrDefault(x => x.Name == dialog.SavedProfileName);
+            Record("Profile saved. " + (dialog.BackupPath == null ? "New configuration created." : "Backup: " + dialog.BackupPath));
+            StatusText.Text = "Profile saved and selected. Review its settings before enrolling a key.";
+        }
+        return Task.CompletedTask;
+    }, "Save profile");
 
     private async void AddTenant_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {

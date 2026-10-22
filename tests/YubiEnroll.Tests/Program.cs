@@ -26,7 +26,9 @@ if (args.FirstOrDefault() == "--write-fixture-config")
     TenantConfigWriter.Save(ConfigSnapshot.Read(args[1]), new TenantSetup("UI-test",
         "11111111-2222-3333-4444-555555555555", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         "http://localhost/yubienroll-redirect", "UI-test-profile", true));
-    Console.WriteLine("Synthetic provider and profile written.");
+    ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), new ProfileSetup("Second profile", MinPinLength: 8, RandomPinLength: 10));
+    ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), new ProfileSetup("UI-test-profile", Reset: true, ForcePinChange: true), "UI-test-profile");
+    Console.WriteLine("Synthetic provider and multiple profiles written and edited.");
     return 0;
 }
 
@@ -125,6 +127,29 @@ Reject(() => (setup with { RedirectUri = "http://localhost.evil.test/" }).Valida
 Reject(() => (setup with { PinLength = 3 }).Validate(), "Invalid PIN policy rejected");
 var quoted = TenantConfigWriter.Build(null, setup with { Name = "Name with \"quotes\" and dots.", ProfileName = "Profile.with.dots" });
 Check(ConfigReader.Parse(quoted).Providers.Single().Name == "Name with \"quotes\" and dots.", "Tenant and profile names are TOML-escaped");
+// Two tenants share one profile; a second profile remains independent.
+var shared = TenantConfigWriter.Build(configText, setup with { CreateProfile = false, ProfileName = "Standard" });
+var policy = new ProfileSetup("Standard", Reset: true, ForcePinChange: true);
+var edited = ProfileConfigWriter.Build(shared, policy, "Standard");
+Check(ProfileConfigWriter.Read(edited, "Standard") == policy, "All seven supplied profile settings round-trip");
+Check(ConfigReader.Parse(edited).Providers.SequenceEqual(ConfigReader.Parse(shared).Providers), "Shared tenant references and provider values survive profile editing");
+Check(ConfigReader.Parse(edited).ActiveProvider == config.ActiveProvider, "Profile edit preserves active tenant");
+var separate = new ProfileSetup("Independent profile", MinPinLength: 8, RandomPinLength: 10);
+var multiple = ProfileConfigWriter.Build(edited, separate);
+Check(ConfigReader.Parse(multiple).Profiles.Count == 3 && ProfileConfigWriter.Read(multiple, "Standard") == policy,
+    "Multiple profiles coexist without modifying existing profiles");
+Check(ProfileConfigWriter.Read(multiple, separate.Name) == separate, "Minimum and generated PIN lengths are independent");
+var omitted = ProfileConfigWriter.Read(configText, "Alternative profile");
+Check(omitted.RandomPin == null && omitted.RequireEa == null && omitted.RandomPinLength == null, "Missing options remain CLI defaults");
+Check(ProfileConfigWriter.Read(ProfileConfigWriter.Build(configText, omitted, omitted.Name), omitted.Name) == omitted,
+    "Editing does not replace omitted options with GUI defaults");
+Reject(() => ProfileConfigWriter.Build(multiple, separate with { Name = "INDEPENDENT PROFILE" }), "Duplicate profile names rejected");
+Reject(() => ProfileConfigWriter.Build(multiple, policy with { Name = "Renamed" }, "Standard"), "Shared profile cannot be silently renamed");
+Reject(() => ProfileConfigWriter.Build(multiple, separate with { RandomPinLength = 6 }), "Generated PIN cannot be shorter than minimum");
+Reject(() => ProfileConfigWriter.Build(multiple, separate with { MinPinLength = 64 }), "Profile PIN limit enforced");
+var endpoints = shared.Replace("provider = \"ENTRA\"", "provider = \"ENTRA\"\nentra_base_url = \"https://login.microsoftonline.com\"\ngraph_base_url = \"https://graph.microsoft.com\"");
+Check(ConfigReader.Parse(ProfileConfigWriter.Build(endpoints, policy, "Standard")).Providers.SequenceEqual(ConfigReader.Parse(endpoints).Providers),
+    "Custom provider endpoints are preserved");
 var tempRoot = Path.Combine(Path.GetTempPath(), "YubiEnroll-setup-test-" + Guid.NewGuid().ToString("N"));
 try
 {
@@ -135,6 +160,10 @@ try
     var backup = TenantConfigWriter.Save(first, setup with { Name = "Another", CreateProfile = false });
     Check(backup != null && File.ReadAllText(backup) == first.Text && ConfigReader.Read(tempPath).Providers.Count == 2,
         "Second save backs up the exact previous configuration");
+    var profileSnapshot = ConfigSnapshot.Read(tempPath);
+    var profileBackup = ProfileConfigWriter.Save(profileSnapshot, separate);
+    Check(profileBackup != null && File.ReadAllText(profileBackup) == profileSnapshot.Text, "Profile save backs up exact original content");
+    Reject(() => ProfileConfigWriter.Save(profileSnapshot, policy), "Stale profile dialog cannot overwrite changes");
     var after = File.ReadAllText(tempPath);
     Reject(() => TenantConfigWriter.Save(first, setup with { Name = "Stale", CreateProfile = false }), "Stale dialog cannot overwrite configuration");
     Check(File.ReadAllText(tempPath) == after, "Rejected stale save leaves file unchanged");

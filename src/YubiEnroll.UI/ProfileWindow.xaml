@@ -1,0 +1,29 @@
+<Window x:Class="YubiEnroll.UI.ProfileWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Enrollment profile" Width="620" Height="740" MinWidth="540" MinHeight="550" WindowStartupLocation="CenterOwner" Background="#F3F5F8" FontFamily="Segoe UI" FontSize="13">
+ <DockPanel Margin="24">
+  <TextBlock x:Name="Heading" DockPanel.Dock="Top" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16" Foreground="#14263B"/>
+  <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+   <TextBlock x:Name="ValidationText" Foreground="#A4262C" TextWrapping="Wrap" Margin="0,0,0,10"/>
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+    <Button Content="Cancel" IsCancel="True"/>
+    <Button Content="Save profile" IsDefault="True" Click="Save_Click"/>
+   </StackPanel>
+  </StackPanel>
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+   <StackPanel>
+    <TextBlock Text="Profile name"/><TextBox x:Name="ProfileName" MaxLength="80" Margin="0,4,0,12"/>
+    <TextBlock x:Name="UsageText" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,16"/>
+    <CheckBox x:Name="ResetProfile" Content="Factory reset key" IsThreeState="True" Margin="0,0,0,10"/>
+    <TextBlock Text="Reset erases existing FIDO credentials. During enrollment, the main window's Reset key checkbox controls whether reset is actually performed." TextWrapping="Wrap" Foreground="#A4262C" Margin="0,0,0,14"/>
+    <TextBlock Text="Minimum PIN length (4–63; empty = CLI default)"/><TextBox x:Name="MinimumPinLength" Margin="0,4,0,12"/>
+    <CheckBox x:Name="AlwaysUv" Content="Require user verification for every operation (Always UV)" IsThreeState="True" Margin="0,0,0,12"/>
+    <CheckBox x:Name="EnterpriseAttestation" Content="Require enterprise attestation" IsThreeState="True" Margin="0,0,0,12"/>
+    <CheckBox x:Name="ForcePinChange" Content="Force PIN change on first use" IsThreeState="True" Margin="0,0,0,12"/>
+    <CheckBox x:Name="RandomPin" Content="Generate a random PIN" IsThreeState="True" Margin="0,0,0,12"/>
+    <TextBlock Text="Generated PIN length (4–63; empty = CLI default)"/><TextBox x:Name="GeneratedPinLength" Margin="0,4,0,12"/>
+    <TextBlock Text="Checkboxes: checked = enabled, unchecked = disabled, dash = CLI default. Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. Enterprise attestation requires a supporting key and configuration." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
+    <TextBlock Text="Existing configuration is backed up before saving. Close other YubiEnroll sessions while editing." TextWrapping="Wrap" Foreground="#42536A"/>
+   </StackPanel>
+  </ScrollViewer>
+ </DockPanel>
+</Window>
