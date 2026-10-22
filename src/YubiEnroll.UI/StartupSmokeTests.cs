@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using YubiEnroll.Core;
 
 namespace YubiEnroll.UI;
@@ -9,6 +10,9 @@ public partial class MainWindow
     internal async Task RunStartupSmokeTestsAsync(string mockExecutable)
     {
         var root = Path.Combine(Path.GetTempPath(), "YubiEnroll-UI-test-" + Guid.NewGuid().ToString("N"));
+        // Suppress native Windows error dialogs in unattended CI only.
+        if (!SetThreadErrorMode(0x0001 | 0x0002 | 0x8000, out var previousErrorMode))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         try
         {
             TraceStartup("Initializing");
@@ -43,8 +47,16 @@ public partial class MainWindow
             Assert(StatusText.Text.StartsWith("Ready") && VersionText.Text.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");
             Assert(Diagnostics.Text.Length == 0 && WorkPanel.IsEnabled, "Successful reload clears diagnostics and busy state");
         }
-        finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+        finally
+        {
+            SetThreadErrorMode(previousErrorMode, out _);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetThreadErrorMode(uint mode, out uint previousMode);
 
     internal static void TraceStartup(string message) =>
         File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "startup-smoke-test.txt"), message + Environment.NewLine);
