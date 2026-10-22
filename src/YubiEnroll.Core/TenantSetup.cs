@@ -80,7 +80,11 @@ public static class TenantConfigWriter
             }};
         // A brand-new file gets an active provider. Existing activation is never overwritten.
         var prefix = existing == null || source.Length == 0 ? Toml.FromModel(new TomlTable { ["active_provider"] = setup.Name }) : "";
-        var result = prefix + source + Environment.NewLine + Toml.FromModel(addition);
+        // Tomlyn emits explicit parent table headers. Appending those again would redefine
+        // [providers]/[profiles] when the existing file already declares them.
+        var fragment = string.Join(Environment.NewLine, Toml.FromModel(addition).Split('\n')
+            .Where(line => line.Trim() is not "[providers]" and not "[profiles]"));
+        var result = prefix + source + Environment.NewLine + fragment;
         var verified = ConfigReader.Parse(result);
         if (!verified.Providers.Any(x => x.Name == setup.Name && x.TenantId == setup.TenantId))
             throw new InvalidDataException("The new tenant configuration could not be validated.");
