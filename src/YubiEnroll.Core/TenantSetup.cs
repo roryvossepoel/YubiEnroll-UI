@@ -83,7 +83,8 @@ public static class TenantConfigWriter
         // Tomlyn emits explicit parent table headers. Appending those again would redefine
         // [providers]/[profiles] when the existing file already declares them.
         var fragment = string.Join(Environment.NewLine, Toml.FromModel(addition).Split('\n')
-            .Where(line => line.Trim() is not "[providers]" and not "[profiles]"));
+            .Where(line => line.Trim() is not "[providers]" and not "[profiles]")
+            .Select(line => line.TrimEnd('\r')));
         var result = prefix + source + Environment.NewLine + fragment;
         var verified = ConfigReader.Parse(result);
         if (!verified.Providers.Any(x => x.Name == setup.Name && x.TenantId == setup.TenantId))
