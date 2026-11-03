@@ -15,6 +15,7 @@ public partial class MainWindow
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         try
         {
+            await TestKeyToolsAsync();
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");

@@ -35,6 +35,9 @@ jobs:
       - name: Verify configuration with YubiEnroll 1.2.0
         shell: pwsh
         run: ./tests/Test-YubiEnrollCompatibility.ps1
+      - name: Verify optional YubiKey Manager CLI 5.9.2
+        shell: pwsh
+        run: ./tests/Test-YkmanCompatibility.ps1
       - uses: actions/upload-artifact@v7
         with:
           name: YubiEnroll-UI-win-x64

@@ -21,7 +21,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         ExecutableInfo.Text = executable;
         ConfigurationInfo.Text = path;
-        VersionInfo.Text = "YubiEnroll UI 0.2.0 · " + version;
+        VersionInfo.Text = "YubiEnroll UI 0.3.0 · " + version;
         Attempt(RefreshLists);
     }
 

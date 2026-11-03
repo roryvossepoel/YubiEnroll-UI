@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.2.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.3.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -13,6 +13,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Reports the CLI exit code and retrieves the registered credential list after a successful command.
 - Keeps the UI responsive and prevents another operation or application shutdown while an operation is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
+- Offers **Key tools → Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. PINs, authentication tokens and console transcripts are not captured or saved by the GUI.
 
 ## Download and start — no C# knowledge required
@@ -87,6 +88,16 @@ Search is enabled after a successful login command, and preparation after select
 
 Technical output is under the collapsed **Activity and diagnostics** section. It opens for diagnostics or registered-key results. User-search output uses a monospace font to preserve columns.
 
+### Erase a key without enrollment
+
+Open **Key tools → Reset FIDO**. This optional feature requires **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it does not block enrollment.
+
+Run the GUI as administrator, connect the key via USB, Refresh, and select its model/serial number. No tenant connection or user selection is required. After the GUI confirmation, follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
+
+**This permanently resets all FIDO2/U2F credentials and the FIDO PIN on the selected key, for all accounts. Entra and other service registrations remain and must be removed separately.** PIV, OATH, OpenPGP and OTP are outside this reset. Native restrictions and model-specific warnings still apply (including YubiKey 4 FIPS attestation warnings); if ykman refuses the reset, the GUI does not bypass it. Read [Yubico's FIDO reset documentation](https://docs.yubico.com/software/yubikey/tools/ykman/FIDO_Commands.html).
+
+This preview only selects keys with FIDO enabled and a readable serial number. Serial-less keys and external NFC readers are not supported. Device identity is checked again after confirmation, and the command always targets the selected serial. A successful message means **ykman reported success**; physical-key verification remains necessary. Closing or cancelling the console does not prove that nothing changed. Inspect the key before retrying.
+
 ### Entra logout
 
 Closing the GUI is not a logout operation. Yubico currently documents the native `logout` command for Okta only, so this Entra interface does not offer a misleading logout button. Browser sessions and any cached authentication remain managed by YubiEnroll/Microsoft. Use **Connect** when switching tenants. See [Yubico command reference](https://docs.yubico.com/software/yubikey/tools/yubienroll/commands.html#yubienroll-logout).
@@ -110,7 +121,7 @@ If UAC uses a different Windows administrator account, the new process sees that
 - Entra ID only; other provider types are not shown.
 - Multiple tenants and profiles can be created and edited under Settings. Existing names cannot be changed; deletion remains in the official CLI. Tenant edits preserve custom cloud endpoints; configure those through native setup or import.
 - Search parsing accepts GUID-first table rows and `ID:` blocks. It intentionally rejects unknown formats. The **Details** tab shows the raw search output for diagnosis; real output from the installed YubiEnroll version still needs validation.
-- No bulk enrollment, credential deletion, automatic key detection or automatic PIN delivery.
+- No bulk enrollment, cloud credential deletion or automatic PIN delivery. Key discovery is limited to the standalone reset window.
 - One operation at a time within each GUI window. **Do not use a second GUI instance or another YubiEnroll session concurrently:** the CLI has a shared active provider. Configuration checks detect changes before commands but cannot lock out external tools.
 - No persistent audit file or telemetry. Details/activity can contain user and tenant identifiers; redact them before sharing screenshots or bug reports. The official CLI's own logging settings are outside this GUI's control.
 - Closing the console prematurely is treated as unsuccessful/unknown; wait for the CLI result and press Enter instead.
@@ -123,7 +134,7 @@ On Windows, install the .NET 10 SDK, then run:
 ./build.ps1 -Runtime win-x64
 ```
 
-The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with first-run setup, form validation/save/cancel, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. A separate Windows CI check downloads the signed official YubiEnroll 1.2.0 installer, verifies its publisher, and checks that the CLI reads a synthetic provider/profile generated by the GUI writer. No login, tenant access or attached hardware is used; YubiEnroll is not redistributed with the app.
+The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with first-run setup, form validation/save/cancel, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. A separate Windows CI check downloads the signed official YubiEnroll 1.2.0 installer, verifies its publisher, and checks that the CLI reads a synthetic provider/profile generated by the GUI writer. A separate check verifies the signed ykman 5.9.2 installer, expected installation folder, version parser, empty device discovery and serial-targeted reset help. No login, tenant access, reset command or attached hardware is used; neither Yubico CLI is redistributed with the app.
 
 For a quick logic test on any .NET 10 development machine:
 

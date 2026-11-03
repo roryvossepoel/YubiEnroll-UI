@@ -19,7 +19,7 @@ public sealed class CliRunner(string executable)
         return info;
     }
 
-    // Only used for version, activation and read-only queries. Enrollment is never timed out or auto-retried.
+    // Only used for version, activation and read-only queries. Interactive enrollment/reset is never timed out or auto-retried.
     public async Task<CliResult> CaptureAsync(params string[] arguments)
     {
         var info = StartInfo(Executable, arguments);
@@ -27,7 +27,7 @@ public sealed class CliRunner(string executable)
         info.RedirectStandardOutput = true;
         info.RedirectStandardError = true;
         info.RedirectStandardInput = true;
-        using var process = Process.Start(info) ?? throw new IOException("Cannot start YubiEnroll.");
+        using var process = Process.Start(info) ?? throw new IOException("Cannot start the Yubico command-line tool.");
         process.StandardInput.Close();
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
@@ -38,7 +38,7 @@ public sealed class CliRunner(string executable)
             try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             await process.WaitForExitAsync();
             await Task.WhenAll(stdout, stderr);
-            throw new TimeoutException("YubiEnroll did not respond within two minutes. Use Login for interactive authentication.");
+            throw new TimeoutException("The Yubico command-line tool did not respond within two minutes.");
         }
         return new(process.ExitCode, await stdout, await stderr);
     }
@@ -48,7 +48,7 @@ public sealed class CliRunner(string executable)
         var host = Path.Combine(AppContext.BaseDirectory, "YubiEnroll.ConsoleHost.exe");
         if (!File.Exists(host)) throw new FileNotFoundException("Console host is missing. Extract the complete download.");
         var info = StartInfo(host, new[] { Executable }.Concat(arguments));
-        using var process = Process.Start(info) ?? throw new IOException("Cannot open enrollment console.");
+        using var process = Process.Start(info) ?? throw new IOException("Cannot open the interactive console.");
         await process.WaitForExitAsync();
         return process.ExitCode;
     }

@@ -86,7 +86,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.2.0";
+    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.3.0";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -235,12 +235,13 @@ public partial class MainWindow : Window
         _busy = true;
         WorkPanel.IsEnabled = false;
         SettingsButton.IsEnabled = false;
+        KeyToolsButton.IsEnabled = false;
         try { await action(); return true; }
         catch (Exception ex)
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.2.0\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.3.0\n{report.Diagnostic}\n\n");
             LogExpander.IsExpanded = true;
             OutputTabs.SelectedIndex = 2;
             Record($"{operation} failed ({ex.GetType().Name}, 0x{ex.HResult:X8}).");
@@ -248,13 +249,25 @@ public partial class MainWindow : Window
                 MessageBox.Show(this, report.Summary, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
-        finally { WorkPanel.IsEnabled = true; SettingsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
+        finally { WorkPanel.IsEnabled = true; SettingsButton.IsEnabled = true; KeyToolsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
     }
 
     private void Record(string text)
     {
         Activity.AppendText($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {text}\n");
         Activity.ScrollToEnd();
+    }
+
+    private async void KeyTools_Click(object sender, RoutedEventArgs e)
+    {
+        KeyToolsWindow? dialog = null;
+        await RunAsync(() =>
+        {
+            dialog = new KeyToolsWindow(IsAdministrator()) { Owner = this };
+            dialog.ShowDialog();
+            return Task.CompletedTask;
+        }, "Key tools");
+        if (dialog?.ElevationRequested == true) Elevate_Click(sender, e);
     }
 
     private async void Settings_Click(object sender, RoutedEventArgs e)

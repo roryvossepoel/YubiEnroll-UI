@@ -1,6 +1,6 @@
 # Third-party components
 
-YubiEnroll is a separately installed Yubico product. No Yubico executable is included in this repository or its build artifacts. This project is an independent community project, not affiliated with or endorsed by Yubico. Yubico and YubiKey are trademarks of their respective owner.
+YubiEnroll is a separately installed Yubico product. Optional standalone FIDO reset uses the separately installed YubiKey Manager CLI (ykman), licensed by Yubico under BSD-2-Clause: https://github.com/Yubico/yubikey-manager. Neither tool is redistributed. No Yubico executable is included in this repository or its build artifacts. This project is an independent community project, not affiliated with or endorsed by Yubico. Yubico and YubiKey are trademarks of their respective owner.
 
 Tomlyn 0.19.0 is used to read TOML configuration. It is licensed under BSD-2-Clause. See https://github.com/xoofx/Tomlyn and its package license.
 

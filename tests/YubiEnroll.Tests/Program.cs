@@ -34,6 +34,22 @@ if (args.FirstOrDefault() == "--write-fixture-config")
     return 0;
 }
 
+// Read-only compatibility check against the separately extracted official CLI in Windows CI.
+if (args.Length == 2 && args[0] == "--check-ykman")
+{
+    var native = new CliRunner(args[1]);
+    var service = new KeyResetService(a => native.CaptureAsync(a), _ => throw new InvalidOperationException("Reset is forbidden in CI."));
+    Console.WriteLine($"Native ykman version parsed: {await service.CheckVersionAsync()}");
+    // --help exits without invoking the reset callback or opening a device.
+    var help = await native.CaptureAsync("--device", "12345678", "fido", "reset", "--help");
+    if (help.ExitCode != 0 || !help.Output.Contains("Reset all FIDO applications"))
+        throw new Exception("Native reset help did not accept the serial-targeted command.");
+    var inventory = await service.DiscoverAsync();
+    if (inventory.Keys.Count != 0) throw new Exception("Unexpected hardware on CI runner.");
+    Console.WriteLine("PASS: native ykman version, empty USB inventory and serial-targeted reset help; no reset executed.");
+    return 0;
+}
+
 var tests = 0;
 void Check(bool condition, string name)
 {
@@ -190,5 +206,62 @@ try
     Check(File.ReadAllText(tempPath) == after, "Rejected stale save leaves file unchanged");
 }
 finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true); }
+Check(KeyResetService.ParseVersion("YubiKey Manager (ykman) version: 5.9.2\r\n") == new Version(5, 9, 2), "Official ykman version format accepted");
+Reject(() => KeyResetService.ParseVersion("YubiKey Manager (ykman) version: 5.7.2"), "Old ykman rejected before reset");
+Reject(() => KeyResetService.ParseVersion("YubiKey Manager (ykman) version: 6.0.0"), "Unknown ykman major rejected");
+Reject(() => KeyResetService.ParseVersion("YubiKey Manager (ykman) version: 5.9.2-dev"), "Unverified development version rejected");
+const string keyRow = "YubiKey 5 NFC (5.7.1) [OTP+FIDO+CCID] Serial: 12345678";
+var keys = KeyResetService.ParseKeys(keyRow + "\nSecurity Key NFC (5.7.1) [FIDO]\nYubiKey [FIDO] <access denied>\nYubiKey 5 [OTP+CCID] Serial: 87654321");
+Check(keys.Keys.Single().Serial == "12345678" && keys.Unavailable == 3, "Only serial-addressable FIDO devices can be selected");
+Check(KeyResetService.ParseKeys("").Keys.Count == 0, "Empty device list is a normal state");
+Check(KeyResetService.ParseKeys("Error: " + keyRow).Keys.Count == 0, "Diagnostic lines are not accepted as devices");
+Reject(() => KeyResetService.ParseKeys(keyRow + "\n" + keyRow), "Duplicate key identities block reset");
+Reject(() => KeyResetService.ResetArguments("12345678 --force"), "Serial cannot inject options");
+Reject(() => KeyResetService.ResetArguments("0"), "Missing serial cannot target an arbitrary key");
+Reject(() => KeyResetService.ResetArguments("4294967296"), "Out-of-range serial rejected");
+Check(KeyResetService.ResetArguments("12345678").SequenceEqual(new[] { "--device", "12345678", "fido", "reset" }),
+    "Standalone reset pins serial and retains native confirmation without force");
+
+async Task ExerciseReset(string scenario, bool approved, bool removeAfterConfirm, bool infoFails, bool staleBefore, int nativeExit)
+{
+    var inventory = staleBefore ? "" : keyRow;
+    var launched = 0;
+    var confirmations = 0;
+    var service = new KeyResetService(a => Task.FromResult(a[0] switch
+    {
+        "--version" => new CliResult(0, "YubiKey Manager (ykman) version: 5.9.2", ""),
+        "list" => new CliResult(0, inventory, ""),
+        "--device" when a.SequenceEqual(new[] { "--device", "12345678", "fido", "info" }) => new CliResult(infoFails ? 1 : 0, "", ""),
+        _ => throw new Exception("Unexpected read command")
+    }), a =>
+    {
+        Check(a.SequenceEqual(KeyResetService.ResetArguments("12345678")), scenario + ": serial retained through launch");
+        launched++;
+        return Task.FromResult(nativeExit);
+    });
+    int? result = null;
+    var blocked = false;
+    try
+    {
+        result = await service.ResetAsync(keys.Keys.Single(), _ =>
+        {
+            confirmations++;
+            if (removeAfterConfirm) inventory = keyRow.Replace("12345678", "87654321");
+            return approved;
+        });
+    }
+    catch (InvalidOperationException) { blocked = true; }
+    var expectedBlock = staleBefore || infoFails || (approved && removeAfterConfirm);
+    var expectedLaunch = approved && !expectedBlock;
+    Check(blocked == expectedBlock && launched == (expectedLaunch ? 1 : 0), scenario + ": reset invocation count");
+    Check(confirmations == (staleBefore || infoFails ? 0 : 1), scenario + ": read checks precede confirmation");
+    Check(result == (expectedLaunch ? (int?)nativeExit : null), scenario + ": exit status preserved without retry");
+}
+await ExerciseReset("Cancellation", false, false, false, false, 0);
+await ExerciseReset("Key swapped during confirmation", true, true, false, false, 0);
+await ExerciseReset("FIDO access denied", true, false, true, false, 0);
+await ExerciseReset("Disconnected before confirmation", true, false, false, true, 0);
+await ExerciseReset("Confirmed reset", true, false, false, false, 0);
+await ExerciseReset("Native reset failure", true, false, false, false, 1);
 Console.WriteLine($"{tests} checks passed.");
 return 0;
