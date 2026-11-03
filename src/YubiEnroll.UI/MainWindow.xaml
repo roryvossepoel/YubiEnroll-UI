@@ -29,7 +29,7 @@
      <ScrollViewer x:Name="OverviewPage" VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28">
        <TextBlock Text="Overview" FontSize="28" FontWeight="SemiBold"/>
-       <TextBlock Text="Inspect your security key, then choose what to do." Foreground="#617084" Margin="0,6,0,24"/>
+       <TextBlock Text="Inspect your security key, then choose what to do." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
        <Border Style="{StaticResource Card}" Margin="0,0,0,18"><StackPanel>
         <TextBlock Text="Connected key" Style="{StaticResource SectionTitle}"/>
         <ComboBox x:Name="OverviewKeys" DisplayMemberPath="Label" SelectionChanged="OverviewKey_Changed" Margin="0,14,0,12" AutomationProperties.Name="Connected security key"/>
@@ -50,7 +50,7 @@
       <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28">
        <TextBlock Text="Prepare Key" FontSize="28" FontWeight="SemiBold"/>
-       <TextBlock Text="Connect to a tenant and prepare a key for a user. Confirm the physical key in the YubiEnroll prompt." Foreground="#617084" Margin="0,6,0,24"/>
+       <TextBlock Text="Connect to a tenant and prepare a key for a user. Confirm the physical key in the YubiEnroll prompt." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
      <StackPanel>
       <TextBlock Text="1   Connect to a tenant" Style="{StaticResource SectionTitle}"/>
