@@ -7,7 +7,7 @@
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,24">
      <TextBlock x:Name="BrandTitle" Text="YubiEnroll UI" FontSize="22" FontWeight="SemiBold"/>
      <TextBlock x:Name="BrandSubtitle" Text="COMMUNITY PREVIEW" FontSize="10" Foreground="#617084" Margin="0,5,0,20"/>
-     <Border Background="White" CornerRadius="8" Padding="12"><TextBlock x:Name="SelectedKeyCard" Text="No key selected" TextWrapping="Wrap" FontSize="12"/></Border>
+     <Border x:Name="SidebarKeyCard" Background="White" CornerRadius="8" Padding="12"><TextBlock x:Name="SelectedKeyCard" Text="No key selected" TextWrapping="Wrap" FontSize="12"/></Border>
     </StackPanel>
     <StackPanel DockPanel.Dock="Bottom">
      <Button x:Name="SettingsButton" Content="Settings" Click="Settings_Click" Margin="0,0,0,8"/>
@@ -36,22 +36,21 @@
         <TextBlock x:Name="KeyInfo" Text="Connect a YubiKey to get started." TextWrapping="Wrap" Foreground="#526277" Margin="0,0,0,14"/>
         <Button Content="Refresh keys" Click="RefreshKeys_Click" HorizontalAlignment="Left"/>
        </StackPanel></Border>
-       <Border Style="{StaticResource Card}" Margin="0,0,0,18"><StackPanel>
-        <TextBlock Text="Readiness" Style="{StaticResource SectionTitle}"/>
-        <TextBlock x:Name="ReadinessText" Text="Checking prerequisites…" TextWrapping="Wrap" Foreground="#526277" Margin="0,10,0,14"/>
-        <Button Content="Check prerequisites" Click="Prerequisites_Click" HorizontalAlignment="Left"/>
-       </StackPanel></Border>
        <Border Style="{StaticResource Card}"><StackPanel>
-        <TextBlock Text="What would you like to do?" Style="{StaticResource SectionTitle}"/>
-        <TextBlock Text="Prepare a key for a user, or erase existing FIDO credentials without signing in to a tenant." TextWrapping="Wrap" Foreground="#617084" Margin="0,10,0,16"/>
-        <WrapPanel><Button Content="Prepare Key" Click="Prepare_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Key Management" Click="KeyTools_Click"/></WrapPanel>
+        <TextBlock Text="Available actions" Style="{StaticResource SectionTitle}"/>
+        <TextBlock x:Name="ReadinessText" Text="Checking prerequisites…" TextWrapping="Wrap" Foreground="#526277" Margin="0,10,0,16"/>
+        <WrapPanel x:Name="OverviewActions"><Button Content="Prepare Key" Click="Prepare_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Key Management" Click="KeyTools_Click"/><Button Content="Prerequisites" Click="Prerequisites_Click"/></WrapPanel>
        </StackPanel></Border>
       </StackPanel>
      </ScrollViewer>
-     <ScrollViewer x:Name="PreparePage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+     <DockPanel x:Name="PreparePage" Visibility="Collapsed">
+      <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#DCE3EB" BorderThickness="0,1,0,0" Padding="24,10">
+       <WrapPanel><Button x:Name="EnrollButton" Content="Prepare YubiKey" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/><Button x:Name="CredentialsButton" Content="View registered keys" Click="Credentials_Click" IsEnabled="False"/></WrapPanel>
+      </Border>
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28">
        <TextBlock Text="Prepare Key" FontSize="28" FontWeight="SemiBold"/>
-       <TextBlock Text="Connect to a tenant and prepare a key for a user." Foreground="#617084" Margin="0,6,0,24"/>
+       <TextBlock Text="Connect to a tenant and prepare a key for a user. Confirm the physical key in the YubiEnroll prompt." Foreground="#617084" Margin="0,6,0,24"/>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
      <StackPanel>
       <TextBlock Text="1   Connect to a tenant" Style="{StaticResource SectionTitle}"/>
@@ -83,14 +82,14 @@
       <TextBox x:Name="KeyName" MaxLength="100"/><TextBlock Text="Leave blank to use YubiEnroll’s default registration name (the key serial number)." TextWrapping="Wrap" Foreground="#617084" FontSize="12" Margin="0,6,0,0"/>
       <TextBlock x:Name="ResetNotice" TextWrapping="Wrap" Foreground="#9A4B0A" Margin="0,12,0,0"/>
       <Expander Header="Profile details" Margin="0,10,0,14"><TextBlock x:Name="ProfileSummary" TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,0"/></Expander>
-      <WrapPanel><Button x:Name="EnrollButton" Content="Prepare YubiKey" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/><Button x:Name="CredentialsButton" Content="View registered keys" Click="Credentials_Click" IsEnabled="False"/></WrapPanel>
      </StackPanel>
     </Border>
     </Grid>
 
       </StackPanel>
-     </ScrollViewer>
-     <ContentControl x:Name="HostedPage" Visibility="Collapsed"/>
+      </ScrollViewer>
+     </DockPanel>
+     <ContentControl HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="HostedPage" Visibility="Collapsed"/>
      <DockPanel x:Name="DetailsPage" Visibility="Collapsed" Margin="28">
       <TextBlock DockPanel.Dock="Top" Text="Activity &amp; diagnostics" FontSize="26" FontWeight="SemiBold"/>
       <TextBlock DockPanel.Dock="Top" Text="Operation details appear here when available. Interactive terminal output is not recorded." TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,10"/>
@@ -104,7 +103,7 @@
      </DockPanel>
     </Grid>
    </DockPanel>
-   <ContentControl x:Name="TerminalOverlay" Visibility="Collapsed" Background="#F5F7FA"/>
+   <ContentControl HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="TerminalOverlay" Visibility="Collapsed" Background="#F5F7FA"/>
   </Grid>
  </Grid>
 </Window>

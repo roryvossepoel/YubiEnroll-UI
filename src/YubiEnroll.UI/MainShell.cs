@@ -14,7 +14,7 @@ public partial class MainWindow
         SidebarColumn.Width = new GridLength(compact ? 120 : 210);
         BrandTitle.FontSize = compact ? 13 : 22;
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        SelectedKeyCard.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        SidebarKeyCard.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         OverviewButton.Content = compact ? "Home" : "Overview";
         PrepareButton.Content = compact ? "Prepare" : "Prepare Key";
         KeyToolsButton.Content = compact ? "Keys" : "Key Management";
@@ -116,7 +116,7 @@ public partial class MainWindow
     {
         if (SelectedKeyCard == null) return;
         if (OverviewKeys.SelectedItem is not KeyStatus key) { SelectedKeyCard.Text = "No key selected"; return; }
-        SelectedKeyCard.Text = key.Label;
+        SelectedKeyCard.Text = "Inspecting\n" + key.Label;
         KeyInfo.Text = key.Label + "\n" + key.PinLabel + "\nStatus is read-only. It does not verify whether all credentials have been erased.";
     }
     private async Task<int> RunInteractiveAsync(string executable, string[] args)

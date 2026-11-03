@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -69,13 +68,13 @@ internal sealed class PseudoConsole : IDisposable
             if (!UpdateProcThreadAttribute(attributes, 0, (IntPtr)0x00020016, _console, (nuint)IntPtr.Size, IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception();
             var startup = new StartupInfoEx { StartupInfo = new StartupInfo { cb = Marshal.SizeOf<StartupInfoEx>() }, AttributeList = attributes };
             var command = new StringBuilder(string.Join(" ", new[] { executable }.Concat(args).Select(WindowsCommandLine.Quote)));
+            _input = new FileStream(inputWrite, FileAccess.Write, 4096, false); inputWrite = null;
+            _output = new FileStream(outputRead, FileAccess.Read, 4096, false); outputRead = null;
             if (!CreateProcess(executable, command, IntPtr.Zero, IntPtr.Zero, false, 0x00080000 | 0x00000400,
                 IntPtr.Zero, Path.GetDirectoryName(executable), ref startup, out var info)) throw new Win32Exception();
             HasStarted = true;
             _process = info.Process;
             CloseHandle(info.Thread);
-            _input = new FileStream(inputWrite, FileAccess.Write, 4096, false); inputWrite = null;
-            _output = new FileStream(outputRead, FileAccess.Read, 4096, false); outputRead = null;
         }
         finally
         {

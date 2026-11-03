@@ -348,7 +348,7 @@ public partial class MainWindow : Window
         var arguments = EnrollmentCommand.Build(user.Id, profile.Name, KeyName.Text, reset);
         var message = $"Tenant: {provider.Name}\nTenant ID: {provider.TenantId}\n\nUser: {user.Details}\n\nProfile: {profile.Name}\nReset key: {reset?.ToString() ?? "CLI default; review native prompt"}\n\n" +
             (reset != false ? "WARNING: This profile resets the key, or leaves reset to the native default. Existing FIDO credentials may be erased.\n\n" : "") +
-            "Register a YubiKey for this user?";
+            "The key inspected on Overview is not automatically targeted for enrollment. Confirm the physical key in the YubiEnroll prompt.\n\nRegister a YubiKey for this user?";
         if (MessageBox.Show(this, message, "Confirm enrollment", MessageBoxButton.YesNo,
             reset != false ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         await ActivateAsync(provider, profile);

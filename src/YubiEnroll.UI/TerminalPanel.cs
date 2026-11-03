@@ -10,7 +10,7 @@ internal sealed class TerminalPanel : Border
 {
     internal readonly TextBox Screen = new()
     {
-        IsReadOnly = true, AcceptsReturn = true, FontFamily = new FontFamily("Consolas"), FontSize = 13,
+        IsReadOnly = true, IsReadOnlyCaretVisible = true, AcceptsReturn = true, FontFamily = new FontFamily("Consolas"), FontSize = 13,
         Background = new SolidColorBrush(Color.FromRgb(20, 31, 46)), Foreground = Brushes.WhiteSmoke,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(16), ContextMenu = new ContextMenu()
@@ -51,7 +51,7 @@ internal sealed class TerminalPanel : Border
         using var session = new PseudoConsole(); _session = session;
         session.Output += text => Dispatcher.BeginInvoke(() =>
         {
-            _screen.Feed(text); Screen.Text = _screen.Text; Screen.ScrollToEnd();
+            _screen.Feed(text); Screen.Text = _screen.Text; Screen.CaretIndex = Screen.Text.Length; Screen.ScrollToEnd();
         });
         _running = true; Screen.Focus(); _status.Text = "Operation running · embedded terminal preview";
         int exit;

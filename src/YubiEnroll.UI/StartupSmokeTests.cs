@@ -151,6 +151,7 @@ public partial class MainWindow
             CaptureWindow(this, "overview.png");
             ShowPage(PreparePage);
             CaptureWindow(this, "enrollment.png");
+            AssertActionFooterVisible();
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);
@@ -193,6 +194,7 @@ public partial class MainWindow
             CaptureWindow(this, "overview-compact.png");
             ShowPage(PreparePage);
             CaptureWindow(this, "prepare-compact.png");
+            AssertActionFooterVisible();
             Width = 1120; Height = 780;
             var panel = new TerminalPanel("Prepare Key — interactive operation", true);
             panel.Screen.Text = "Example output — synthetic test only\r\nTouch your YubiKey to continue.\r\n";
@@ -206,6 +208,15 @@ public partial class MainWindow
             SetThreadErrorMode(previousErrorMode, out _);
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    private void AssertActionFooterVisible()
+    {
+        UpdateLayout();
+        var root = (System.Windows.FrameworkElement)Content;
+        var bottom = EnrollButton.TranslatePoint(new System.Windows.Point(0, EnrollButton.ActualHeight), root);
+        Assert(EnrollButton.IsVisible && EnrollButton.ActualHeight > 0 && bottom.Y <= root.ActualHeight,
+            "Prepare action remains visible outside the scrolling form");
     }
 
     private async Task TestEmbeddedTerminalAsync(string mockExecutable)
