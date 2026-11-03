@@ -48,6 +48,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: UI-visual-checks
           path: artifacts/win-x64/app/visual-checks/*.png

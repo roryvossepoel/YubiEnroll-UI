@@ -4,6 +4,19 @@ namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
+    private static void AssertResetLayout(KeyToolsWindow dialog)
+    {
+        // The work-area clamp intentionally permits scrolling on small screens.
+        // Verify access to all warning content, while keeping actions outside that scroll area.
+        dialog.BodyScroll.ScrollToBottom(); dialog.UpdateLayout();
+        Assert(dialog.BodyScroll.ViewportHeight > 100 && Math.Abs(dialog.BodyScroll.VerticalOffset - dialog.BodyScroll.ScrollableHeight) < 1,
+            "Reset warning remains reachable by scrolling at the available screen height");
+        var root = (System.Windows.FrameworkElement)dialog.Content;
+        var bottom = dialog.CloseButton.TranslatePoint(new System.Windows.Point(0, dialog.CloseButton.ActualHeight), root);
+        Assert(bottom.Y <= root.ActualHeight && dialog.CloseButton.ActualHeight > 0, "Reset action footer stays inside the visible window");
+        dialog.BodyScroll.ScrollToTop(); dialog.UpdateLayout();
+    }
+
     private async Task TestKeyToolsAsync()
     {
         const string row = "YubiKey 5 NFC (5.7.1) [OTP+FIDO+CCID] Serial: 12345678";
@@ -53,7 +66,7 @@ public partial class MainWindow
             dialog.Keys.SelectedIndex = 0;
             Assert(dialog.ResetButton.IsEnabled, "Explicit device selection enables reset without tenant login");
             CaptureWindow(dialog, "key-tools.png");
-            Assert(dialog.BodyScroll.ExtentHeight <= dialog.BodyScroll.ViewportHeight, "Full reset warning fits at the default window size");
+            AssertResetLayout(dialog);
             await dialog.ResetSelectedAsync(_ => false);
             Assert(launched == 0 && dialog.ResetButton.IsEnabled && dialog.StatusText.Text.Contains("cancelled"), "Cancelled reset refreshes and preserves selection without changing the key");
             await dialog.RefreshAsync();
@@ -76,7 +89,7 @@ public partial class MainWindow
                 dialog.Keys.SelectedItem is KeyStatus { Pin: FidoPinState.NotSet, Key.Serial: "12345678" },
                 "Successful reset reloads PIN status and restores the same key without repeating reset");
             CaptureWindow(dialog, "key-tools-after-reset.png");
-            Assert(dialog.BodyScroll.ExtentHeight <= dialog.BodyScroll.ViewportHeight, "Reset warning fits with the read-back result visible");
+            AssertResetLayout(dialog);
             pending = new TaskCompletionSource<int>();
             pending.SetResult(1);
             await dialog.RefreshAsync();

@@ -55,12 +55,12 @@ public partial class KeyToolsWindow : Window
         StatusText.Text = "Reading connected keys and FIDO PIN status…";
         if (_service == null)
         {
-            StatusText.Text = "YubiKey Manager CLI was not found. Install it in the standard Yubico folder under Program Files, then reopen Key tools. Enrollment does not require this extra tool.";
+            StatusText.Text = "YubiKey Manager CLI was not found. Install it in the standard Yubico folder under Program Files, then reopen Key Management. Enrollment does not require this extra tool.";
             return;
         }
         if (!_administrator)
         {
-            StatusText.Text = "Restart as administrator to access FIDO keys. After restarting, open Key tools and select the key again.";
+            StatusText.Text = "Restart as administrator to access FIDO keys. After restarting, open Key Management and select the key again.";
             return;
         }
         var version = await _service.CheckVersionAsync();
