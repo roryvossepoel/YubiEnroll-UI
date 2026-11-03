@@ -37,6 +37,16 @@ try {
         $profilesText -notmatch 'Second profile\s+8\s+False\s+False\s+False\s+False\s+True\s+10') {
         throw 'CLI did not read all seven edited profile settings and the independent second profile'
     }
+    & ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe --rename-fixture-config $legacy
+    if ($LASTEXITCODE -ne 0) { throw 'Rename fixture failed' }
+    $renamed = & $exe providers show 'UI test renamed' 2>&1
+    if ($LASTEXITCODE -ne 0 -or ($renamed -join "`n") -notmatch 'Renamed profile') { throw 'CLI did not read renamed tenant/profile with spaces' }
+    & $exe providers activate 'UI test renamed'
+    if ($LASTEXITCODE -ne 0) { throw 'Native activation of renamed provider failed' }
+    & ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe --remove-fixture-config $legacy
+    if ($LASTEXITCODE -ne 0) { throw 'Remove fixture failed' }
+    & $exe providers list
+    if ($LASTEXITCODE -ne 0) { throw 'CLI did not accept no providers/no active provider' }
     'PASS: native YubiEnroll 1.2.0 reads the GUI-generated provider and profile.'
 } finally {
     if (Test-Path $legacy) { Remove-Item -LiteralPath $legacy }

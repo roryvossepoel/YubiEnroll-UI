@@ -2,19 +2,33 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.3.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.4.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
 - Reads existing YubiEnroll tenants and profiles, and adds Entra tenants through an Add tenant form. Existing configuration is preserved and backed up before additions.
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
-- Opens a real console for YubiEnroll login and key enrollment, including PIN, touch and reinsertion prompts.
+- Starts on Overview with key inspection and task navigation. Prepare Key, Key Management and Settings share one window.
+- Opens a real console for YubiEnroll login and enrollment, with an opt-in embedded terminal preview under Settings → Prerequisites.
 - Reports the CLI exit code and retrieves the registered credential list after a successful command.
 - Keeps the UI responsive and prevents another operation or application shutdown while an operation is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
-- Offers **Key tools → Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
-- Keeps a session-only activity log. PINs, authentication tokens and console transcripts are not captured or saved by the GUI.
+- Offers **Key Management → Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
+- Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
+
+## Preview 0.4.0 changes
+
+- Overview, Prepare Key and Key Management navigation, with Settings and Help & About.
+- Read-only key/PIN inspection and automatic same-key refresh after FIDO reset.
+- Rename/remove local tenants and profiles; linked tenant pills and shorter setup help.
+- Guided import review, separate export card, prerequisites and technical details.
+- Full-height activity/diagnostics view with empty states.
+- Optional embedded monochrome terminal using Windows ConPTY; external console remains the default.
+
+The embedded terminal is enabled **for the current session only** under Settings → Prerequisites. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Done. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
+
+Only standalone **FIDO reset** is currently available. Additional application-specific resets (issue #7), final product name/logo (#9), and optional batch handover (#19) remain separate follow-up work. No repository rename or full factory-reset claim is made in this preview.
 
 ## Download and start — no C# knowledge required
 
@@ -66,7 +80,7 @@ Open **Settings → Tenants → Add tenant** and enter the tenant name, Director
 
 This form targets Microsoft Entra public cloud. For national clouds, use YubiEnroll’s native provider setup to configure the appropriate endpoints.
 
-The executable is detected in the standard Yubico installation folder under Program Files. **Settings → System** shows the executable, version and configuration path, with **Recheck** and the administrator restart fallback. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
+The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** shows the executable, version and configuration path, with **Recheck** and the administrator restart fallback. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
 
 ### Manage multiple profiles
 
@@ -90,9 +104,9 @@ Technical output is under the collapsed **Activity and diagnostics** section. It
 
 ### Erase a key without enrollment
 
-Open **Key tools → Reset FIDO**. This optional feature requires **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it does not block enrollment.
+Open **Key Management → Reset FIDO**. This optional feature requires **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it does not block enrollment.
 
-Run the GUI as administrator, connect the key via USB, Refresh, and select its model/serial number. No tenant connection or user selection is required. After the GUI confirmation, follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
+Run the GUI as administrator, connect the key via USB, Refresh, and select its model/serial number. Each entry shows the FIDO PIN status read from that key (set, not set, blocked, disabled/unsupported or unknown). No tenant connection or user selection is required. After the GUI confirmation, follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI reloads the connected keys and their PIN status, restoring the same selected key if it is still available. After exit 0 it reports whether the PIN is now unset; an unreadable status stays unknown, and a PIN still present requires inspection. This checks PIN state, not every passkey or cloud registration. A different key is never selected automatically. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
 
 **This permanently resets all FIDO2/U2F credentials and the FIDO PIN on the selected key, for all accounts. Entra and other service registrations remain and must be removed separately.** PIV, OATH, OpenPGP and OTP are outside this reset. Native restrictions and model-specific warnings still apply (including YubiKey 4 FIPS attestation warnings); if ykman refuses the reset, the GUI does not bypass it. Read [Yubico's FIDO reset documentation](https://docs.yubico.com/software/yubikey/tools/ykman/FIDO_Commands.html).
 
@@ -112,16 +126,16 @@ When enrollment fails or its console is closed early, a credential may already h
 
 ## Elevation
 
-The GUI starts with normal user rights. Yubico documents that YubiEnroll requests elevation when needed. If that does not work in your environment, **Settings → System → Restart as administrator** provides an explicit fallback (equivalent to starting the app elevated).
+The GUI starts with normal user rights. Yubico documents that YubiEnroll requests elevation when needed. If that does not work in your environment, **Settings → Prerequisites → Restart as administrator** provides an explicit fallback (equivalent to starting the app elevated).
 
 If UAC uses a different Windows administrator account, the new process sees that account's `%APPDATA%`, configuration and authentication state. No configuration or tokens are copied between accounts. Recheck the tenant banner after restarting.
 
 ## Preview limitations
 
 - Entra ID only; other provider types are not shown.
-- Multiple tenants and profiles can be created and edited under Settings. Existing names cannot be changed; deletion remains in the official CLI. Tenant edits preserve custom cloud endpoints; configure those through native setup or import.
+- Multiple tenants and profiles can be created and edited under Settings. Names can be changed, including spaces. Profile renaming updates linked tenants; tenant renaming updates active_provider. Tenants can be removed locally; a profile must be unassigned from all tenants before removal. Tenant edits preserve custom cloud endpoints; configure those through native setup or import.
 - Search parsing accepts GUID-first table rows and `ID:` blocks. It intentionally rejects unknown formats. The **Details** tab shows the raw search output for diagnosis; real output from the installed YubiEnroll version still needs validation.
-- No bulk enrollment, cloud credential deletion or automatic PIN delivery. Key discovery is limited to the standalone reset window.
+- No automated bulk enrollment, cloud credential deletion or automatic PIN delivery. A temporary batch register with protected PIN handover is tracked separately in issue #19 and is not implemented in this preview. Overview and Key Management inspect connected serial-addressable FIDO keys.
 - One operation at a time within each GUI window. **Do not use a second GUI instance or another YubiEnroll session concurrently:** the CLI has a shared active provider. Configuration checks detect changes before commands but cannot lock out external tools.
 - No persistent audit file or telemetry. Details/activity can contain user and tenant identifiers; redact them before sharing screenshots or bug reports. The official CLI's own logging settings are outside this GUI's control.
 - Closing the console prematurely is treated as unsuccessful/unknown; wait for the CLI result and press Enter instead.

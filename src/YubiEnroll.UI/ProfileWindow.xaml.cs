@@ -17,10 +17,11 @@ public partial class ProfileWindow : Window
         _snapshot = snapshot;
         _editName = editName;
         InitializeComponent();
+        MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
         var profile = editName == null ? new ProfileSetup("") : ProfileConfigWriter.Read(snapshot.Text ?? "", editName);
-        Heading.Text = editName == null ? "New enrollment profile" : "Edit enrollment profile";
+        Heading.Text = editName == null ? "New configuration profile" : "Edit configuration profile";
         ProfileName.Text = profile.Name;
-        ProfileName.IsReadOnly = editName != null;
+        ProfileName.IsReadOnly = false;
         ResetProfile.IsChecked = profile.Reset;
         MinimumPinLength.Text = profile.MinPinLength?.ToString(CultureInfo.InvariantCulture) ?? "";
         AlwaysUv.IsChecked = profile.RequireAlwaysUv;
@@ -29,7 +30,8 @@ public partial class ProfileWindow : Window
         RandomPin.IsChecked = profile.RandomPin;
         GeneratedPinLength.Text = profile.RandomPinLength?.ToString(CultureInfo.InvariantCulture) ?? "";
         var linked = ConfigReader.Parse(snapshot.Text ?? "").Providers.Where(x => x.Profile == editName).Select(x => x.Name).ToArray();
-        UsageText.Text = linked.Length > 0 ? "Shared by tenants: " + string.Join(", ", linked) + ". Changes apply to all of them." :
+        LinkedTenants.ItemsSource = linked;
+        UsageText.Text = linked.Length > 0 ? $"Used by {linked.Length} tenant(s). Changes apply to all of them." :
             "Select this profile in the main window to use it for enrollment.";
     }
 

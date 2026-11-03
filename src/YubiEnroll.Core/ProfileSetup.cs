@@ -61,10 +61,18 @@ public static class ProfileConfigWriter
         }
         else
         {
-            if (setup.Name != editName)
-                throw new ArgumentException("An existing profile cannot be renamed because tenants may reference it.");
             if (!profiles.TryGetValue(editName, out var value) || value is not TomlTable table)
                 throw new InvalidOperationException("The selected profile no longer exists. Reload the configuration.");
+            if (profiles.Keys.Any(x => x != editName && x.Equals(setup.Name, StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException("A profile with this name already exists.");
+            if (setup.Name != editName)
+            {
+                profiles.Remove(editName);
+                if (model.TryGetValue("providers", out var providers) && providers is TomlTable tenants)
+                    foreach (var tenant in tenants.Values.OfType<TomlTable>())
+                        if (tenant.TryGetValue("profile", out var reference) && reference is string name && name == editName)
+                            tenant["profile"] = setup.Name;
+            }
             profile = table; // Preserve unknown fields on the edited profile.
         }
         void Set(string key, object? value)
@@ -91,4 +99,14 @@ public static class ProfileConfigWriter
 
     public static string? Save(ConfigSnapshot expected, ProfileSetup setup, string? editName = null) =>
         ConfigFileWriter.Save(expected, Build(expected.Text, setup, editName));
+
+    public static string Remove(string text, string name)
+    {
+        Read(text, name);
+        if (ConfigReader.Parse(text).Providers.Any(x => x.Profile == name))
+            throw new InvalidOperationException("This profile is used by tenants. Assign a different profile to those tenants before removing it.");
+        var model = Model(text);
+        Profiles(model).Remove(name);
+        return Toml.FromModel(model);
+    }
 }

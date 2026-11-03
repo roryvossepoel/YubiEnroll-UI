@@ -107,8 +107,10 @@ public static class TenantConfigWriter
     {
         var setup = request.Validate();
         Read(text, name);
-        if (setup.Name != name) throw new ArgumentException("Existing tenants cannot be renamed in this editor.");
         var model = Toml.ToModel(text);
+        var providers = (TomlTable)model["providers"];
+        if (providers.Keys.Any(x => x != name && x.Equals(setup.Name, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("A tenant with this name already exists.");
         var profiles = model.TryGetValue("profiles", out var p) && p is TomlTable pt ? pt : new TomlTable();
         if (setup.CreateProfile)
         {
@@ -124,6 +126,23 @@ public static class TenantConfigWriter
         tenant["client_id"] = setup.ClientId;
         tenant["redirect_uri"] = setup.RedirectUri;
         tenant["profile"] = setup.ProfileName;
+        if (setup.Name != name)
+        {
+            providers.Remove(name);
+            providers[setup.Name] = tenant;
+            if (model.TryGetValue("active_provider", out var active) && active is string a && a == name)
+                model["active_provider"] = setup.Name;
+        }
+        return Toml.FromModel(model);
+    }
+
+    public static string Remove(string text, string name)
+    {
+        Read(text, name);
+        var model = Toml.ToModel(text);
+        ((TomlTable)model["providers"]).Remove(name);
+        if (model.TryGetValue("active_provider", out var active) && active is string a && a == name)
+            model.Remove("active_provider");
         return Toml.FromModel(model);
     }
 

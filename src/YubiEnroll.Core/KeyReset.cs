@@ -8,6 +8,22 @@ public sealed record ResetKey(string Serial, string Model)
     public string Label => $"{Model} · Serial {Serial}";
 }
 
+public enum FidoPinState { Unknown, NotSet, Set, Blocked, Disabled, Unsupported }
+
+public sealed record KeyStatus(ResetKey Key, FidoPinState Pin)
+{
+    public string Label => Key.Label;
+    public string PinLabel => "FIDO PIN: " + (Pin switch
+    {
+        FidoPinState.NotSet => "Not set",
+        FidoPinState.Set => "Set",
+        FidoPinState.Blocked => "Set (blocked)",
+        FidoPinState.Disabled => "Disabled",
+        FidoPinState.Unsupported => "Not supported",
+        _ => "Unknown — could not verify"
+    });
+}
+
 public sealed record KeyInventory(IReadOnlyList<ResetKey> Keys, int Unavailable);
 
 // Deliberately limited to USB FIDO keys with a readable serial number. Never targets the first device.
@@ -56,6 +72,30 @@ public sealed class KeyResetService(
     }
 
     public async Task<KeyInventory> DiscoverAsync() => ParseKeys(await ReadAsync(["list"]));
+
+    public static FidoPinState ParsePinState(string output)
+    {
+        var fields = output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.StartsWith("PIN:", StringComparison.Ordinal)).ToArray();
+        if (fields.Length != 1) return FidoPinState.Unknown;
+        var value = fields[0][4..].Trim();
+        return value switch
+        {
+            "Not set" => FidoPinState.NotSet,
+            "Set" => FidoPinState.Set,
+            "Blocked" => FidoPinState.Blocked,
+            "Disabled" => FidoPinState.Disabled,
+            "Not supported" => FidoPinState.Unsupported,
+            _ when Regex.IsMatch(value, @"\A[1-9][0-9]* attempt\(s\) remaining\z") => FidoPinState.Set,
+            _ => FidoPinState.Unknown
+        };
+    }
+
+    public async Task<FidoPinState> ReadPinStateAsync(ResetKey key)
+    {
+        ValidateSerial(key.Serial);
+        return ParsePinState(await ReadAsync(["--device", key.Serial, "fido", "info"]));
+    }
 
     private static void ValidateSerial(string serial)
     {

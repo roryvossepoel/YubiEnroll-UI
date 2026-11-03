@@ -28,21 +28,24 @@ public partial class MainWindow : Window
     private Provider SelectedProvider => Tenants.SelectedItem as Provider
         ?? throw new InvalidOperationException("Select an Entra tenant first.");
     private EnrollmentProfile SelectedProfile => Profiles.SelectedItem as EnrollmentProfile
-        ?? throw new InvalidOperationException("Select an enrollment profile first.");
+        ?? throw new InvalidOperationException("Select a configuration profile first.");
     private UserCandidate SelectedUser => Users.SelectedItem as UserCandidate
         ?? throw new InvalidOperationException("Search and select a user first.");
     private CliRunner Runner => File.Exists(_exePath) ? new(_exePath)
-        : throw new InvalidOperationException("Install Yubico YubiEnroll in its standard location, then recheck in Settings → System.");
+        : throw new InvalidOperationException("Install Yubico YubiEnroll in its standard location, then recheck in Settings → Prerequisites.");
 
     public MainWindow(bool smokeTest = false)
     {
         _smokeTest = smokeTest;
         InitializeComponent();
+        MaxHeight = Math.Max(440, SystemParameters.WorkArea.Height - 24);
+        MaxWidth = Math.Max(640, SystemParameters.WorkArea.Width - 24);
+        SizeChanged += (_, _) => ResizePreparation();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        if (!_smokeTest) await InitializeAsync();
+        if (!_smokeTest) { await InitializeAsync(); await RefreshOverviewAsync(); }
     }
 
     private async Task InitializeAsync(string? appDataOverride = null, string? executableOverride = null)
@@ -65,7 +68,7 @@ public partial class MainWindow : Window
         else
         {
             _versionText = "YubiEnroll is not installed";
-            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → System → Recheck.");
+            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → Prerequisites → Recheck.");
         }
         // Config loading is independent of executable discovery/version probing. An error in one
         // must not hide the other or disable Settings and prerequisite recovery.
@@ -78,7 +81,7 @@ public partial class MainWindow : Window
         if (issues.Count > 0 && _config?.Providers.Count == 0) StatusText.Text += "\n" + SetupOrReadyMessage();
         if (issues.Count > 0)
         {
-            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then recheck in Settings → System.";
+            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then recheck in Settings → Prerequisites.";
             if (Diagnostics.Text.Length > 0) OutputTabs.SelectedIndex = 2;
         }
     }
@@ -86,7 +89,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.3.0";
+    private string ReadyMessage() => $"Ready · {(IsAdministrator() ? "administrator" : "standard user")} · preview 0.4.0";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -168,7 +171,7 @@ public partial class MainWindow : Window
         SearchPanel.IsEnabled = IsConnected;
         PreparePanel.IsEnabled = IsConnected && Users.SelectedItem != null;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
-        ProfileSummary.Text = profile?.Summary ?? "Choose an enrollment profile.";
+        ProfileSummary.Text = profile?.Summary ?? "Choose a configuration profile.";
         ResetNotice.Text = "";
         if (profile != null)
         {
@@ -234,6 +237,7 @@ public partial class MainWindow : Window
         if (_busy) return false;
         _busy = true;
         WorkPanel.IsEnabled = false;
+        Navigation.IsEnabled = false; AboutButton.IsEnabled = false;
         SettingsButton.IsEnabled = false;
         KeyToolsButton.IsEnabled = false;
         try { await action(); return true; }
@@ -241,7 +245,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.3.0\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.0\n{report.Diagnostic}\n\n");
             LogExpander.IsExpanded = true;
             OutputTabs.SelectedIndex = 2;
             Record($"{operation} failed ({ex.GetType().Name}, 0x{ex.HResult:X8}).");
@@ -249,7 +253,7 @@ public partial class MainWindow : Window
                 MessageBox.Show(this, report.Summary, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
-        finally { WorkPanel.IsEnabled = true; SettingsButton.IsEnabled = true; KeyToolsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
+        finally { WorkPanel.IsEnabled = true; Navigation.IsEnabled = true; AboutButton.IsEnabled = true; SettingsButton.IsEnabled = true; KeyToolsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
     }
 
     private void Record(string text)
@@ -260,29 +264,21 @@ public partial class MainWindow : Window
 
     private async void KeyTools_Click(object sender, RoutedEventArgs e)
     {
-        KeyToolsWindow? dialog = null;
-        await RunAsync(() =>
+        if (_busy) return;
+        var dialog = new KeyToolsWindow(IsAdministrator(), RunInteractiveAsync);
+        dialog.BusyChanged += active => { Navigation.IsEnabled = !active; SettingsButton.IsEnabled = !active; AboutButton.IsEnabled = !active; };
+        dialog.Finished += async () =>
         {
-            dialog = new KeyToolsWindow(IsAdministrator()) { Owner = this };
-            dialog.ShowDialog();
-            return Task.CompletedTask;
-        }, "Key tools");
-        if (dialog?.ElevationRequested == true) Elevate_Click(sender, e);
+            var elevate = dialog.ElevationRequested;
+            ShowPage(OverviewPage);
+            await RefreshOverviewAsync();
+            if (elevate) Elevate_Click(sender, e);
+        };
+        Host(dialog);
+        await dialog.RefreshAsync();
     }
 
-    private async void Settings_Click(object sender, RoutedEventArgs e)
-    {
-        SettingsWindow? dialog = null;
-        await RunAsync(() =>
-        {
-            dialog = new SettingsWindow(_configPath, _exePath, _versionText) { Owner = this };
-            dialog.ShowDialog();
-            if (dialog.Changed) LoadConfiguration(_configPath);
-            return Task.CompletedTask;
-        }, "Settings");
-        if (dialog?.RecheckRequested == true) await InitializeAsync();
-        if (dialog?.ElevationRequested == true) Elevate_Click(sender, e);
-    }
+    private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
 
     private async void Login_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
@@ -290,8 +286,8 @@ public partial class MainWindow : Window
         _connectedProvider = null;
         ResetSelection();
         await ActivateAsync(provider);
-        StatusText.Text = "Complete login in the console/browser, then press Enter in the console.";
-        var exit = await Runner.InteractiveAsync("login");
+        StatusText.Text = EmbeddedTerminal ? "Complete the sign-in prompts below and in your browser, then choose Done." : "Complete login in the console/browser, then press Enter in the console.";
+        var exit = await RunInteractiveAsync(_exePath, ["login"]);
         Record($"Login command finished with exit {exit}.");
         if (exit == 0)
         {
@@ -357,8 +353,8 @@ public partial class MainWindow : Window
             reset != false ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         await ActivateAsync(provider, profile);
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {profile.Name} · reset {reset}.");
-        StatusText.Text = "Follow the console prompts. Record the PIN securely, then press Enter to return.";
-        var code = await Runner.InteractiveAsync(arguments);
+        StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before choosing Done." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
+        var code = await RunInteractiveAsync(_exePath, arguments);
         Record($"Enrollment command returned exit {code}.");
         if (code != 0)
         {
@@ -408,7 +404,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_busy) return;
+        if (!_busy && !(_hostedWindow is KeyToolsWindow tools && tools.IsOperationActive)) return;
         e.Cancel = true;
         MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
     }

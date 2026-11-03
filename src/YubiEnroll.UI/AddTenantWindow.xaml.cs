@@ -22,6 +22,7 @@ public partial class AddTenantWindow : Window
         _snapshot = snapshot;
         _editName = editName;
         InitializeComponent();
+        MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
 
         var config = ConfigReader.Parse(snapshot.Text ?? "");
         ProfileChoice.Items.Add(new ProfileOption("Create a new profile", null));
@@ -33,7 +34,7 @@ public partial class AddTenantWindow : Window
             Heading.Text = "Edit Microsoft Entra tenant";
             Title = Heading.Text;
             TenantName.Text = tenant.Name;
-            TenantName.IsReadOnly = true;
+            TenantName.IsReadOnly = false;
             TenantId.Text = tenant.TenantId;
             ClientId.Text = tenant.ClientId;
             RedirectUri.Text = tenant.RedirectUri;

@@ -16,6 +16,7 @@ public partial class MainWindow
         try
         {
             await TestKeyToolsAsync();
+            await TestEmbeddedTerminalAsync(mockExecutable);
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -75,7 +76,7 @@ public partial class MainWindow
             {
                 try
                 {
-                    Assert(editDialog.UsageText.Text.Contains("New tenant") && editDialog.ProfileName.IsReadOnly, "Editor shows linked tenants and protects profile name");
+                    Assert(editDialog.LinkedTenants.Items.Count == 1 && !editDialog.ProfileName.IsReadOnly, "Editor shows linked tenants and permits profile renaming");
                     editDialog.ResetProfile.IsChecked = true;
                     editDialog.ForcePinChange.IsChecked = true;
                     Assert(editDialog.TrySave(), "Existing profile can be edited");
@@ -97,7 +98,7 @@ public partial class MainWindow
             {
                 try
                 {
-                    Assert(tenantEditor.TenantName.IsReadOnly && tenantEditor.ClientId.Text.Length > 0, "Tenant editor loads existing values and protects name");
+                    Assert(!tenantEditor.TenantName.IsReadOnly && tenantEditor.ClientId.Text.Length > 0, "Tenant editor loads existing values and permits renaming");
                     tenantEditor.ClientId.Text = "bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee";
                     Assert(tenantEditor.TrySave(), "Tenant form edits existing tenant without creating duplicates");
                 }
@@ -110,7 +111,7 @@ public partial class MainWindow
             {
                 try
                 {
-                    Assert(settings.SettingsTabs.Items.Count == 4 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                    Assert(settings.SettingsTabs.Items.Count == 5 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
                         "Settings separates tenants, profiles, system and transfer");
                     var transfer = ConfigTransfer.Export(File.ReadAllText(path));
                     var beforePreview = File.ReadAllText(path);
@@ -129,6 +130,8 @@ public partial class MainWindow
                     CaptureWindow(settings, "settings-system.png");
                     settings.SettingsTabs.SelectedIndex = 3;
                     CaptureWindow(settings, "settings-transfer.png");
+                    settings.SettingsTabs.SelectedIndex = 4;
+                    CaptureWindow(settings, "settings-about.png");
                 }
                 finally { settings.Close(); }
             });
@@ -142,7 +145,11 @@ public partial class MainWindow
             Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") };
             Users.SelectedIndex = 0;
             Assert(PreparePanel.IsEnabled && EnrollButton.IsEnabled && ResetNotice.Text.Contains("erases"), "Profile reset is visible before enrollment");
-            LogExpander.IsExpanded = false;
+            ShowPage(OverviewPage);
+            ReadinessText.Text = "YubiEnroll: installed · Administrator: yes\nConfiguration: 1 tenant · 2 profiles";
+            KeyInfo.Text = "Connect a YubiKey to get started.";
+            CaptureWindow(this, "overview.png");
+            ShowPage(PreparePage);
             CaptureWindow(this, "enrollment.png");
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
@@ -178,12 +185,50 @@ public partial class MainWindow
             await InitializeAsync(root, mockExecutable);
             Assert(StatusText.Text.StartsWith("Ready") && _versionText.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");
             Assert(Diagnostics.Text.Length == 0 && WorkPanel.IsEnabled, "Successful reload clears diagnostics and busy state");
+            OpenSettings();
+            Assert(HostedPage.Visibility == System.Windows.Visibility.Visible && HostedPage.Content != null, "Settings opens inside the main shell");
+            CaptureWindow(this, "shell-settings.png");
+            ShowPage(OverviewPage);
+            Width = 800; Height = 580;
+            CaptureWindow(this, "overview-compact.png");
+            ShowPage(PreparePage);
+            CaptureWindow(this, "prepare-compact.png");
+            Width = 1120; Height = 780;
+            var panel = new TerminalPanel("Prepare Key — interactive operation", true);
+            panel.Screen.Text = "Example output — synthetic test only\r\nTouch your YubiKey to continue.\r\n";
+            TerminalOverlay.Content = panel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
+            CaptureWindow(this, "embedded-terminal.png");
+            TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
+
         }
         finally
         {
             SetThreadErrorMode(previousErrorMode, out _);
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    private async Task TestEmbeddedTerminalAsync(string mockExecutable)
+    {
+        using var terminal = new PseudoConsole();
+        var output = new System.Text.StringBuilder();
+        var sent = false;
+        var sentHidden = false;
+        terminal.Output += text =>
+        {
+            lock (output)
+            {
+                output.Append(text);
+                if (!sent && output.ToString().Contains("TERMINAL_READY")) { sent = true; terminal.Write("confirm\r"); }
+                if (!sentHidden && output.ToString().Contains("HIDDEN_READY")) { sentHidden = true; terminal.Write("synthetic-pin\r"); }
+            }
+        };
+        var run = terminal.RunAsync(mockExecutable, ["--terminal-probe"]);
+        var code = await run.WaitAsync(TimeSpan.FromSeconds(20)); // Synthetic test only; production operations have no timeout.
+        Assert(code == 7 && output.ToString().Contains("INPUT_OK"), "Embedded ConPTY round-trips interactive input and preserves exit code");
+        Assert(output.ToString().Contains("HIDDEN_OK") && !output.ToString().Contains("synthetic-pin"), "Native no-echo input is not displayed by embedded terminal");
+        var screen = new TerminalScreen(); screen.Feed(output.ToString());
+        Assert(screen.Text.Contains("VT_OK"), "Embedded terminal renders native VT output");
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file)

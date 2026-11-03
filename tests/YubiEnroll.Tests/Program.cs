@@ -20,6 +20,21 @@ if (args.FirstOrDefault() == "--echo")
     return 0;
 }
 
+if (args.FirstOrDefault() == "--terminal-probe")
+{
+    Console.WriteLine("TERMINAL_READY");
+    var response = Console.ReadLine();
+    Console.WriteLine(response == "confirm" ? "INPUT_OK" : "INPUT_FAILED");
+    Console.Write("\x1b[32mVT_OK\x1b[0m\r\n");
+    var inputHandle = ConsoleProbe.GetStdHandle(-10);
+    if (!ConsoleProbe.GetConsoleMode(inputHandle, out var mode) || !ConsoleProbe.SetConsoleMode(inputHandle, (mode | 2u) & ~4u)) return 10;
+    Console.WriteLine("HIDDEN_READY");
+    var hidden = Console.ReadLine();
+    ConsoleProbe.SetConsoleMode(inputHandle, mode);
+    Console.WriteLine(hidden == "synthetic-pin" ? "HIDDEN_OK" : "HIDDEN_FAILED");
+    return response == "confirm" && hidden == "synthetic-pin" ? 7 : 9;
+}
+
 if (args.FirstOrDefault() == "--write-fixture-config")
 {
     // Dedicated CI mode: caller supplies an isolated synthetic path, never reads a real tenant.
@@ -31,6 +46,21 @@ if (args.FirstOrDefault() == "--write-fixture-config")
     var fixture = ConfigSnapshot.Read(args[1]);
     ConfigFileWriter.Save(fixture, ConfigTransfer.ValidateImport(ConfigTransfer.Export(fixture.Text!)));
     Console.WriteLine("Synthetic provider and multiple profiles written, edited and transferred.");
+    return 0;
+}
+
+if (args.FirstOrDefault() == "--rename-fixture-config")
+{
+    var snapshot = ConfigSnapshot.Read(args[1]);
+    var text = TenantConfigWriter.Edit(snapshot.Text!, TenantConfigWriter.Read(snapshot.Text!, "UI-test") with { Name = "UI test renamed" }, "UI-test");
+    text = ProfileConfigWriter.Build(text, ProfileConfigWriter.Read(text, "UI-test-profile") with { Name = "Renamed profile" }, "UI-test-profile");
+    ConfigFileWriter.Save(snapshot, text);
+    return 0;
+}
+if (args.FirstOrDefault() == "--remove-fixture-config")
+{
+    var snapshot = ConfigSnapshot.Read(args[1]);
+    ConfigFileWriter.Save(snapshot, TenantConfigWriter.Remove(snapshot.Text!, "UI test renamed"));
     return 0;
 }
 
@@ -162,7 +192,12 @@ Check(omitted.RandomPin == null && omitted.RequireEa == null && omitted.RandomPi
 Check(ProfileConfigWriter.Read(ProfileConfigWriter.Build(configText, omitted, omitted.Name), omitted.Name) == omitted,
     "Editing does not replace omitted options with GUI defaults");
 Reject(() => ProfileConfigWriter.Build(multiple, separate with { Name = "INDEPENDENT PROFILE" }), "Duplicate profile names rejected");
-Reject(() => ProfileConfigWriter.Build(multiple, policy with { Name = "Renamed" }, "Standard"), "Shared profile cannot be silently renamed");
+var renamedProfile = ProfileConfigWriter.Build(multiple, policy with { Name = "Renamed profile" }, "Standard");
+Check(ConfigReader.Parse(renamedProfile).Providers.Where(x => x.Profile == "Renamed profile").Count() == ConfigReader.Parse(multiple).Providers.Where(x => x.Profile == "Standard").Count(), "Profile rename updates every linked tenant atomically");
+Check(ProfileConfigWriter.Read(renamedProfile, "Renamed profile") == policy with { Name = "Renamed profile" }, "Renaming preserves profile values and accepts spaces");
+Reject(() => ProfileConfigWriter.Build(multiple, policy with { Name = separate.Name }, "Standard"), "Profile rename rejects duplicate names");
+Reject(() => ProfileConfigWriter.Remove(multiple, "Standard"), "Linked profile cannot be removed");
+Check(!ConfigReader.Parse(ProfileConfigWriter.Remove(multiple, separate.Name)).Profiles.Any(x => x.Name == separate.Name), "Unused profile can be removed");
 Reject(() => ProfileConfigWriter.Build(multiple, separate with { RandomPinLength = 6 }), "Generated PIN cannot be shorter than minimum");
 Reject(() => ProfileConfigWriter.Build(multiple, separate with { MinPinLength = 64 }), "Profile PIN limit enforced");
 var endpoints = shared.Replace("provider = \"ENTRA\"", "provider = \"ENTRA\"\nentra_base_url = \"https://login.microsoftonline.com\"\ngraph_base_url = \"https://graph.microsoft.com\"");
@@ -263,5 +298,48 @@ await ExerciseReset("FIDO access denied", true, false, true, false, 0);
 await ExerciseReset("Disconnected before confirmation", true, false, false, true, 0);
 await ExerciseReset("Confirmed reset", true, false, false, false, 0);
 await ExerciseReset("Native reset failure", true, false, false, false, 1);
+Check(KeyResetService.ParsePinState("AAGUID: example\r\nPIN:                Not set\r\nMinimum PIN length: 4") == FidoPinState.NotSet,
+    "Aligned native FIDO output recognizes an unset PIN");
+Check(KeyResetService.ParsePinState("PIN: 8 attempt(s) remaining") == FidoPinState.Set, "Remaining attempts mean a PIN is configured");
+Check(KeyResetService.ParsePinState("PIN: 1 attempt(s) remaining\nPIN is temporarily blocked.") == FidoPinState.Set, "Temporary lock does not imply PIN removed");
+Check(KeyResetService.ParsePinState("PIN: Blocked") == FidoPinState.Blocked, "Blocked PIN remains set");
+Check(KeyResetService.ParsePinState("PIN: Disabled") == FidoPinState.Disabled, "Disabled application is distinct from unset PIN");
+Check(KeyResetService.ParsePinState("PIN: Not supported") == FidoPinState.Unsupported, "Unsupported PIN is distinct from unset PIN");
+Check(KeyResetService.ParsePinState("PIN: Set") == FidoPinState.Set, "Legacy explicit PIN status supported");
+Check(KeyResetService.ParsePinState("NOTE: PIN: Not set") == FidoPinState.Unknown, "Diagnostic text cannot claim PIN removal");
+Check(KeyResetService.ParsePinState("PIN: Not set\nPIN: 8 attempt(s) remaining") == FidoPinState.Unknown, "Contradictory PIN fields remain unknown");
+Check(KeyResetService.ParsePinState("PIN: Unexpected format") == FidoPinState.Unknown &&
+    KeyResetService.ParsePinState("") == FidoPinState.Unknown, "Missing and unfamiliar PIN status never imply no PIN");
+var statusReader = new KeyResetService(a =>
+{
+    Check(a.SequenceEqual(new[] { "--device", "12345678", "fido", "info" }), "PIN status uses the selected serial and only fido info");
+    return Task.FromResult(new CliResult(0, "PIN: Not set", ""));
+}, _ => throw new Exception("Status reading must never launch an interactive operation"));
+Check(await statusReader.ReadPinStateAsync(keys.Keys.Single()) == FidoPinState.NotSet, "Read-only status result reaches caller");
+var tenantRename = TenantConfigWriter.Read(shared, setup.Name) with { Name = "Renamed tenant" };
+var renamedTenant = TenantConfigWriter.Edit(shared, tenantRename, setup.Name);
+Check(ConfigReader.Parse(renamedTenant).Providers.Any(x => x.Name == "Renamed tenant") && !ConfigReader.Parse(renamedTenant).Providers.Any(x => x.Name == setup.Name), "Tenant rename replaces local name without duplication");
+var firstTenantText = TenantConfigWriter.Build(null, setup);
+var activeRenamed = TenantConfigWriter.Edit(firstTenantText, setup with { Name = "Active renamed", CreateProfile = false }, setup.Name);
+Check(ConfigReader.Parse(activeRenamed).ActiveProvider == "Active renamed", "Renaming active tenant updates active_provider");
+var lastRemoved = TenantConfigWriter.Remove(activeRenamed, "Active renamed");
+Check(ConfigReader.Parse(lastRemoved).Providers.Count == 0 && ConfigReader.Parse(lastRemoved).Profiles.Count == 1 && !lastRemoved.Contains("active_provider"), "Removing last tenant clears activation and preserves profiles");
+var screen = new TerminalScreen(20, 4);
+screen.Feed("hello\r\nPIN: "); screen.Feed("\x1b[32mNot set\x1b[0m");
+Check(screen.Text.Contains("PIN: Not set") && !screen.Text.Contains('\x1b'), "Terminal renders split output and strips display attributes");
+screen.Feed("\r\x1b[2KDone");
+Check(screen.Text.EndsWith("Done") && !screen.Text.Contains("Not set"), "Terminal carriage return and erase line remove stale output");
+screen.Feed("\x1b]52;c;do-not-copy\a");
+Check(!screen.Text.Contains("do-not-copy"), "Terminal ignores clipboard control sequences");
+screen.Clear(); Check(screen.Text.Length == 0, "Terminal buffers clear after dismissal");
+Check(WindowsCommandLine.Quote("name with spaces") == "\"name with spaces\"", "Native process argument quoting preserves spaces");
+Check(WindowsCommandLine.Quote("x\"y") == "\"x\\\"y\"", "Native process argument quoting escapes quotes");
 Console.WriteLine($"{tests} checks passed.");
 return 0;
+
+internal static class ConsoleProbe
+{
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] internal static extern IntPtr GetStdHandle(int handle);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)] internal static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)] internal static extern bool SetConsoleMode(IntPtr handle, uint mode);
+}
