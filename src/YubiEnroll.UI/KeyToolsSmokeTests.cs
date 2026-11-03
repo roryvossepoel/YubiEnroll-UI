@@ -48,6 +48,7 @@ public partial class MainWindow
             dialog.Keys.SelectedIndex = 0;
             Assert(dialog.ResetButton.IsEnabled, "Explicit device selection enables reset without tenant login");
             CaptureWindow(dialog, "key-tools.png");
+            Assert(dialog.BodyScroll.ExtentHeight <= dialog.BodyScroll.ViewportHeight, "Full reset warning fits at the default window size");
             await dialog.ResetSelectedAsync(_ => false);
             Assert(launched == 0 && !dialog.ResetButton.IsEnabled && dialog.StatusText.Text.Contains("cancelled"), "Cancelled reset makes no change and clears selection");
             await dialog.RefreshAsync();

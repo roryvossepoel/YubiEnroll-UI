@@ -1,5 +1,5 @@
 <Window x:Class="YubiEnroll.UI.KeyToolsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Key tools" Width="690" Height="620" MinWidth="620" MinHeight="560" WindowStartupLocation="CenterOwner" Background="#F5F7FA" FontFamily="Segoe UI" FontSize="14" Foreground="#172B41" Loaded="Window_Loaded" Closing="Window_Closing">
+ Title="Key tools" Width="690" Height="720" MinWidth="620" MinHeight="600" WindowStartupLocation="CenterOwner" Background="#F5F7FA" FontFamily="Segoe UI" FontSize="14" Foreground="#172B41" Loaded="Window_Loaded" Closing="Window_Closing">
  <DockPanel Margin="24">
   <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20">
    <TextBlock Text="Reset FIDO" FontSize="25" FontWeight="SemiBold"/>
@@ -12,7 +12,7 @@
     <Button x:Name="ResetButton" Content="Reset FIDO…" Click="Reset_Click" IsEnabled="False" Background="#A52C36" Foreground="White"/>
    </StackPanel>
   </StackPanel>
-  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <ScrollViewer x:Name="BodyScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
    <StackPanel>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
      <StackPanel>
