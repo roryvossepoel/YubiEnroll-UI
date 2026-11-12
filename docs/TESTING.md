@@ -1,4 +1,4 @@
-# Manual acceptance checks for preview 0.4.0
+# Manual acceptance checks for preview 0.4.1
 
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 
@@ -83,3 +83,16 @@ Synthetic UI tests cover refreshed selection/status, cancellation, failed reads,
 8. No claim of physical-device acceptance is made by the synthetic CI checks. CI exercises ConPTY input, no-echo synthetic input, VT rendering and exit-code propagation without authenticating or touching a key.
 
 The optional temporary enrollment register/PIN handover is tracked in issue #19; it is not part of this preview. Additional application reset options remain in issue #7.
+
+
+## Preview 0.4.1 feedback acceptance
+- Maximize on the primary and secondary monitor at 100%, 150% and 200% scaling. The window must fill the work area above the taskbar.
+- Inspect one key, navigate to Key Management: the same serial is selected. Add a second key, then remove the selected key: another device must never be substituted silently. Reinsert and refresh.
+- Verify blocked / unset / unknown PIN presentation. Unknown is not evidence that a key is empty.
+- Connect using the embedded terminal (now default). Native confirmation remains. Browser sign-in success returns automatically; failures remain visible until Done. External console remains available in Settings.
+- Close the external console AFTER the native tool has completed: the log must retain the native exit code, not the host window's close code. Closing before completion must not be treated as success.
+- Search a user, open Registered keys, refresh, close: tenant/user/profile selection stays intact. These are cloud registrations, not a physical-key inventory.
+- Inspect Settings → Activity log after a failed enrollment. HTTP status/request IDs may be recorded; no generated PIN, tokens or terminal transcript may be exported.
+- A 405 response must remain reported as a 405; do not infer missing role activation. Retry with the required role activated in the correct tenant and retain request IDs if the error persists.
+- Enrollment still uses native YubiEnroll device selection. The review dialog explicitly distinguishes the inspected key from the native enrollment target. Use one test key and confirm the physical device.
+- Native USB reset, real Entra/PIM sign-in and enrollment require manual acceptance. Extra application resets and encrypted batch handover remain out of scope for this polish.

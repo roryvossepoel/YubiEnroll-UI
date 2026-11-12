@@ -20,9 +20,12 @@ internal sealed class TerminalPanel : Border
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
     private readonly TaskCompletionSource _dismissed = new();
     private PseudoConsole? _session;
+    internal string FailureDetail { get; private set; } = "";
     private bool _running;
-    internal TerminalPanel(string title, bool enrollment)
+    private readonly bool _autoCloseOnSuccess;
+    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false)
     {
+        _autoCloseOnSuccess = autoCloseOnSuccess;
         Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
         var layout = new DockPanel(); Child = layout;
         var heading = new TextBlock { Text = title, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
@@ -60,6 +63,7 @@ internal sealed class TerminalPanel : Border
             exit = await session.RunAsync(executable, args);
             // Process queued final output before enabling dismissal.
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+            if (exit != 0) FailureDetail = InteractiveFailure.Describe(_screen.Text);
             _status.Text = $"The Yubico tool finished with exit code {exit}." + (exit == 0 ? "" : " The operation may be incomplete. Inspect the result before retrying.");
         }
         catch
@@ -68,6 +72,7 @@ internal sealed class TerminalPanel : Border
             _status.Text = session.HasStarted ? "The terminal connection failed after launch. The operation's outcome is unknown. No retry was started." : "The embedded terminal could not start. Choose external console in Settings before trying again.";
         }
         finally { _running = false; _session = null; _done.IsEnabled = true; _done.Focus(); }
+        if (_autoCloseOnSuccess && exit == 0) { _screen.Clear(); Screen.Clear(); return exit; }
         await _dismissed.Task;
         return exit;
     }

@@ -47,10 +47,20 @@ public sealed class CliRunner(string executable)
     {
         var host = Path.Combine(AppContext.BaseDirectory, "YubiEnroll.ConsoleHost.exe");
         if (!File.Exists(host)) throw new FileNotFoundException("Console host is missing. Extract the complete download.");
-        var info = StartInfo(host, new[] { Executable }.Concat(arguments));
-        using var process = Process.Start(info) ?? throw new IOException("Cannot open the interactive console.");
-        await process.WaitForExitAsync();
-        return process.ExitCode;
+        var directory = Path.Combine(Path.GetTempPath(), "YubiEnroll-operation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var resultFile = Path.Combine(directory, "exit-code");
+        try
+        {
+            var info = StartInfo(host, new[] { "--result-file", resultFile, Executable }.Concat(arguments));
+            using var process = Process.Start(info) ?? throw new IOException("Cannot open the interactive console.");
+            await process.WaitForExitAsync();
+            // Preserve the native result even when the host is closed at its final Enter prompt.
+            if (File.Exists(resultFile) && int.TryParse(await File.ReadAllTextAsync(resultFile), out var code)) return code;
+            return process.ExitCode == 0 ? 125 : process.ExitCode; // No confirmed native outcome.
+        }
+        finally { try { Directory.Delete(directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+
     }
 }
 

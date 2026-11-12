@@ -4,7 +4,7 @@ namespace YubiEnroll.Core;
 
 public sealed record UserCandidate(string Id, string Details)
 {
-    public string Label => Regex.Replace(Details.Replace(Id, "", StringComparison.OrdinalIgnoreCase).Trim(' ', '|', '│'), @"\s{2,}", "  ·  ");
+    public string Label => string.Join("  ·  ", Regex.Split(Details.Replace(Id, "", StringComparison.OrdinalIgnoreCase).Trim(' ', '|', '│'), @"\s{2,}|[|│]").Select(x => x.Trim()).Where(x => x.Length > 0 && x != "None"));
     public override string ToString() => Details;
 }
 

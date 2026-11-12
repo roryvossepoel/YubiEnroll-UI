@@ -111,7 +111,7 @@ public partial class MainWindow
             {
                 try
                 {
-                    Assert(settings.SettingsTabs.Items.Count == 5 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                    Assert(settings.SettingsTabs.Items.Count == 6 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
                         "Settings separates tenants, profiles, system and transfer");
                     var transfer = ConfigTransfer.Export(File.ReadAllText(path));
                     var beforePreview = File.ReadAllText(path);
@@ -184,11 +184,15 @@ public partial class MainWindow
                 !Diagnostics.Text.Contains("Native error: n/a"), "Windows executable failure includes its native error code");
             TraceStartup("Initializing");
             await InitializeAsync(root, mockExecutable);
-            Assert(StatusText.Text.StartsWith("Ready") && _versionText.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");
+            Assert((StatusText.Text.StartsWith("Ready") || StatusText.Text.StartsWith("Standard user")) && _versionText.Contains("Mock YubiEnroll"), "Normal startup with valid configuration and mock CLI");
             Assert(Diagnostics.Text.Length == 0 && WorkPanel.IsEnabled, "Successful reload clears diagnostics and busy state");
             OpenSettings();
             Assert(HostedPage.Visibility == System.Windows.Visibility.Visible && HostedPage.Content != null, "Settings opens inside the main shell");
             CaptureWindow(this, "shell-settings.png");
+            ShowPage(OverviewPage);
+            Assert(double.IsPositiveInfinity(MaxWidth) && double.IsPositiveInfinity(MaxHeight), "Main window does not constrain maximization to a reduced work area");
+            _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
+            ShowPage(DetailsPage); CaptureWindow(this, "activity-log.png");
             ShowPage(OverviewPage);
             Width = 800; Height = 580;
             CaptureWindow(this, "overview-compact.png");

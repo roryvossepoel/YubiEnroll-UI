@@ -5,8 +5,9 @@
   <DockPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="Done" DockPanel.Dock="Right" Click="Done_Click" Margin="12,0,0,0"/><TextBlock x:Name="Feedback" TextWrapping="Wrap" Foreground="#526277" VerticalAlignment="Center"/></DockPanel>
   <TabControl x:Name="SettingsTabs">
    <TabItem Header="Tenants"><DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Configure tenants here. Connect to one from the main window." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock DockPanel.Dock="Top" Text="Configure tenants here. Connect to a tenant on the Prepare Key page." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
     <WrapPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="Add tenant" Click="AddTenant_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="EditTenantButton" Content="Edit tenant" Click="EditTenant_Click" IsEnabled="False"/><Button x:Name="RemoveTenantButton" Content="Remove" Click="RemoveTenant_Click" IsEnabled="False"/></WrapPanel>
+    <TextBox x:Name="TenantFilter" DockPanel.Dock="Top" TextChanged="TenantFilter_Changed" ToolTip="Search tenants by name" AutomationProperties.Name="Search tenants" Margin="0,0,0,12"/>
     <ListBox x:Name="TenantList" SelectionChanged="Selection_Changed" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="10"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Profile, StringFormat=Profile: {0}}" Foreground="#617084" Margin="0,4,0,0"/><TextBlock Text="{Binding TenantId}" Foreground="#7A8796" FontSize="11" Margin="0,4,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
     </ListBox>
@@ -54,7 +55,7 @@
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Help &amp; About"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
     <TextBlock Text="YubiEnroll UI" FontSize="26" FontWeight="SemiBold"/>
-    <TextBlock Text="Community preview 0.4.0 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
+    <TextBlock Text="Community preview 0.4.1 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
     <TextBlock Text="An independent open-source community project. Not affiliated with, sponsored by, or endorsed by Yubico. Yubico and YubiKey are trademarks of Yubico." TextWrapping="Wrap" Margin="0,0,0,18"/>
     <TextBlock Text="Our project" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
     <WrapPanel><Button Content="GitHub" Tag="https://github.com/roryvossepoel/YubiEnroll-UI" Click="Link_Click"/><Button Content="Report an issue" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/issues" Click="Link_Click"/><Button Content="Testing guide" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/blob/feature/initial-wpf-app/docs/TESTING.md" Click="Link_Click"/></WrapPanel>
@@ -62,8 +63,9 @@
     <WrapPanel><Button Content="YubiEnroll" Tag="https://www.yubico.com/products/yubienroll/" Click="Link_Click"/><Button Content="YubiEnroll docs" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html" Click="Link_Click"/><Button Content="YubiKey Manager CLI" Tag="https://developers.yubico.com/yubikey-manager/" Click="Link_Click"/></WrapPanel>
     <WrapPanel Margin="0,8,0,0"><Button Content="ykman docs" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/" Click="Link_Click"/><Button Content="Authenticator docs" Tag="https://docs.yubico.com/software/yubikey/tools/authenticator/auth-guide/index.html" Click="Link_Click"/></WrapPanel>
     <TextBlock Text="License &amp; diagnostics" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
-    <TextBlock Text="MIT licensed. LICENSE and THIRD-PARTY-NOTICES.md are included with the download. Yubico tools are installed separately. Activity and error details are available through View details; interactive console output and PINs are not saved to that log. External tools manage their own authentication and caches." TextWrapping="Wrap" Foreground="#617084"/>
+    <TextBlock Text="MIT licensed. LICENSE and THIRD-PARTY-NOTICES.md are included with the download. Yubico tools are installed separately. Activity and error details are available in Settings → Activity log; interactive console output and PINs are not saved to that log. External tools manage their own authentication and caches." TextWrapping="Wrap" Foreground="#617084"/>
    </StackPanel></ScrollViewer></TabItem>
+   <TabItem Header="Activity log"><StackPanel Margin="18"><TextBlock Text="Review actions and errors for this session." TextWrapping="Wrap" Margin="0,0,0,16"/><Button Content="Open activity log" Click="Activity_Click" HorizontalAlignment="Left"/></StackPanel></TabItem>
   </TabControl>
  </DockPanel>
 </Window>

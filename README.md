@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.4.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.4.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -10,21 +10,21 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Starts on Overview with key inspection and task navigation. Prepare Key, Key Management and Settings share one window.
-- Opens a real console for YubiEnroll login and enrollment, with an opt-in embedded terminal preview under Settings → Prerequisites.
+- Hosts YubiEnroll login and enrollment in an embedded terminal preview, with an external-console fallback under Settings → Prerequisites.
 - Reports the CLI exit code and retrieves the registered credential list after a successful command.
 - Keeps the UI responsive and prevents another operation or application shutdown while an operation is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
 - Offers **Key Management → Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
 
-## Preview 0.4.0 changes
+## Preview 0.4.1 changes
 
 - Overview, Prepare Key and Key Management navigation, with Settings and Help & About.
 - Read-only key/PIN inspection and automatic same-key refresh after FIDO reset.
 - Rename/remove local tenants and profiles; linked tenant pills and shorter setup help.
 - Guided import review, separate export card, prerequisites and technical details.
 - Full-height activity/diagnostics view with empty states.
-- Optional embedded monochrome terminal using Windows ConPTY; external console remains the default.
+- Embedded monochrome terminal using Windows ConPTY by default; the external console remains an optional fallback.
 
 The embedded terminal is enabled **for the current session only** under Settings → Prerequisites. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Done. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
@@ -165,3 +165,7 @@ GUI and helper source: [MIT](LICENSE). YubiEnroll is installed separately and re
 ## Yubico workflow reference
 
 The interface follows Yubico's [Entra provider setup](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#adding-microsoft-entra-id), [profile creation](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#creating-enrollment-profiles) and [profile setting descriptions](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#profile-settings). Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. First-use PIN-change prompting also depends on the end user's platform. Omitted reset is treated as potentially destructive rather than assuming a safe default.
+
+
+### Preview 0.4.1 polish
+Overview focuses on the connected key; Key Management shares its selection and refreshes after USB changes. Settings contains Help & About and one session Activity log. Registered keys open beside the selected user in their own dialog. The embedded terminal is now the default; successful login returns automatically. Native confirmations remain and enrollment device targeting is still performed by YubiEnroll. The app icon is an original community-project asset, not a Yubico mark.

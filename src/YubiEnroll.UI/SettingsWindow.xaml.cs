@@ -12,6 +12,13 @@ public partial class SettingsWindow : Window
     private ConfigSnapshot? _importSnapshot;
     private string? _importText;
     public event Action? Finished;
+    public event Action? ActivityRequested;
+    private void Activity_Click(object sender, RoutedEventArgs e) => ActivityRequested?.Invoke();
+    private void TenantFilter_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (TenantList?.ItemsSource == null) return;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(TenantList.ItemsSource).Filter = item => item is Provider p && p.Name.Contains(TenantFilter.Text.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
     private Window DialogOwner => Owner ?? this;
     public bool EmbeddedTerminal { get => EmbeddedChoice.IsChecked == true; set => EmbeddedChoice.IsChecked = value; }
     private sealed record ProfileRow(string Name, string[] Tenants)
@@ -47,7 +54,8 @@ public partial class SettingsWindow : Window
     private void RefreshLists()
     {
         var config = ConfigReader.Parse(ConfigSnapshot.Read(_path).Text ?? "");
-        TenantList.ItemsSource = config.Providers;
+        TenantList.ItemsSource = config.Providers.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+        TenantFilter_Changed(this, null!);
         ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, config.Providers.Where(t => t.Profile == p.Name).Select(t => t.Name).ToArray()));
         ExportCounts.Text = $"{config.Providers.Count} tenant(s) · {config.Profiles.Count} profile(s)";
         Feedback.Text = $"{config.Providers.Count} tenant(s) · {config.Profiles.Count} profile(s)";

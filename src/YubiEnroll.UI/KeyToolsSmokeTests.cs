@@ -12,8 +12,8 @@ public partial class MainWindow
         Assert(dialog.BodyScroll.ViewportHeight > 100 && Math.Abs(dialog.BodyScroll.VerticalOffset - dialog.BodyScroll.ScrollableHeight) < 1,
             "Reset warning remains reachable by scrolling at the available screen height");
         var root = (System.Windows.FrameworkElement)dialog.Content;
-        var bottom = dialog.CloseButton.TranslatePoint(new System.Windows.Point(0, dialog.CloseButton.ActualHeight), root);
-        Assert(bottom.Y <= root.ActualHeight && dialog.CloseButton.ActualHeight > 0, "Reset action footer stays inside the visible window");
+        var bottom = dialog.ResetButton.TranslatePoint(new System.Windows.Point(0, dialog.ResetButton.ActualHeight), root);
+        Assert(bottom.Y <= root.ActualHeight && dialog.ResetButton.ActualHeight > 0, "Reset action footer stays inside the visible window");
         dialog.BodyScroll.ScrollToTop(); dialog.UpdateLayout();
     }
 
@@ -61,7 +61,7 @@ public partial class MainWindow
         await ShowCase(new KeyToolsWindow(service, true, false), async dialog =>
         {
             await dialog.RefreshAsync();
-            Assert(dialog.Keys.Items.Count == 1 && !dialog.ResetButton.IsEnabled, "Device discovery requires explicit key selection");
+            Assert(dialog.Keys.Items.Count == 1 && dialog.ResetButton.IsEnabled, "A single key is selected automatically; reset still requires confirmation");
             Assert(((KeyStatus)dialog.Keys.Items[0]).Pin == FidoPinState.Set, "Initial discovery reads PIN status without changing the key");
             dialog.Keys.SelectedIndex = 0;
             Assert(dialog.ResetButton.IsEnabled, "Explicit device selection enables reset without tenant login");

@@ -8,7 +8,7 @@
   <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
    <TextBlock x:Name="StatusText" Text="Checking prerequisites…" TextWrapping="Wrap" Foreground="#526277" Margin="0,0,0,12"/>
    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-    <Button x:Name="CloseButton" Content="Close" Click="Close_Click"/>
+    <Button x:Name="CloseButton" Content="Close" Click="Close_Click" Visibility="Collapsed"/>
     <Button x:Name="ResetButton" Content="Reset FIDO…" Click="Reset_Click" IsEnabled="False" Background="#A52C36" Foreground="White"/>
    </StackPanel>
   </StackPanel>
@@ -21,9 +21,10 @@
       <ComboBox x:Name="Keys" SelectionChanged="Key_Changed" AutomationProperties.Name="Key to reset">
        <ComboBox.ItemTemplate><DataTemplate><StackPanel>
         <TextBlock Text="{Binding Label}" TextWrapping="Wrap"/>
-        <TextBlock Text="{Binding PinLabel}" Foreground="#526277" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
+
        </StackPanel></DataTemplate></ComboBox.ItemTemplate>
       </ComboBox>
+      <TextBlock x:Name="PinStatus" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,12,0,0"/>
       <WrapPanel Margin="0,10,0,0">
        <Button x:Name="RefreshButton" Content="Refresh" Click="Refresh_Click"/>
        <Button x:Name="DownloadButton" Content="Get YubiKey Manager CLI" Click="Download_Click"/>
@@ -34,7 +35,7 @@
     </Border>
     <Border Background="#FFF2F0" BorderBrush="#E8C2BE" BorderThickness="1" CornerRadius="8" Padding="18">
      <StackPanel>
-      <TextBlock Text="Permanent reset · all accounts on this key" FontWeight="SemiBold" Foreground="#852D32" TextWrapping="Wrap"/>
+      <TextBlock Text="Reset FIDO · erase all passkeys and the FIDO PIN" FontWeight="SemiBold" Foreground="#852D32" TextWrapping="Wrap"/>
       <TextBlock Text="Erases all FIDO2/U2F credentials and the FIDO PIN. Existing FIDO sign-ins with this key will stop working. This cannot be undone." TextWrapping="Wrap" Margin="0,8,0,8"/>
       <TextBlock Text="Registrations in Entra and other services remain and must be removed there separately. This is not a reset of PIV, OATH, OpenPGP or OTP." TextWrapping="Wrap"/>
       <TextBlock Text="Follow the console prompts to unplug, reinsert and touch the same key. Do not close the console until it finishes." TextWrapping="Wrap" Margin="0,8,0,0"/>

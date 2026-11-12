@@ -17,7 +17,7 @@ public sealed record KeyStatus(ResetKey Key, FidoPinState Pin)
     {
         FidoPinState.NotSet => "Not set",
         FidoPinState.Set => "Set",
-        FidoPinState.Blocked => "Set (blocked)",
+        FidoPinState.Blocked => "Blocked — inspect the key before enrollment",
         FidoPinState.Disabled => "Disabled",
         FidoPinState.Unsupported => "Not supported",
         _ => "Unknown — could not verify"

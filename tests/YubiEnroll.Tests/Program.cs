@@ -334,6 +334,13 @@ Check(!screen.Text.Contains("do-not-copy"), "Terminal ignores clipboard control 
 screen.Clear(); Check(screen.Text.Length == 0, "Terminal buffers clear after dismissal");
 Check(WindowsCommandLine.Quote("name with spaces") == "\"name with spaces\"", "Native process argument quoting preserves spaces");
 Check(WindowsCommandLine.Quote("x\"y") == "\"x\\\"y\"", "Native process argument quoting escapes quotes");
+var registrations = RegisteredCredentials.Parse("Fetching credentials...\nDisplay name  Model  ID\nDesk key  YubiKey 5 NFC  credential-1\nBackup key  Security Key  credential-2\n");
+Check(registrations.Count == 2 && registrations[0].Name == "Desk key" && registrations[1].Id == "credential-2", "Registered keys table preserves names and credential identifiers");
+Check(RegisteredCredentials.Parse("unrecognized output\nkey  model  id").Count == 0, "Unknown registration format is not guessed");
+var failure = InteractiveFailure.Describe("ERROR: 405 Method Not Allowed\nrequest-id: 11111111-2222-3333-4444-555555555555\nPIN: secret-marker\naccess_token: secret-token");
+Check(failure.Contains("405") && failure.Contains("11111111-2222-3333-4444-555555555555") && !failure.Contains("secret") && !failure.Contains("PIN"), "Interactive diagnostic extraction keeps codes and excludes PINs and tokens");
+Check(InteractiveFailure.Describe("PIN: 123456\nLogin successful").Length == 0, "No terminal content logged for successful operation");
+Check(!new UserCandidate(id, id + "  Alex Example  alex@example.test  None").Label.Contains("None"), "Empty optional user column is hidden");
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 
