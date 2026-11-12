@@ -17,17 +17,18 @@ internal sealed class ActivityLogView : DockPanel
     }
     private readonly ObservableCollection<Entry> _entries = new();
     private readonly ListCollectionView _view;
+    private readonly TextBlock _empty = new() { Text = "No activity yet.", Margin = new Thickness(0, 8, 0, 0) };
     internal ActivityLogView()
     {
         Margin = new Thickness(18);
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
-
 
         var help = new TextBlock { Text = "Actions and errors from this session. Expand an event for technical details. PINs and terminal transcripts are not recorded.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         SetDock(help, Dock.Top); Children.Add(help);
         var actions = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
         SetDock(actions, Dock.Top); Children.Add(actions);
         _view = new ListCollectionView(_entries);
+        ((System.Collections.Specialized.INotifyCollectionChanged)_view).CollectionChanged += (_, _) => UpdateEmpty();
         var filter = new ComboBox { ItemsSource = new[] { "All", "Errors", "Warnings" }, SelectedIndex = 0, MinWidth = 120, Margin = new Thickness(0, 0, 12, 0) };
         filter.SelectionChanged += (_, _) => { _view.Filter = x => filter.SelectedIndex == 0 || ((Entry)x).Level == (filter.SelectedIndex == 1 ? "Error" : "Warning"); };
         actions.Children.Add(filter);
@@ -45,13 +46,24 @@ internal sealed class ActivityLogView : DockPanel
         var list = new ItemsControl { ItemsSource = _view };
         var expander = new FrameworkElementFactory(typeof(Expander));
         expander.SetBinding(Expander.HeaderProperty, new Binding("Heading"));
+        var header = new FrameworkElementFactory(typeof(TextBlock));
+        header.SetBinding(TextBlock.TextProperty, new Binding());
+        header.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        expander.SetValue(Expander.HeaderTemplateProperty, new DataTemplate { VisualTree = header });
         expander.SetValue(MarginProperty, new Thickness(0, 0, 0, 12));
         var detail = new FrameworkElementFactory(typeof(TextBlock));
         detail.SetBinding(TextBlock.TextProperty, new Binding("Detail"));
         detail.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
         detail.SetValue(MarginProperty, new Thickness(20, 8, 0, 8));
         expander.AppendChild(detail); list.ItemTemplate = new DataTemplate { VisualTree = expander };
-        Children.Add(new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        var body = new Grid();
+        body.Children.Add(new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        body.Children.Add(_empty); Children.Add(body);
+    }
+    private void UpdateEmpty()
+    {
+        _empty.Text = _entries.Count == 0 ? "No activity yet." : "No events match this filter.";
+        _empty.Visibility = _view.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
     }
     private string Export() => string.Join("\n\n", _view.Cast<Entry>().Select(e => e.Text));
     internal void Add(string message, string level, string detail)

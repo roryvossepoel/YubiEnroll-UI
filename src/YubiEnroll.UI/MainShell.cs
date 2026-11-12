@@ -10,6 +10,8 @@ public partial class MainWindow
 {
     private void ResizePreparation()
     {
+        Users.MinHeight = ActualHeight < 800 ? 80 : 130;
+        Users.MaxHeight = ActualHeight < 800 ? 130 : 200;
         var compact = ActualWidth < 880;
         SidebarColumn.Width = new GridLength(compact ? 120 : 210);
         BrandTitle.FontSize = compact ? 13 : 22;
@@ -156,6 +158,12 @@ public partial class MainWindow
     private void RenderSelectedKey()
     {
         var key = _selectedKey;
+        if (OverviewKeys.ItemsSource is IEnumerable<KeyStatus> available && key != null)
+        {
+            _readingKeys = true;
+            try { OverviewKeys.SelectedItem = available.FirstOrDefault(x => x.Key.Serial == key.Key.Serial); }
+            finally { _readingKeys = false; }
+        }
         KeyPinStatus.Text = key?.PinLabel ?? "";
         KeyPinStatus.Foreground = key?.Pin == FidoPinState.Blocked ? System.Windows.Media.Brushes.Firebrick : System.Windows.Media.Brushes.DarkSlateGray;
         KeyRecovery.Visibility = KeyRecoveryButton.Visibility = key?.Pin == FidoPinState.Blocked ? Visibility.Visible : Visibility.Collapsed;

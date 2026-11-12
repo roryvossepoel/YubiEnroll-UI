@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
         SizeChanged += (_, _) => ResizePreparation();
+        ShowPage(OverviewPage);
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -178,6 +179,8 @@ public partial class MainWindow : Window
         var profile = Profiles.SelectedItem as EnrollmentProfile;
         EnrollButton.IsEnabled = IsConnected && Users.SelectedItem != null && profile != null;
         CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
+        CredentialsButton.Visibility = Users.SelectedItem != null ? Visibility.Visible : Visibility.Collapsed;
+        SelectedUserText.Visibility = Users.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ResetSelection()

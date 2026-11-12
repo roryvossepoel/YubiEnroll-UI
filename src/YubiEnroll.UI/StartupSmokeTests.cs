@@ -160,6 +160,8 @@ public partial class MainWindow
             KeyInfo.Text = "Connect a YubiKey to get started.";
             CaptureWindow(this, "overview.png");
             ShowPage(PreparePage);
+            CaptureWindow(this, "enrollment-small-desktop.png");
+            Width = 1120; Height = 860;
             CaptureWindow(this, "enrollment.png");
             var reviewCapture = Dispatcher.InvokeAsync(() =>
             {
@@ -220,6 +222,7 @@ public partial class MainWindow
             hosted.SettingsTabs.SelectedIndex = 5;
             UpdateLayout();
             Assert(hosted.ActivityHost.Content == _activityView && _activityView.IsVisible, "Activity log is visible directly in its Settings tab");
+            Assert(System.Windows.Documents.TextElement.GetFontWeight(_activityView) == System.Windows.FontWeights.Normal, "Selected tab does not make all activity text bold");
             hosted.SettingsTabs.SelectedIndex = 0;
             CaptureWindow(this, "shell-settings.png");
             ShowPage(OverviewPage);
