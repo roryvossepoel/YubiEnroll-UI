@@ -17,6 +17,7 @@ public partial class MainWindow
         {
             await TestKeyToolsAsync();
             await TestEmbeddedTerminalAsync(mockExecutable);
+            await TestExternalOutcomeAsync(mockExecutable);
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -151,6 +152,22 @@ public partial class MainWindow
             CaptureWindow(this, "overview.png");
             ShowPage(PreparePage);
             CaptureWindow(this, "enrollment.png");
+            var reviewCapture = Dispatcher.InvokeAsync(() =>
+            {
+                var review = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Confirm enrollment");
+                CaptureWindow(review, "enrollment-review.png");
+                review.Close();
+            });
+            Assert(!ConfirmEnrollment(SelectedProvider, SelectedProfile, SelectedUser, "This profile erases existing FIDO credentials."), "Closing enrollment review cancels without launching a tool");
+            await reviewCapture.Task;
+            var keysCapture = Dispatcher.InvokeAsync(() =>
+            {
+                var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
+                CaptureWindow(keys, "registered-keys.png");
+                keys.Close();
+            });
+            ShowRegisteredKeys(SelectedUser, SelectedProvider, "Display name  Model  ID\nDemo key  YubiKey 5 NFC  synthetic-credential-id");
+            await keysCapture.Task;
             AssertActionFooterVisible();
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
@@ -244,6 +261,30 @@ public partial class MainWindow
         Assert(output.ToString().Contains("HIDDEN_OK") && !output.ToString().Contains("synthetic-pin"), "Native no-echo input is not displayed by embedded terminal");
         var screen = new TerminalScreen(); screen.Feed(output.ToString());
         Assert(screen.Text.Contains("VT_OK"), "Embedded terminal renders native VT output");
+    }
+
+    private async Task TestExternalOutcomeAsync(string mockExecutable)
+    {
+        var result = Path.Combine(Path.GetTempPath(), "yubienroll-test-exit-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var host = Path.Combine(AppContext.BaseDirectory, "YubiEnroll.ConsoleHost.exe");
+            using var process = System.Diagnostics.Process.Start(CliRunner.StartInfo(host, ["--result-file", result, mockExecutable, "--exit-probe"]))!;
+            try
+            {
+                var deadline = DateTime.UtcNow.AddSeconds(10);
+                while ((!File.Exists(result) || File.ReadAllText(result).Length == 0) && DateTime.UtcNow < deadline) await Task.Delay(100);
+                Assert(File.ReadAllText(result) == "7", "External host records the native result before waiting for Enter");
+                process.Kill(); await process.WaitForExitAsync();
+                Assert(CliRunner.ReadNativeOutcome(result, process.ExitCode) == 7, "Closing the host preserves the recorded native result");
+            }
+            finally { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); } }
+        }
+        finally { File.Delete(result); }
+        var terminal = new TerminalPanel("Login completion test", false, true);
+        TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
+        try { Assert(await terminal.RunAsync(mockExecutable, ["--version"]).WaitAsync(TimeSpan.FromSeconds(10)) == 0, "Successful embedded login returns without a Done click"); }
+        finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed; }
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file)

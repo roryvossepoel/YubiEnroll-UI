@@ -58,6 +58,12 @@ public partial class MainWindow
             await dialog.ResetSelectedAsync(_ => throw new Exception("Must not ask for confirmation without admin"));
             Assert(!dialog.ResetButton.IsEnabled && dialog.ElevateButton.IsVisible && launched == 0, "Standard user cannot reset and can request elevation");
         });
+        await ShowCase(new KeyToolsWindow(service, true, false) { PreferredKey = new ResetKey("87654321", "YubiKey 5 NFC (5.7.1)") }, async dialog =>
+        {
+            await dialog.RefreshAsync();
+            Assert(dialog.Keys.Items.Count == 1 && dialog.Keys.SelectedItem == null && !dialog.ResetButton.IsEnabled,
+                "A shared selection that disappeared is not replaced by the only remaining key");
+        });
         await ShowCase(new KeyToolsWindow(service, true, false), async dialog =>
         {
             await dialog.RefreshAsync();

@@ -43,6 +43,12 @@ public sealed class CliRunner(string executable)
         return new(process.ExitCode, await stdout, await stderr);
     }
 
+    public static int ReadNativeOutcome(string resultFile, int hostExit)
+    {
+        if (File.Exists(resultFile) && int.TryParse(File.ReadAllText(resultFile), out var code)) return code;
+        return hostExit == 0 ? 125 : hostExit;
+    }
+
     public async Task<int> InteractiveAsync(params string[] arguments)
     {
         var host = Path.Combine(AppContext.BaseDirectory, "YubiEnroll.ConsoleHost.exe");
@@ -56,8 +62,7 @@ public sealed class CliRunner(string executable)
             using var process = Process.Start(info) ?? throw new IOException("Cannot open the interactive console.");
             await process.WaitForExitAsync();
             // Preserve the native result even when the host is closed at its final Enter prompt.
-            if (File.Exists(resultFile) && int.TryParse(await File.ReadAllTextAsync(resultFile), out var code)) return code;
-            return process.ExitCode == 0 ? 125 : process.ExitCode; // No confirmed native outcome.
+            return ReadNativeOutcome(resultFile, process.ExitCode);
         }
         finally { try { Directory.Delete(directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
 

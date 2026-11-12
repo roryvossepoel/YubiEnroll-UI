@@ -6,6 +6,7 @@ if (args.FirstOrDefault() == "--version")
     Console.WriteLine("Mock YubiEnroll 0.0.0 (CI only)");
     return 0;
 }
+if (args.FirstOrDefault() == "--exit-probe") return 7;
 if (args.FirstOrDefault() == "--probe")
 {
     // More than a pipe buffer on each stream exposes sequential ReadToEnd deadlocks.
@@ -341,6 +342,17 @@ var failure = InteractiveFailure.Describe("ERROR: 405 Method Not Allowed\nreques
 Check(failure.Contains("405") && failure.Contains("11111111-2222-3333-4444-555555555555") && !failure.Contains("secret") && !failure.Contains("PIN"), "Interactive diagnostic extraction keeps codes and excludes PINs and tokens");
 Check(InteractiveFailure.Describe("PIN: 123456\nLogin successful").Length == 0, "No terminal content logged for successful operation");
 Check(!new UserCandidate(id, id + "  Alex Example  alex@example.test  None").Label.Contains("None"), "Empty optional user column is hidden");
+var exitFile = Path.GetTempFileName();
+try
+{
+    File.WriteAllText(exitFile, "2");
+    Check(CliRunner.ReadNativeOutcome(exitFile, -1073741510) == 2, "Native failure survives closing the console host");
+    File.WriteAllText(exitFile, "0");
+    Check(CliRunner.ReadNativeOutcome(exitFile, -1073741510) == 0, "Completed native success survives closing the console host");
+    File.WriteAllText(exitFile, "");
+    Check(CliRunner.ReadNativeOutcome(exitFile, 0) != 0, "Missing native outcome cannot be interpreted as success");
+}
+finally { File.Delete(exitFile); }
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 
