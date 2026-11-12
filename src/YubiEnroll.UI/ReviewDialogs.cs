@@ -40,6 +40,7 @@ public partial class MainWindow
     private void ShowRegisteredKeys(UserCandidate user, Provider provider, string output)
     {
         var dialog = ReviewWindow("Registered keys", 780);
+        dialog.Height = Math.Min(SystemParameters.WorkArea.Height, Math.Min(680, 420 + Math.Max(0, RegisteredCredentials.Parse(output).Count - 1) * 180));
         var layout = new DockPanel { Margin = new Thickness(24) }; dialog.Content = layout;
         var title = ReviewText("Registered keys", 24);
         DockPanel.SetDock(title, Dock.Top); layout.Children.Add(title);

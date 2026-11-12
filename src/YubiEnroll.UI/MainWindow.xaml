@@ -48,7 +48,7 @@
        <WrapPanel><Button x:Name="EnrollButton" Content="Prepare Key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/></WrapPanel>
       </Border>
       <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel Margin="28">
+      <StackPanel Margin="28,28,28,16">
        <TextBlock Text="Prepare Key" FontSize="28" FontWeight="SemiBold"/>
        <TextBlock Text="Connect to a tenant and prepare a key for a user. Confirm the physical key in the YubiEnroll prompt." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
