@@ -21,12 +21,23 @@ internal sealed class PseudoConsole : IDisposable
     public async Task<int> RunAsync(string executable, string[] arguments)
     {
         Start(executable, arguments);
-        var reading = Task.Run(async () =>
+        var reading = Task.Run(() =>
         {
-            using var reader = new StreamReader(_output!, new UTF8Encoding(false), false, 4096, leaveOpen: true);
-            var buffer = new char[4096];
-            try { int read; while ((read = await reader.ReadAsync(buffer)) > 0) Output?.Invoke(new string(buffer, 0, read)); }
+            // Decode each pipe read immediately; do not wait for a line, a char-buffer fill or exit.
+            var decoder = Encoding.UTF8.GetDecoder();
+            var bytes = new byte[4096];
+            var chars = new char[4096];
+            try
+            {
+                int read;
+                while ((read = _output!.Read(bytes, 0, bytes.Length)) > 0)
+                {
+                    var count = decoder.GetChars(bytes, 0, read, chars, 0, flush: false);
+                    if (count > 0) Output?.Invoke(new string(chars, 0, count));
+                }
+            }
             catch (IOException) { /* Closing the pseudoconsole breaks its output pipe. */ }
+            finally { Array.Clear(bytes); Array.Clear(chars); }
         });
         await Task.Run(() => WaitForSingleObject(_process, 0xffffffff));
         if (!GetExitCodeProcess(_process, out var code)) throw new Win32Exception();
@@ -53,7 +64,7 @@ internal sealed class PseudoConsole : IDisposable
     private void Start(string executable, string[] args)
     {
         SafeFileHandle? inputRead = null, inputWrite = null, outputRead = null, outputWrite = null;
-        IntPtr attributes = IntPtr.Zero;
+        IntPtr attributes = IntPtr.Zero, environment = IntPtr.Zero;
         try
         {
             if (!CreatePipe(out inputRead, out inputWrite, IntPtr.Zero, 0) ||
@@ -70,14 +81,21 @@ internal sealed class PseudoConsole : IDisposable
             var command = new StringBuilder(string.Join(" ", new[] { executable }.Concat(args).Select(WindowsCommandLine.Quote)));
             _input = new FileStream(inputWrite, FileAccess.Write, 4096, false); inputWrite = null;
             _output = new FileStream(outputRead, FileAccess.Read, 4096, false); outputRead = null;
+            // YubiEnroll/ykman are Python-based tools: request prompt output without buffering.
+            var variables = Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
+                .ToDictionary(e => (string)e.Key, e => (string)e.Value!, StringComparer.OrdinalIgnoreCase);
+            variables["PYTHONUNBUFFERED"] = "1";
+            variables["PYTHONIOENCODING"] = "utf-8";
+            environment = Marshal.StringToHGlobalUni(string.Join("\0", variables.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase).Select(x => x.Key + "=" + x.Value)) + "\0\0");
             if (!CreateProcess(executable, command, IntPtr.Zero, IntPtr.Zero, false, 0x00080000 | 0x00000400,
-                IntPtr.Zero, Path.GetDirectoryName(executable), ref startup, out var info)) throw new Win32Exception();
+                environment, Path.GetDirectoryName(executable), ref startup, out var info)) throw new Win32Exception();
             HasStarted = true;
             _process = info.Process;
             CloseHandle(info.Thread);
         }
         finally
         {
+            if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment);
             if (attributes != IntPtr.Zero) { DeleteProcThreadAttributeList(attributes); Marshal.FreeHGlobal(attributes); }
             inputRead?.Dispose(); inputWrite?.Dispose(); outputRead?.Dispose(); outputWrite?.Dispose();
         }

@@ -340,6 +340,8 @@ Check(registrations.Count == 2 && registrations[0].Name == "Desk key" && registr
 Check(RegisteredCredentials.Parse("unrecognized output\nkey  model  id").Count == 0, "Unknown registration format is not guessed");
 var failure = InteractiveFailure.Describe("ERROR: 405 Method Not Allowed\nrequest-id: 11111111-2222-3333-4444-555555555555\nPIN: secret-marker\naccess_token: secret-token");
 Check(failure.Contains("405") && failure.Contains("11111111-2222-3333-4444-555555555555") && !failure.Contains("secret") && !failure.Contains("PIN"), "Interactive diagnostic extraction keeps codes and excludes PINs and tokens");
+Check(new ResetKey("12345678", "YubiKey 5C (5.7.1)").RegistrationName == "YubiKey 5C (12345678)", "Suggested registration name omits firmware and includes serial");
+Check(new ResetKey("87654321", "Security Key NFC").RegistrationName == "Security Key NFC (87654321)", "Suggested registration name preserves reported model");
 Check(InteractiveFailure.Describe("PIN: 123456\nLogin successful").Length == 0, "No terminal content logged for successful operation");
 Check(!new UserCandidate(id, id + "  Alex Example  alex@example.test  None").Label.Contains("None"), "Empty optional user column is hidden");
 var exitFile = Path.GetTempFileName();

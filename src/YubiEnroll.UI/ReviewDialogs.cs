@@ -41,9 +41,9 @@ public partial class MainWindow
     {
         var dialog = ReviewWindow("Registered keys", 780);
         var layout = new DockPanel { Margin = new Thickness(24) }; dialog.Content = layout;
-        var title = ReviewText($"Registered keys\n{user.Label}\nTenant: {provider.Name}", 18);
+        var title = ReviewText("Registered keys", 24);
         DockPanel.SetDock(title, Dock.Top); layout.Children.Add(title);
-        var note = ReviewText("Registrations in this tenant. This is not an inventory of credentials on the connected physical key.");
+        var note = ReviewText($"{user.Label}\nTenant: {provider.Name}");
         DockPanel.SetDock(note, Dock.Top); layout.Children.Add(note);
         var buttons = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) }; DockPanel.SetDock(buttons, Dock.Bottom); layout.Children.Add(buttons);
         var close = new Button { Content = "Close", IsCancel = true }; close.Click += (_, _) => dialog.Close();
@@ -57,12 +57,12 @@ public partial class MainWindow
             foreach (var row in rows)
             {
                 var card = new StackPanel();
-                card.Children.Add(ReviewText(row.Name, 18)); card.Children.Add(ReviewText(row.Model));
-                card.Children.Add(new Expander { Header = "Registration ID", Content = new TextBox { Text = row.Id, IsReadOnly = true, TextWrapping = TextWrapping.Wrap } });
+                card.Children.Add(ReviewText(row.Name, 16)); card.Children.Add(ReviewText(row.Model));
+                card.Children.Add(new TextBlock { Text = "Registration ID", FontSize = 12, Margin = new Thickness(0, 0, 0, 4) });
+                card.Children.Add(new TextBox { Text = row.Id, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontSize = 12, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Padding = new Thickness(0) });
                 display.Children.Add(new Border { Style = (Style)FindResource("Card"), Child = card, Margin = new Thickness(0, 0, 0, 12) });
             }
-            if (rows.Count == 0) display.Children.Add(ReviewText("No registration rows recognized. Review the tool response below."));
-            display.Children.Add(new Expander { Header = "Tool response", Content = new TextBox { Text = text.Trim(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap } });
+            if (rows.Count == 0) display.Children.Add(ReviewText("No registered keys could be displayed. Try Refresh or verify the user’s registrations in Entra."));
         }
         Render(output);
         refresh.Click += async (_, _) =>

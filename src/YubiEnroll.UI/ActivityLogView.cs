@@ -19,10 +19,11 @@ internal sealed class ActivityLogView : DockPanel
     private readonly ListCollectionView _view;
     internal ActivityLogView()
     {
-        Margin = new Thickness(28);
-        var title = new TextBlock { Text = "Activity log", FontSize = 28, FontWeight = FontWeights.SemiBold };
-        SetDock(title, Dock.Top); Children.Add(title);
-        var help = new TextBlock { Text = "Actions and errors from this session. Expand an event for technical details. PINs and terminal transcripts are not recorded.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 18) };
+        Margin = new Thickness(18);
+        System.Windows.Documents.TextElement.SetFontSize(this, 14);
+
+
+        var help = new TextBlock { Text = "Actions and errors from this session. Expand an event for technical details. PINs and terminal transcripts are not recorded.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         SetDock(help, Dock.Top); Children.Add(help);
         var actions = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
         SetDock(actions, Dock.Top); Children.Add(actions);

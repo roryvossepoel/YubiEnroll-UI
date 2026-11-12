@@ -12,8 +12,6 @@ public partial class SettingsWindow : Window
     private ConfigSnapshot? _importSnapshot;
     private string? _importText;
     public event Action? Finished;
-    public event Action? ActivityRequested;
-    private void Activity_Click(object sender, RoutedEventArgs e) => ActivityRequested?.Invoke();
     private void TenantFilter_Changed(object sender, TextChangedEventArgs e)
     {
         if (TenantList?.ItemsSource == null) return;
@@ -36,8 +34,8 @@ public partial class SettingsWindow : Window
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
         ExecutableInfo.Text = executable;
         ConfigurationInfo.Text = path;
-        VersionInfo.Text = "YubiEnroll: " + version;
-        AccessInfo.Text = "Administrator: " + (new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator) ? "Yes" : "No — restart for FIDO access");
+        VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
+        AccessInfo.Text = "Running with administrative permissions: " + (new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator) ? "Yes" : "No");
         ManagerInfo.Text = KeyResetService.FindExecutable().Length == 0 ? "YubiKey Manager CLI: missing (optional for enrollment)" : "YubiKey Manager CLI: installed; version and device access checked on Overview / Key Management.";
         Attempt(RefreshLists);
     }
@@ -57,8 +55,7 @@ public partial class SettingsWindow : Window
         TenantList.ItemsSource = config.Providers.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         TenantFilter_Changed(this, null!);
         ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, config.Providers.Where(t => t.Profile == p.Name).Select(t => t.Name).ToArray()));
-        ExportCounts.Text = $"{config.Providers.Count} tenant(s) · {config.Profiles.Count} profile(s)";
-        Feedback.Text = $"{config.Providers.Count} tenant(s) · {config.Profiles.Count} profile(s)";
+        Feedback.Text = "";
     }
 
     private void Selection_Changed(object sender, SelectionChangedEventArgs e)
@@ -150,11 +147,11 @@ public partial class SettingsWindow : Window
     }
 
     private void Finish() { if (IsVisible) Close(); else Finished?.Invoke(); }
-    private void Done_Click(object sender, RoutedEventArgs e) => Finish();
     private void CancelImport_Click(object sender, RoutedEventArgs e)
     {
         _importText = null; _importSnapshot = null; ImportReview.Visibility = Visibility.Collapsed; ImportButton.IsEnabled = false;
     }
+    private void Prerequisites_Click(object sender, RoutedEventArgs e) => SettingsTabs.SelectedIndex = 2;
     private void Link_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string url }) return;

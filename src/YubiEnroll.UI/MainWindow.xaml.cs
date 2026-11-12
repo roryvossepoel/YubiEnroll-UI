@@ -43,7 +43,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
-        DetailsPage.Content = _activityView;
         SizeChanged += (_, _) => ResizePreparation();
     }
 
@@ -93,7 +92,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · preview 0.4.1" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · preview 0.4.2" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -153,6 +152,7 @@ public partial class MainWindow : Window
         ResetSelection();
         Query.Clear();
         KeyName.Clear();
+        SuggestRegistrationName();
         Details.Clear();
         var provider = Tenants.SelectedItem as Provider;
         Profiles.SelectedItem = _config?.Profiles.FirstOrDefault(x => x.Name == provider?.Profile);
@@ -176,22 +176,6 @@ public partial class MainWindow : Window
         if (!IsConnected) SelectedUserText.Text = "Connect to a tenant first.";
         PreparePanel.IsEnabled = IsConnected && Users.SelectedItem != null;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
-        ProfileSummary.Text = profile?.Summary ?? "Choose a configuration profile.";
-        ResetNotice.Text = "";
-        if (profile != null)
-        {
-            try
-            {
-                var policy = ProfileConfigWriter.Read(ConfigSnapshot.Read(_configPath).Text ?? "", profile.Name);
-                ResetNotice.Text = policy.Reset switch
-                {
-                    true => "This profile resets the key and erases its existing FIDO credentials.",
-                    false => "This profile keeps existing FIDO credentials (no reset).",
-                    null => "Reset is unspecified: the native default may erase existing FIDO credentials. Review the confirmation."
-                };
-            }
-            catch { ResetNotice.Text = "Profile settings changed or cannot be read. Reload in Settings before continuing."; }
-        }
         EnrollButton.IsEnabled = IsConnected && Users.SelectedItem != null && profile != null;
         CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
     }
@@ -252,7 +236,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.1\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.2\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -365,8 +349,9 @@ public partial class MainWindow : Window
         if (!ConfirmEnrollment(provider, profile, user, warning)) return;
         await ActivateAsync(provider, profile);
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {profile.Name} · reset {reset}.");
-        StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before choosing Done." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
+        StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         var code = await RunInteractiveAsync(_exePath, arguments);
+        _deviceRefresh?.Start(); // Refresh status after enrollment, once the operation has released the key.
         Record(code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.", code == 0 ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
         if (code != 0)
         {

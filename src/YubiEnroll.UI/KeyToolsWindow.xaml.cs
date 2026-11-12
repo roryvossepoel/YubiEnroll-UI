@@ -134,7 +134,7 @@ public partial class KeyToolsWindow : Window
                 exit = await _service.ResetAsync(selected, key =>
                 {
                     if (!confirm(key)) return false;
-                    StatusText.Text = "Follow the console prompts to confirm, reinsert and touch this key. When it finishes, choose Done in the app or press Enter in the external console.";
+                    StatusText.Text = "Follow the console prompts to confirm, reinsert and touch this key. When it finishes, choose Return in the app or press Enter in the external console.";
                     return true;
                 });
             }

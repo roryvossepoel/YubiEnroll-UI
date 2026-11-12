@@ -32,6 +32,7 @@ public partial class MainWindow
     {
         if (_hostedWindow is SettingsWindow settings)
         {
+            settings.ActivityHost.Content = null;
             EmbeddedTerminal = settings.EmbeddedTerminal;
             if (settings.Changed) LoadConfiguration(_configPath);
         }
@@ -43,7 +44,7 @@ public partial class MainWindow
     {
         if (_busy || (_hostedWindow is KeyToolsWindow keyTools && keyTools.IsOperationActive)) return;
         if (page != HostedPage) LeaveHostedPage();
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, HostedPage, DetailsPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, HostedPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
         OverviewButton.FontWeight = page == OverviewPage ? FontWeights.Bold : FontWeights.Normal;
         PrepareButton.FontWeight = page == PreparePage ? FontWeights.Bold : FontWeights.Normal;
@@ -51,14 +52,14 @@ public partial class MainWindow
         {
             var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage ||
                 button == KeyToolsButton && page == HostedPage && _hostedWindow is KeyToolsWindow ||
-                button == SettingsButton && (page == DetailsPage || page == HostedPage && _hostedWindow is SettingsWindow);
-            button.Background = active ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(218, 237, 238)) : System.Windows.Media.Brushes.Transparent;
+                button == SettingsButton && page == HostedPage && _hostedWindow is SettingsWindow;
+            button.Tag = active ? "active" : null;
             button.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
         }
     }
-    private async void Overview_Click(object sender, RoutedEventArgs e) { ShowPage(OverviewPage); await RefreshOverviewAsync(); }
+    private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);
     private void Prepare_Click(object sender, RoutedEventArgs e) => ShowPage(PreparePage);
-    private void Details_Click(object sender, RoutedEventArgs e) => ShowPage(DetailsPage);
+    private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(5);
     private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(2);
     private void About_Click(object sender, RoutedEventArgs e) => OpenSettings(4);
     private void Host(Window window)
@@ -66,6 +67,7 @@ public partial class MainWindow
         LeaveHostedPage();
         _hostedWindow = window;
         window.Owner = this;
+        window.ShowInTaskbar = false;
         var content = window.Content; window.Content = null;
         HostedPage.Content = content;
         ShowPage(HostedPage);
@@ -76,7 +78,7 @@ public partial class MainWindow
         LeaveHostedPage();
         var settings = new SettingsWindow(_configPath, _exePath, _versionText) { EmbeddedTerminal = EmbeddedTerminal };
         settings.SettingsTabs.SelectedIndex = tab;
-        settings.ActivityRequested += () => ShowPage(DetailsPage);
+        settings.ActivityHost.Content = _activityView;
         settings.Finished += async () =>
         {
             var elevate = settings.ElevationRequested;
@@ -98,6 +100,7 @@ public partial class MainWindow
             OverviewKeys.ItemsSource = null;
             _readingKeys = false;
             KeyInfo.Text = "Reading connected keys…";
+            KeyPinStatus.Text = ""; KeyRecovery.Visibility = KeyRecoveryButton.Visibility = Visibility.Collapsed;
             ReadinessText.Text = !IsAdministrator() ? "Restart as administrator to inspect FIDO PIN status and reset keys." : "";
             if (!_cliReady) ReadinessText.Text += "\nInstall YubiEnroll to prepare keys.";
             ReadinessCard.Visibility = ReadinessText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -140,6 +143,8 @@ public partial class MainWindow
         _selectedKey = key;
         if (key != null) { _selectionSerial = key.Key.Serial; _lastKnownKey = key.Key; }
         SelectedKeyCard.Text = key == null ? "No key selected" : "Connected\n" + key.Key.Model + "\nSerial " + key.Key.Serial;
+        RenderSelectedKey();
+        SuggestRegistrationName();
         if (changed) Record(key == null ? "Selected key is unavailable." : $"Key selected · serial {key.Key.Serial} · {key.PinLabel}");
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)
@@ -147,14 +152,28 @@ public partial class MainWindow
         if (SelectedKeyCard == null || KeyPinStatus == null || _readingKeys) return;
         var key = OverviewKeys.SelectedItem as KeyStatus;
         SetSelectedKey(key);
+    }
+    private void RenderSelectedKey()
+    {
+        var key = _selectedKey;
         KeyPinStatus.Text = key?.PinLabel ?? "";
         KeyPinStatus.Foreground = key?.Pin == FidoPinState.Blocked ? System.Windows.Media.Brushes.Firebrick : System.Windows.Media.Brushes.DarkSlateGray;
-        if (key != null) KeyInfo.Text = key.Key.Model + "\nSerial number: " + key.Key.Serial;
+        KeyRecovery.Visibility = KeyRecoveryButton.Visibility = key?.Pin == FidoPinState.Blocked ? Visibility.Visible : Visibility.Collapsed;
+        KeyInfo.Text = key == null ? "No supported key selected. Connect a key or choose Refresh keys." : key.Key.Model + "\nSerial number: " + key.Key.Serial;
+    }
+    private string _suggestedName = "";
+    private void SuggestRegistrationName()
+    {
+        if (KeyName == null) return;
+        var next = _selectedKey?.Key.RegistrationName ?? "";
+        if (string.IsNullOrWhiteSpace(KeyName.Text) || KeyName.Text == _suggestedName) KeyName.Text = next;
+        _suggestedName = next;
     }
     private System.Windows.Threading.DispatcherTimer? _deviceRefresh;
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
+        TaskbarIdentity.Apply(this);
         if (_smokeTest) return;
         Closed += (_, _) => _deviceRefresh?.Stop();
         _deviceRefresh = new() { Interval = TimeSpan.FromSeconds(1) };

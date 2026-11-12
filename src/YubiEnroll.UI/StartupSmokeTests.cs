@@ -145,8 +145,17 @@ public partial class MainWindow
             Assert(SearchPanel.IsEnabled && !PreparePanel.IsEnabled, "User selection required after connection");
             Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") };
             Users.SelectedIndex = 0;
-            Assert(PreparePanel.IsEnabled && EnrollButton.IsEnabled && ResetNotice.Text.Contains("erases"), "Profile reset is visible before enrollment");
-            ShowPage(OverviewPage);
+            Assert(PreparePanel.IsEnabled && EnrollButton.IsEnabled, "Selected profile and user enable enrollment review");
+            SetSelectedKey(new KeyStatus(new ResetKey("12345678", "YubiKey 5C (5.7.1)"), FidoPinState.Blocked));
+            Assert(KeyName.Text == "YubiKey 5C (12345678)", "Registration name is populated from model and serial without firmware");
+            KeyName.Text = "My custom key";
+            SetSelectedKey(new KeyStatus(new ResetKey("87654321", "YubiKey 5 NFC (5.7.1)"), FidoPinState.Set));
+            Assert(KeyName.Text == "My custom key", "Device refresh preserves a custom registration name");
+            KeyName.Clear(); SuggestRegistrationName();
+            var cached = _selectedKey;
+            Overview_Click(this, new System.Windows.RoutedEventArgs());
+            Assert(ReferenceEquals(cached, _selectedKey) && !_busy, "Overview navigation keeps the existing inspection without a device read");
+            Assert(TaskbarIdentity.HasWindowIcons(this), "Published window exposes both large and small taskbar/title icons");
             ReadinessText.Text = "YubiEnroll: installed · Administrator: yes\nConfiguration: 1 tenant · 2 profiles";
             KeyInfo.Text = "Connect a YubiKey to get started.";
             CaptureWindow(this, "overview.png");
@@ -205,18 +214,25 @@ public partial class MainWindow
             Assert(Diagnostics.Text.Length == 0 && WorkPanel.IsEnabled, "Successful reload clears diagnostics and busy state");
             OpenSettings();
             Assert(HostedPage.Visibility == System.Windows.Visibility.Visible && HostedPage.Content != null, "Settings opens inside the main shell");
+            UpdateLayout();
+            var hosted = (SettingsWindow)_hostedWindow!;
+            Assert(System.Windows.Documents.TextElement.GetFontSize((System.Windows.DependencyObject)HostedPage.Content!) == 14, "Hosted settings retains the shared body font size");
+            hosted.SettingsTabs.SelectedIndex = 5;
+            UpdateLayout();
+            Assert(hosted.ActivityHost.Content == _activityView && _activityView.IsVisible, "Activity log is visible directly in its Settings tab");
+            hosted.SettingsTabs.SelectedIndex = 0;
             CaptureWindow(this, "shell-settings.png");
             ShowPage(OverviewPage);
             Assert(double.IsPositiveInfinity(MaxWidth) && double.IsPositiveInfinity(MaxHeight), "Main window does not constrain maximization to a reduced work area");
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
-            ShowPage(DetailsPage); CaptureWindow(this, "activity-log.png");
+            OpenSettings(5); CaptureWindow(this, "activity-log.png");
             ShowPage(OverviewPage);
             Width = 800; Height = 580;
             CaptureWindow(this, "overview-compact.png");
             ShowPage(PreparePage);
             CaptureWindow(this, "prepare-compact.png");
             AssertActionFooterVisible();
-            Width = 1120; Height = 780;
+            Width = 1120; Height = 860;
             var panel = new TerminalPanel("Prepare Key — interactive operation", true);
             panel.Screen.Text = "Example output — synthetic test only\r\nTouch your YubiKey to continue.\r\n";
             TerminalOverlay.Content = panel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
@@ -259,6 +275,25 @@ public partial class MainWindow
         var code = await run.WaitAsync(TimeSpan.FromSeconds(20)); // Synthetic test only; production operations have no timeout.
         Assert(code == 7 && output.ToString().Contains("INPUT_OK"), "Embedded ConPTY round-trips interactive input and preserves exit code");
         Assert(output.ToString().Contains("HIDDEN_OK") && !output.ToString().Contains("synthetic-pin"), "Native no-echo input is not displayed by embedded terminal");
+        // Test the actual live renderer too, not just transport output after process completion.
+        var panel = new TerminalPanel("Live prompt rendering", false);
+        TerminalOverlay.Content = panel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
+        var live = panel.RunAsync(mockExecutable, ["--terminal-probe"]);
+        async Task WaitForText(string expected)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!panel.Screen.Text.Contains(expected) && DateTime.UtcNow < deadline) await Task.Delay(50);
+            Assert(panel.Screen.Text.Contains(expected), "Live terminal displays " + expected + " before input/process exit");
+        }
+        await WaitForText("TERMINAL_READY");
+        CaptureWindow(this, "terminal-live-prompt.png");
+        panel.SendInput("confirm\r");
+        await WaitForText("HIDDEN_READY");
+        panel.SendInput("synthetic-pin\r");
+        await WaitForText("HIDDEN_OK");
+        while (!live.IsCompleted) { panel.DismissCompleted(); await Task.Delay(50); }
+        Assert(await live == 7 && !panel.Screen.Text.Contains("synthetic-pin"), "Live renderer retains outcome and clears hidden-input session");
+        TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
         var screen = new TerminalScreen(); screen.Feed(output.ToString());
         Assert(screen.Text.Contains("VT_OK"), "Embedded terminal renders native VT output");
     }
@@ -285,6 +320,20 @@ public partial class MainWindow
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
         try { Assert(await terminal.RunAsync(mockExecutable, ["--version"]).WaitAsync(TimeSpan.FromSeconds(10)) == 0, "Successful embedded login returns without a Done click"); }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed; }
+    }
+
+    internal async Task RunNativeTerminalCheckAsync(string executable)
+    {
+        var panel = new TerminalPanel("Native CLI rendering check", false);
+        TerminalOverlay.Content = panel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
+        var run = panel.RunAsync(executable, ["--help"]); // No login, configuration mutation or device operation.
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (panel.CompletedExitCode == null && DateTime.UtcNow < deadline) await Task.Delay(50);
+        CaptureWindow(this, "terminal-native-help.png");
+        Assert(panel.CompletedExitCode == 0 && panel.Screen.Text.Contains("Usage:"), "Actual YubiEnroll help renders inside the published terminal control");
+        panel.DismissCompleted();
+        Assert(await run == 0, "Native terminal check returns successfully");
+        TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file)

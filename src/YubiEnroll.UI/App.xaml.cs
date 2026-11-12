@@ -5,7 +5,18 @@ public partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
+        TaskbarIdentity.Initialize();
         base.OnStartup(e);
+        if (e.Args.Length == 2 && e.Args[0] == "--terminal-check")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var code = 0;
+            var window = new MainWindow(smokeTest: true);
+            window.Show();
+            try { await window.RunNativeTerminalCheckAsync(e.Args[1]); }
+            catch (Exception ex) { code = 1; File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "native-terminal-check.txt"), ex.ToString()); }
+            window.Close(); Shutdown(code); return;
+        }
         if (e.Args.Contains("--smoke-test"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -30,6 +41,7 @@ public partial class App : Application
             Shutdown(code);
             return;
         }
-        new MainWindow().Show();
+        MainWindow = new MainWindow();
+        MainWindow.Show();
     }
 }

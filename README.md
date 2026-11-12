@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.4.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.4.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -26,7 +26,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Full-height activity/diagnostics view with empty states.
 - Embedded monochrome terminal using Windows ConPTY by default; the external console remains an optional fallback.
 
-The embedded terminal is enabled **for the current session only** under Settings → Prerequisites. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Done. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
+The embedded terminal is enabled **for the current session only** under Settings → Prerequisites. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
 Only standalone **FIDO reset** is currently available. Additional application-specific resets (issue #7), final product name/logo (#9), and optional batch handover (#19) remain separate follow-up work. No repository rename or full factory-reset claim is made in this preview.
 
@@ -169,3 +169,10 @@ The interface follows Yubico's [Entra provider setup](https://docs.yubico.com/so
 
 ### Preview 0.4.1 polish
 Overview focuses on the connected key; Key Management shares its selection and refreshes after USB changes. Settings contains Help & About and one session Activity log. Registered keys open beside the selected user in their own dialog. The embedded terminal is now the default; successful login returns automatically. Native confirmations remain and enrollment device targeting is still performed by YubiEnroll. The app icon is an original community-project asset, not a Yubico mark.
+
+
+### Preview 0.4.2 polish
+
+Settings now hosts Activity directly, with no Done button or persistent totals. Typography is retained when pages are hosted, navigation uses neutral colors, and prerequisites separates component status from project help. Overview reuses its inspected state until Refresh, a device change or a completed key operation. Blocked PIN guidance links to Key Management without performing a reset.
+
+Prepare Key suggests an editable model/serial registration name and leaves reset warnings in the final review. Registered keys shows IDs directly without a raw tool-output section. The main window starts taller, and the original charcoal/green icon is explicitly applied to native window/taskbar identity. The terminal reads and decodes pipe output immediately and requests unbuffered Python output; CI checks live prompts and the real native help renderer. Real authentication and physical-key acceptance are still required.

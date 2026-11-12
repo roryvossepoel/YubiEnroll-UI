@@ -1,8 +1,8 @@
 <Window x:Class="YubiEnroll.UI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Icon="Assets/App.ico" Title="YubiEnroll UI — Community Preview" Width="1120" Height="780" MinWidth="640" MinHeight="500" Background="#F5F7FA" FontFamily="Segoe UI" FontSize="14" Foreground="#172B41" Loaded="Window_Loaded" Closing="Window_Closing">
+ WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Icon="pack://application:,,,/Assets/App.ico" Title="YubiEnroll UI — Community Preview" Width="1120" Height="860" MinWidth="640" MinHeight="500" Background="#F5F7FA" FontFamily="Segoe UI" FontSize="14" Foreground="#172B41" Loaded="Window_Loaded" Closing="Window_Closing">
  <Grid>
   <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-  <Border Background="#EAF0F4" BorderBrush="#DCE3EB" BorderThickness="0,0,1,0">
+  <Border Background="#F0F2F3" BorderBrush="#DCE3EB" BorderThickness="0,0,1,0">
    <DockPanel Margin="16,24">
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,24">
      <TextBlock x:Name="BrandTitle" Text="YubiEnroll UI" FontSize="22" FontWeight="SemiBold"/>
@@ -10,13 +10,13 @@
      <Border x:Name="SidebarKeyCard" Background="White" CornerRadius="8" Padding="12"><TextBlock x:Name="SelectedKeyCard" Text="No key selected" TextWrapping="Wrap" FontSize="12"/></Border>
     </StackPanel>
     <StackPanel DockPanel.Dock="Bottom">
-     <Button x:Name="SettingsButton" Content="Settings" Click="Settings_Click" Margin="0,0,0,8"/>
+     <Button x:Name="SettingsButton" Style="{StaticResource NavigationButton}" Content="Settings" Click="Settings_Click" Margin="0,0,0,8"/>
 
     </StackPanel>
     <StackPanel x:Name="Navigation">
-     <Button x:Name="OverviewButton" Content="Overview" Click="Overview_Click" Margin="0,0,0,8"/>
-     <Button x:Name="PrepareButton" Content="Prepare Key" Click="Prepare_Click" Margin="0,0,0,8"/>
-     <Button x:Name="KeyToolsButton" Content="Key Management" Click="KeyTools_Click" Margin="0"/>
+     <Button x:Name="OverviewButton" Style="{StaticResource NavigationButton}" Content="Overview" Click="Overview_Click" Margin="0,0,0,8"/>
+     <Button x:Name="PrepareButton" Style="{StaticResource NavigationButton}" Content="Prepare Key" Click="Prepare_Click" Margin="0,0,0,8"/>
+     <Button x:Name="KeyToolsButton" Style="{StaticResource NavigationButton}" Content="Key Management" Click="KeyTools_Click" Margin="0"/>
     </StackPanel>
    </DockPanel>
   </Border>
@@ -33,8 +33,8 @@
        <Border Style="{StaticResource Card}" Margin="0,0,0,18"><StackPanel>
         <TextBlock Text="Connected key" Style="{StaticResource SectionTitle}"/>
         <ComboBox x:Name="OverviewKeys" DisplayMemberPath="Label" SelectionChanged="OverviewKey_Changed" Margin="0,14,0,12" AutomationProperties.Name="Connected security key"/>
-        <TextBlock x:Name="KeyInfo" FontSize="18" Text="Connect a YubiKey to get started." TextWrapping="Wrap" Foreground="#526277" Margin="0,0,0,14"/>
-        <TextBlock x:Name="KeyPinStatus" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" TextWrapping="Wrap"/><Button Content="Refresh keys" Click="RefreshKeys_Click" HorizontalAlignment="Left"/>
+        <TextBlock x:Name="KeyInfo" FontSize="14" Text="Connect a YubiKey to get started." TextWrapping="Wrap" Foreground="#526277" Margin="0,0,0,14"/>
+        <TextBlock x:Name="KeyPinStatus" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" TextWrapping="Wrap"/><TextBlock x:Name="KeyRecovery" Text="Open Key Management and reset FIDO to remove the blocked PIN. This also erases all passkeys on the key." Visibility="Collapsed" TextWrapping="Wrap" Margin="0,0,0,12"/><Button x:Name="KeyRecoveryButton" Content="Open Key Management" Click="KeyTools_Click" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,10"/><Button Content="Refresh keys" Click="RefreshKeys_Click" HorizontalAlignment="Left"/>
        </StackPanel></Border>
        <Border x:Name="ReadinessCard" Style="{StaticResource Card}" Visibility="Collapsed"><StackPanel>
         <TextBlock Text="Attention needed" Style="{StaticResource SectionTitle}"/>
@@ -66,7 +66,7 @@
      <StackPanel x:Name="SearchPanel" IsEnabled="False">
       <TextBlock Text="2   Choose a user" Style="{StaticResource SectionTitle}"/>
       <TextBlock Text="Search by name or email" Margin="0,12,0,4" Foreground="#617084"/><DockPanel Margin="0,0,0,12"><Button DockPanel.Dock="Right" Content="Search" Click="Search_Click" Margin="12,0,0,0"/><TextBox x:Name="Query" KeyDown="Query_KeyDown" ToolTip="Search by name or username" AutomationProperties.Name="Search users"/></DockPanel>
-      <ListBox x:Name="Users" SelectionChanged="User_Changed" MinHeight="150" MaxHeight="220" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+      <ListBox x:Name="Users" SelectionChanged="User_Changed" MinHeight="110" MaxHeight="180" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
        <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="8,7"><TextBlock Text="{Binding Label}" TextWrapping="Wrap"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
        <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle>
       </ListBox>
@@ -80,9 +80,7 @@
       <TextBlock Text="Configuration profile" Margin="0,14,0,6"/>
       <ComboBox x:Name="Profiles" DisplayMemberPath="Name" SelectionChanged="Profile_Changed"/>
       <TextBlock Text="Key name (optional)" Margin="0,12,0,6"/>
-      <TextBox x:Name="KeyName" MaxLength="100"/><TextBlock Text="Leave blank to use YubiEnroll’s default registration name (the key serial number)." TextWrapping="Wrap" Foreground="#617084" FontSize="12" Margin="0,6,0,0"/>
-      <TextBlock x:Name="ResetNotice" TextWrapping="Wrap" Foreground="#9A4B0A" Margin="0,12,0,0"/>
-      <Expander Header="Profile details" Margin="0,10,0,14"><TextBlock x:Name="ProfileSummary" TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,0"/></Expander>
+      <TextBox x:Name="KeyName" MaxLength="100"/>
      </StackPanel>
     </Border>
     </Grid>
@@ -91,7 +89,7 @@
       </ScrollViewer>
      </DockPanel>
      <ContentControl HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" x:Name="HostedPage" Visibility="Collapsed"/>
-     <ContentControl x:Name="DetailsPage" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+
 
     </Grid>
    </DockPanel>

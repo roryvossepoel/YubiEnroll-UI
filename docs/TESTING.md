@@ -1,4 +1,4 @@
-# Manual acceptance checks for preview 0.4.1
+# Manual acceptance checks for preview 0.4.2
 
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 
@@ -77,7 +77,7 @@ Synthetic UI tests cover refreshed selection/status, cancellation, failed reads,
 2. Open Settings and Key Management from the sidebar. Verify they use the same content area; edit dialogs may still be modal. Inspect all pages at small window sizes and 100/150/200% display scaling.
 3. Rename a shared profile using spaces; confirm every linked tenant retains that profile and other settings remain unchanged. Reject duplicate names. Remove an unused profile; refuse removal while referenced. Rename/remove an active tenant, reopen the app and explicitly reconnect before enrollment.
 4. Import a test configuration: confirm incoming entries and existing entries being replaced are visible, Cancel changes nothing, and a successful replacement reports the backup path. Confirm export omits credentials/authentication data.
-5. Enable **Use embedded terminal (preview, this session)** under Settings → Prerequisites and choose Done. Run login and then a disposable-key preparation. Test typing, hidden PIN input, generated PIN output, confirmation, touch and remove/reinsert. Record PIN securely before Done. Confirm no interactive transcript appears in activity/diagnostics or exported settings.
+5. Enable **Use embedded terminal (preview, this session)** under Settings → Prerequisites and navigate back to Prepare Key. Run login and then a disposable-key preparation. Test typing, hidden PIN input, generated PIN output, confirmation, touch and remove/reinsert. Record PIN securely before returning. Confirm no interactive transcript appears in activity/diagnostics or exported settings.
 6. Verify native failures return their exit code, do not auto-retry, and leave the UI usable. Never interrupt a live reset as a casual test. Use the external console for the next attempt if the embedded mode cannot support your CLI/UAC environment, after inspecting any uncertain outcome.
 7. Reset FIDO on a disposable key. After completion, verify the same device is selected if still present and PIN status has been reread. Disconnecting it must not select another key automatically.
 8. No claim of physical-device acceptance is made by the synthetic CI checks. CI exercises ConPTY input, no-echo synthetic input, VT rendering and exit-code propagation without authenticating or touching a key.
@@ -89,10 +89,26 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Maximize on the primary and secondary monitor at 100%, 150% and 200% scaling. The window must fill the work area above the taskbar.
 - Inspect one key, navigate to Key Management: the same serial is selected. Add a second key, then remove the selected key: another device must never be substituted silently. Reinsert and refresh.
 - Verify blocked / unset / unknown PIN presentation. Unknown is not evidence that a key is empty.
-- Connect using the embedded terminal (now default). Native confirmation remains. Browser sign-in success returns automatically; failures remain visible until Done. External console remains available in Settings.
+- Connect using the embedded terminal (now default). Native confirmation remains. Browser sign-in success returns automatically; failures remain visible until Return. External console remains available in Settings.
 - Close the external console AFTER the native tool has completed: the log must retain the native exit code, not the host window's close code. Closing before completion must not be treated as success.
 - Search a user, open Registered keys, refresh, close: tenant/user/profile selection stays intact. These are cloud registrations, not a physical-key inventory.
 - Inspect Settings → Activity log after a failed enrollment. HTTP status/request IDs may be recorded; no generated PIN, tokens or terminal transcript may be exported.
 - A 405 response must remain reported as a 405; do not infer missing role activation. Retry with the required role activated in the correct tenant and retain request IDs if the error persists.
 - Enrollment still uses native YubiEnroll device selection. The review dialog explicitly distinguishes the inspected key from the native enrollment target. Use one test key and confirm the physical device.
 - Native USB reset, real Entra/PIM sign-in and enrollment require manual acceptance. Extra application resets and encrypted batch handover remain out of scope for this polish.
+
+
+## Preview 0.4.2 operator acceptance
+
+- Overview navigation must preserve the inspected key and must not launch another read. Refresh and USB changes still update it; enrollment/reset completion must refresh device state.
+- A blocked FIDO PIN offers a direct Key Management route and states that FIDO reset removes the PIN and all passkeys. No reset occurs simply by navigating.
+- Confirm the default 1120 × 860 window, capped to the current work area, fits the preparation form at normal desktop scaling. At small sizes, scrolling must remain available with the prepare action visible.
+- Settings body text must retain Segoe UI 14 when hosted. Prerequisites lists YubiEnroll, ykman, then administrative permissions. Help & About is project information/documentation.
+- Settings has no Done button or persistent tenant/profile totals. Activity appears directly inside its tab; the same session events survive navigating away and back. Copy/export remain explicit and exclude terminal transcripts/PINs.
+- Registered keys displays the registration ID directly, without a Tool response section. An unrecognized response is not proof of no keys.
+- The key-name suggestion uses the inspected model without firmware and its serial, e.g. `YubiKey 5C (12345678)`. Custom names survive device refresh. The native CLI still chooses the enrollment device; verify the physical device in the confirmation/prompt. No claim of automatic serial targeting is made.
+- Prepare Key has no profile-details expander or repeated reset notice; the final enrollment review retains the exact profile reset warning.
+- Confirm the original charcoal/green icon in Explorer, title bar, Alt+Tab and the taskbar after launching the new executable. Existing pinned shortcuts may reference an older download; unpin that old shortcut and pin the new executable when testing.
+- Verify real Connect output remains visible before browser authentication completes. The app must provide a waiting message even when the CLI has not emitted output. Test real enrollment prompts, hidden PIN input and generated PIN visibility using a disposable key. External console remains an explicit fallback; never auto-retry a started operation.
+
+Automated regressions include live terminal text before input/process exit, actual native YubiEnroll `--help` through the published renderer (no authentication), both native window icon sizes, hosted fonts, direct Activity navigation and editable name suggestions. Physical browser sign-in and taskbar shell caching remain manual checks.

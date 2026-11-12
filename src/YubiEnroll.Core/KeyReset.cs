@@ -6,6 +6,7 @@ namespace YubiEnroll.Core;
 public sealed record ResetKey(string Serial, string Model)
 {
     public string Label => $"{Model} · Serial {Serial}";
+    public string RegistrationName => $"{Regex.Replace(Model, @"\s*\(\d+\.\d+\.\d+\)\s*$", "").Trim()} ({Serial})";
 }
 
 public enum FidoPinState { Unknown, NotSet, Set, Blocked, Disabled, Unsupported }
@@ -17,7 +18,7 @@ public sealed record KeyStatus(ResetKey Key, FidoPinState Pin)
     {
         FidoPinState.NotSet => "Not set",
         FidoPinState.Set => "Set",
-        FidoPinState.Blocked => "Blocked — inspect the key before enrollment",
+        FidoPinState.Blocked => "Blocked — FIDO reset required",
         FidoPinState.Disabled => "Disabled",
         FidoPinState.Unsupported => "Not supported",
         _ => "Unknown — could not verify"

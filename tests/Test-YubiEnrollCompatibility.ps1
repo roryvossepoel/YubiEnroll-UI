@@ -13,6 +13,14 @@ $exe = (Get-ChildItem $destination -Filter yubienroll.exe -Recurse -File | Selec
 if (-not $exe) { throw 'YubiEnroll executable not found in extracted package' }
 & $exe --version
 if ($LASTEXITCODE -ne 0) { throw 'YubiEnroll version check failed' }
+# Exercise the real native program through the published terminal renderer, without sign-in.
+$terminalArgs = '--terminal-check "' + $exe + '"'
+$terminalCheck = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList $terminalArgs -PassThru
+if (-not $terminalCheck.WaitForExit(30000)) { $terminalCheck.Kill(); throw 'Native terminal rendering test timed out' }
+if ($terminalCheck.ExitCode -ne 0) {
+    Get-Content ./artifacts/win-x64/app/native-terminal-check.txt -ErrorAction SilentlyContinue
+    throw 'Native terminal rendering test failed'
+}
 # The hosted runner is disposable. Refuse to touch a pre-existing configuration.
 $modern = Join-Path $env:APPDATA 'yubienroll/yubienroll.toml'
 $legacy = Join-Path $env:APPDATA 'Yubico/yubienroll/yubienroll.toml'

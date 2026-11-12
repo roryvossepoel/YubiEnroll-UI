@@ -7,7 +7,7 @@ public sealed record RegisteredCredential(string Name, string Model, string Id);
 public static class RegisteredCredentials
 {
     // Read-only presentation: only a recognized table with three columns is interpreted.
-    // Raw output remains available when a CLI version uses a different format.
+    // Unrecognized formats are never interpreted as proof that there are no registrations.
     public static IReadOnlyList<RegisteredCredential> Parse(string text)
     {
         var result = new List<RegisteredCredential>();
