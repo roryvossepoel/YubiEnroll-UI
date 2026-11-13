@@ -1,4 +1,4 @@
-# Manual acceptance checks for preview 0.4.2
+# Manual acceptance checks for preview 0.4.3
 
 ## Preview 0.4.3: current acceptance workflow
 
@@ -15,6 +15,7 @@ Earlier version sections below are historical checks; use this workflow for the 
 - The inventory check is not a running-process device binding. Real CLI login, PIN generation, reset/enrollment and interrupted-operation outcomes require hardware acceptance; automated CI does not prove these.
 
 
+## Earlier acceptance checks (historical)
 
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 

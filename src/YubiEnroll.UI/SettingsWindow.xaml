@@ -22,7 +22,7 @@
     <TextBlock x:Name="VersionInfo" Margin="0,12,0,12" TextWrapping="Wrap"/>
     <TextBlock x:Name="ManagerInfo" TextWrapping="Wrap" Margin="0,0,0,12"/>
     <TextBlock x:Name="AccessInfo" TextWrapping="Wrap" Margin="0,0,0,16"/>
-    <TextBlock Text="YubiEnroll is required for preparation. YubiKey Manager CLI 5.9.2+ (5.x) is required for target verification, key inspection and FIDO reset." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock Text="YubiEnroll is required for enrollment. YubiKey Manager CLI 5.9.2+ (5.x) is required for target verification, key inspection and FIDO reset." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
     <WrapPanel Margin="0,0,0,12"><Button Content="Get YubiEnroll" Tag="https://www.yubico.com/products/yubienroll/" Click="Link_Click"/><Button Content="Get YubiKey Manager CLI" Tag="https://developers.yubico.com/yubikey-manager/" Click="Link_Click"/></WrapPanel>
     <WrapPanel><Button Content="Recheck" Click="Recheck_Click"/><Button Content="Restart as administrator" Click="Elevate_Click"/></WrapPanel>
     <TextBlock Text="Interactive console" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
