@@ -18,15 +18,7 @@ public partial class MainWindow
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         SidebarKeyCard.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         OverviewButton.Content = compact ? "Home" : "Overview";
-        PrepareButton.Content = compact ? "Prepare" : "Prepare Key";
-        KeyToolsButton.Content = compact ? "Keys" : "Key Management";
-
-        var narrow = ActualWidth < 1000;
-        PreparationColumns.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
-        Grid.SetColumn(PreparationCard, narrow ? 0 : 1);
-        Grid.SetRow(PreparationCard, narrow ? 1 : 0);
-        UserCard.Margin = narrow ? new Thickness(0, 0, 0, 16) : new Thickness(0, 0, 8, 0);
-        PreparationCard.Margin = narrow ? new Thickness(0) : new Thickness(8, 0, 0, 0);
+        PrepareButton.Content = compact ? "Enroll" : "Enroll key";
     }
     private Window? _hostedWindow;
     internal bool EmbeddedTerminal { get; set; } = true; // External console remains an explicit fallback.
@@ -50,10 +42,9 @@ public partial class MainWindow
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
         OverviewButton.FontWeight = page == OverviewPage ? FontWeights.Bold : FontWeights.Normal;
         PrepareButton.FontWeight = page == PreparePage ? FontWeights.Bold : FontWeights.Normal;
-        foreach (var button in new[] { OverviewButton, PrepareButton, KeyToolsButton, SettingsButton })
+        foreach (var button in new[] { OverviewButton, PrepareButton, SettingsButton })
         {
             var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage ||
-                button == KeyToolsButton && page == HostedPage && _hostedWindow is KeyToolsWindow ||
                 button == SettingsButton && page == HostedPage && _hostedWindow is SettingsWindow;
             button.Tag = active ? "active" : null;
             button.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
@@ -95,20 +86,17 @@ public partial class MainWindow
     private async Task RefreshOverviewAsync()
     {
         if (_busy) return;
-        var previousSerial = _selectionSerial;
         await RunAsync(async () =>
         {
-            _readingKeys = true;
-            OverviewKeys.ItemsSource = null;
-            _readingKeys = false;
+
             KeyInfo.Text = "Reading connected keys…";
-            KeyPinStatus.Text = ""; KeyRecovery.Visibility = KeyRecoveryButton.Visibility = Visibility.Collapsed;
+            KeyPinStatus.Text = ""; KeyRecovery.Visibility = Visibility.Collapsed;
             ReadinessText.Text = !IsAdministrator() ? "Restart as administrator to inspect FIDO PIN status and reset keys." : "";
             if (!_cliReady) ReadinessText.Text += "\nInstall YubiEnroll to prepare keys.";
             ReadinessCard.Visibility = ReadinessText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             OverviewElevate.Visibility = IsAdministrator() ? Visibility.Collapsed : Visibility.Visible;
             var path = KeyResetService.FindExecutable();
-            if (path.Length == 0) { SetSelectedKey(null); KeyPinStatus.Text = ""; OverviewKeys.Visibility = Visibility.Collapsed; KeyInfo.Text = "Install YubiKey Manager CLI to inspect and manage connected keys. Tenant and profile settings remain available."; return; }
+            if (path.Length == 0) { ApplyInventory(Array.Empty<KeyStatus>(), 0); KeyPinStatus.Text = "";  KeyInfo.Text = "Install YubiKey Manager CLI to inspect and manage connected keys. Tenant and profile settings remain available."; return; }
             var runner = new CliRunner(path);
             var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
             try
@@ -123,16 +111,11 @@ public partial class MainWindow
                     if (IsAdministrator()) try { pin = await service.ReadPinStateAsync(key); } catch { }
                     entries.Add(new(key, pin));
                 }
-                OverviewKeys.ItemsSource = entries;
-                OverviewKeys.SelectedItem = entries.FirstOrDefault(x => x.Key.Serial == previousSerial);
-                // Restore by serial, and never substitute another device for a previously selected key.
-                if (previousSerial == null && entries.Count == 1) OverviewKeys.SelectedIndex = 0;
-                OverviewKey_Changed(this, null!);
-                OverviewKeys.Visibility = entries.Count > 1 || (entries.Count == 1 && OverviewKeys.SelectedItem == null) ? Visibility.Visible : Visibility.Collapsed;
-                if (OverviewKeys.SelectedItem == null) KeyInfo.Text = entries.Count == 0 ? "No supported key detected. Connect a USB security key to get started." : "Choose a key to inspect its status.";
+                ApplyInventory(entries, inventory.Unavailable);
+                if (_selectedKey == null) KeyInfo.Text = entries.Count == 0 ? "No supported key detected. Connect the target key and refresh." : "Choose the key you want to work on, then select Use this key.";
                 if (inventory.Unavailable > 0) KeyInfo.Text += "\nSome devices could not be inspected. Check device access and FIDO support.";
             }
-            catch { SetSelectedKey(null); KeyPinStatus.Text = ""; KeyInfo.Text = "Unable to inspect keys. Check prerequisites, close other key tools and refresh."; Record("Key inspection unavailable.", "Warning"); }
+            catch { ApplyInventory(Array.Empty<KeyStatus>(), 0); KeyPinStatus.Text = ""; KeyInfo.Text = "Unable to inspect keys. Check prerequisites, close other key tools and refresh."; Record("Key inspection unavailable.", "Warning"); }
         }, "Inspect connected keys");
     }
     private KeyStatus? _selectedKey;
@@ -144,30 +127,66 @@ public partial class MainWindow
         var changed = _selectedKey?.Key.Serial != key?.Key.Serial || _selectedKey?.Pin != key?.Pin;
         _selectedKey = key;
         if (key != null) { _selectionSerial = key.Key.Serial; _lastKnownKey = key.Key; }
-        SelectedKeyCard.Text = key == null ? "No key selected" : "Connected\n" + key.Key.Model + "\nSerial " + key.Key.Serial;
+        SelectedKeyCard.Text = key == null ? (_lastKnownKey == null ? "No target key selected" : "Target disconnected\nSerial " + _lastKnownKey.Serial) : "Target key\n" + key.Key.Model + "\nSerial " + key.Key.Serial;
         RenderSelectedKey();
         SuggestRegistrationName();
+        UpdateSummary();
         if (changed) Record(key == null ? "Selected key is unavailable." : $"Key selected · serial {key.Key.Serial} · {key.PinLabel}");
+    }
+    private IReadOnlyList<KeyStatus> _knownKeys = Array.Empty<KeyStatus>();
+    private int _unavailableKeys;
+    private bool _choosingTarget = true;
+    private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable)
+    {
+        _knownKeys = entries;
+        _unavailableKeys = unavailable;
+        _readingKeys = true;
+        try
+        {
+            OverviewKeys.ItemsSource = EnrollmentKeys.ItemsSource = entries;
+            OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = entries.FirstOrDefault(x => x.Key.Serial == _selectionSerial);
+        }
+        finally { _readingKeys = false; }
+        // Discovery never chooses a new target, even when there is just one device.
+        SetSelectedKey(entries.FirstOrDefault(x => x.Key == _lastKnownKey));
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (SelectedKeyCard == null || KeyPinStatus == null || _readingKeys) return;
-        var key = OverviewKeys.SelectedItem as KeyStatus;
+        if (EnrollmentKeys == null || UseEnrollmentKey == null || _readingKeys) return;
+        var candidate = (sender as ComboBox)?.SelectedItem as KeyStatus;
+        _readingKeys = true;
+        try { OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = candidate; }
+        finally { _readingKeys = false; }
+        UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = candidate != null;
+    }
+    private void UseTargetKey_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || OverviewKeys.SelectedItem is not KeyStatus key || !_knownKeys.Contains(key)) return;
+        _choosingTarget = false;
         SetSelectedKey(key);
+        StatusText.Text = "Target key selected · serial " + key.Key.Serial;
+    }
+    private void ChangeTargetKey_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        _choosingTarget = true;
+        RenderSelectedKey();
+        UpdateSummary();
     }
     private void RenderSelectedKey()
     {
         var key = _selectedKey;
-        if (OverviewKeys.ItemsSource is IEnumerable<KeyStatus> available && key != null)
-        {
-            _readingKeys = true;
-            try { OverviewKeys.SelectedItem = available.FirstOrDefault(x => x.Key.Serial == key.Key.Serial); }
-            finally { _readingKeys = false; }
-        }
+        var choosing = _choosingTarget || key == null;
+        OverviewChooser.Visibility = EnrollmentChooser.Visibility = choosing ? Visibility.Visible : Visibility.Collapsed;
+        ChangeOverviewKey.Visibility = ChangeEnrollmentKey.Visibility = choosing ? Visibility.Collapsed : Visibility.Visible;
         KeyPinStatus.Text = key?.PinLabel ?? "";
         KeyPinStatus.Foreground = key?.Pin == FidoPinState.Blocked ? System.Windows.Media.Brushes.Firebrick : System.Windows.Media.Brushes.DarkSlateGray;
-        KeyRecovery.Visibility = KeyRecoveryButton.Visibility = key?.Pin == FidoPinState.Blocked ? Visibility.Visible : Visibility.Collapsed;
-        KeyInfo.Text = key == null ? "No supported key selected. Connect a key or choose Refresh keys." : key.Key.Model + "\nSerial number: " + key.Key.Serial;
+        KeyRecovery.Visibility = key?.Pin == FidoPinState.Blocked ? Visibility.Visible : Visibility.Collapsed;
+        KeyInfo.Text = key == null ? (_lastKnownKey == null ? "No target key selected." : "Target key disconnected · serial " + _lastKnownKey.Serial) : key.Key.Model + " · Serial " + key.Key.Serial;
+        EnrollmentTargetText.Text = key == null ? KeyInfo.Text : key.Key.Model + " · Serial " + key.Key.Serial;
+        ResetTargetButton.IsEnabled = key != null && !choosing && IsAdministrator();
+        UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = OverviewKeys.SelectedItem is KeyStatus;
+        EnrollmentTargetNotice.Text = EnrollmentTargetGuard.Explain(key?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys);
     }
     private string _suggestedName = "";
     private void SuggestRegistrationName()
@@ -207,7 +226,7 @@ public partial class MainWindow
         if (!EmbeddedTerminal) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? "Prepare Key — interactive operation" : login ? "Connect to tenant" : "Key Management — interactive operation", enrollment, login);
+        var terminal = new TerminalPanel(enrollment ? "Enroll key — interactive operation" : login ? "Connect to tenant" : "Reset FIDO — interactive operation", enrollment, login);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }

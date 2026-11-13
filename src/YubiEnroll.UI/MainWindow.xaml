@@ -15,8 +15,7 @@
     </StackPanel>
     <StackPanel x:Name="Navigation">
      <Button x:Name="OverviewButton" Style="{StaticResource NavigationButton}" Content="Overview" Click="Overview_Click" Margin="0,0,0,8"/>
-     <Button x:Name="PrepareButton" Style="{StaticResource NavigationButton}" Content="Prepare Key" Click="Prepare_Click" Margin="0,0,0,8"/>
-     <Button x:Name="KeyToolsButton" Style="{StaticResource NavigationButton}" Content="Key Management" Click="KeyTools_Click" Margin="0"/>
+     <Button x:Name="PrepareButton" Style="{StaticResource NavigationButton}" Content="Enroll key" Click="Prepare_Click" Margin="0,0,0,8"/>
     </StackPanel>
    </DockPanel>
   </Border>
@@ -29,12 +28,22 @@
      <ScrollViewer x:Name="OverviewPage" VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28">
        <TextBlock Text="Overview" FontSize="28" FontWeight="SemiBold"/>
-       <TextBlock Text="Connected security key and FIDO status." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
+       <TextBlock Text="Choose the key you want to work on. Your sign-in key is separate." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
        <Border Style="{StaticResource Card}" Margin="0,0,0,18"><StackPanel>
-        <TextBlock Text="Connected key" Style="{StaticResource SectionTitle}"/>
-        <ComboBox x:Name="OverviewKeys" DisplayMemberPath="Label" SelectionChanged="OverviewKey_Changed" Margin="0,14,0,12" AutomationProperties.Name="Connected security key"/>
-        <TextBlock x:Name="KeyInfo" FontSize="14" Text="Connect a YubiKey to get started." TextWrapping="Wrap" Foreground="#526277" Margin="0,0,0,14"/>
-        <TextBlock x:Name="KeyPinStatus" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" TextWrapping="Wrap"/><TextBlock x:Name="KeyRecovery" Text="Open Key Management and reset FIDO to remove the blocked PIN. This also erases all passkeys on the key." Visibility="Collapsed" TextWrapping="Wrap" Margin="0,0,0,12"/><Button x:Name="KeyRecoveryButton" Content="Open Key Management" Click="KeyTools_Click" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,10"/><Button Content="Refresh keys" Click="RefreshKeys_Click" HorizontalAlignment="Left"/>
+        <TextBlock Text="Target key" Style="{StaticResource SectionTitle}"/>
+        <StackPanel x:Name="OverviewChooser" Margin="0,12,0,12">
+         <ComboBox x:Name="OverviewKeys" DisplayMemberPath="Label" SelectionChanged="OverviewKey_Changed" AutomationProperties.Name="Choose target key"/>
+         <Button x:Name="UseOverviewKey" Content="Use this key" Click="UseTargetKey_Click" HorizontalAlignment="Left" Margin="0,8,0,0" IsEnabled="False"/>
+        </StackPanel>
+        <TextBlock x:Name="KeyInfo" FontSize="16" Text="Choose a target key to begin." TextWrapping="Wrap" Margin="0,10,0,10"/>
+        <TextBlock x:Name="KeyPinStatus" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" TextWrapping="Wrap"/>
+        <TextBlock x:Name="KeyRecovery" Text="Reset FIDO to remove the blocked PIN. This erases all passkeys on the target key." Visibility="Collapsed" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <WrapPanel><Button x:Name="ChangeOverviewKey" Content="Change key" Click="ChangeTargetKey_Click"/><Button Content="Refresh keys" Click="RefreshKeys_Click"/></WrapPanel>
+       </StackPanel></Border>
+       <Border Style="{StaticResource Card}" Margin="0,0,0,18"><StackPanel>
+        <TextBlock Text="Key actions" Style="{StaticResource SectionTitle}"/>
+        <TextBlock Text="Enroll a passkey for a user, or erase the target key’s FIDO passkeys and PIN." TextWrapping="Wrap" Margin="0,8,0,12"/>
+        <WrapPanel><Button Content="Enroll key" Click="Prepare_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="ResetTargetButton" Content="Reset FIDO…" Click="ResetTarget_Click" IsEnabled="False"/></WrapPanel>
        </StackPanel></Border>
        <Border x:Name="ReadinessCard" Style="{StaticResource Card}" Visibility="Collapsed"><StackPanel>
         <TextBlock Text="Attention needed" Style="{StaticResource SectionTitle}"/>
@@ -45,15 +54,25 @@
      </ScrollViewer>
      <DockPanel x:Name="PreparePage" Visibility="Collapsed">
       <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#DCE3EB" BorderThickness="0,1,0,0" Padding="24,10">
-       <WrapPanel><Button x:Name="EnrollButton" Content="Prepare Key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/></WrapPanel>
+       <WrapPanel><Button x:Name="EnrollButton" Content="Enroll key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/></WrapPanel>
       </Border>
       <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28,28,28,16">
-       <TextBlock Text="Prepare Key" FontSize="28" FontWeight="SemiBold"/>
-       <TextBlock Text="Connect to a tenant and prepare a key for a user. Confirm the physical key in the YubiEnroll prompt." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
+       <TextBlock Text="Enroll key" FontSize="28" FontWeight="SemiBold"/>
+       <TextBlock Text="Choose the target key, then the tenant and user who will receive it." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
+    <Border Style="{StaticResource Card}" Margin="0,0,0,16"><StackPanel>
+     <TextBlock Text="1   Choose the target key" Style="{StaticResource SectionTitle}"/>
+     <TextBlock x:Name="EnrollmentTargetText" Text="Select the key you want to enroll, not your administrator sign-in key." TextWrapping="Wrap" Margin="0,10,0,8"/>
+     <StackPanel x:Name="EnrollmentChooser">
+      <ComboBox x:Name="EnrollmentKeys" DisplayMemberPath="Label" SelectionChanged="OverviewKey_Changed" AutomationProperties.Name="Enrollment target key"/>
+      <Button x:Name="UseEnrollmentKey" Content="Use this key" Click="UseTargetKey_Click" HorizontalAlignment="Left" Margin="0,8,0,0" IsEnabled="False"/>
+     </StackPanel>
+     <WrapPanel Margin="0,8,0,0"><Button x:Name="ChangeEnrollmentKey" Content="Change key" Click="ChangeTargetKey_Click"/><Button Content="Refresh keys" Click="RefreshKeys_Click"/></WrapPanel>
+     <TextBlock x:Name="EnrollmentTargetNotice" TextWrapping="Wrap" Foreground="#884A17" Margin="0,10,0,0"/>
+    </StackPanel></Border>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16">
      <StackPanel>
-      <TextBlock Text="1   Connect to a tenant" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="2   Connect to a tenant" Style="{StaticResource SectionTitle}"/>
       <Grid Margin="0,14,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
        <ComboBox x:Name="Tenants" DisplayMemberPath="Name" SelectionChanged="Tenant_Changed" VerticalContentAlignment="Center" AutomationProperties.Name="Tenant"/>
        <Button x:Name="ConnectButton" Grid.Column="1" Content="Connect" Click="Login_Click" Style="{StaticResource PrimaryButton}" Margin="12,0,0,0"/>
@@ -61,10 +80,10 @@
       <TextBlock x:Name="ContextBanner" Text="Select a tenant to begin." TextWrapping="Wrap" Foreground="#617084" Margin="0,10,0,0"/>
      </StackPanel>
     </Border>
-    <Grid x:Name="PreparationColumns"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Border x:Name="UserCard" Style="{StaticResource Card}" Margin="0,0,8,0">
+    <StackPanel>
+    <Border x:Name="UserCard" Style="{StaticResource Card}" Margin="0,0,0,16">
      <StackPanel x:Name="SearchPanel" IsEnabled="False">
-      <TextBlock Text="2   Choose a user" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="3   Choose a user" Style="{StaticResource SectionTitle}"/>
       <TextBlock Text="Search by name or email" Margin="0,12,0,4" Foreground="#617084"/><DockPanel Margin="0,0,0,12"><Button DockPanel.Dock="Right" Content="Search" Click="Search_Click" Margin="12,0,0,0"/><TextBox x:Name="Query" KeyDown="Query_KeyDown" ToolTip="Search by name or username" AutomationProperties.Name="Search users"/></DockPanel>
       <ListBox x:Name="Users" SelectionChanged="User_Changed" MinHeight="110" MaxHeight="180" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
        <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="8,7"><TextBlock Text="{Binding Label}" TextWrapping="Wrap"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
@@ -74,16 +93,16 @@
       <Button x:Name="CredentialsButton" Content="Registered keys…" HorizontalAlignment="Left" Margin="0,12,0,0" Click="Credentials_Click" IsEnabled="False"/>
      </StackPanel>
     </Border>
-    <Border x:Name="PreparationCard" Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,0">
+    <Border x:Name="PreparationCard" Style="{StaticResource Card}">
      <StackPanel x:Name="PreparePanel" IsEnabled="False">
-      <TextBlock Text="3   Configure the key" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="4   Configure the key" Style="{StaticResource SectionTitle}"/>
       <TextBlock Text="Configuration profile" Margin="0,14,0,6"/>
       <ComboBox x:Name="Profiles" DisplayMemberPath="Name" SelectionChanged="Profile_Changed"/>
       <TextBlock Text="Key name (optional)" Margin="0,12,0,6"/>
       <TextBox x:Name="KeyName" MaxLength="100"/>
      </StackPanel>
     </Border>
-    </Grid>
+    </StackPanel>
 
       </StackPanel>
       </ScrollViewer>

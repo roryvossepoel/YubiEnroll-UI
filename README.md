@@ -1,3 +1,5 @@
+> **Target-selection development branch:** this is a draft, not the 0.4.2 release. Multi-key enrollment is blocked until direct device targeting is implemented. See [the design and remaining work](docs/TARGET-KEY-DESIGN.md).
+
 # YubiEnroll UI
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.

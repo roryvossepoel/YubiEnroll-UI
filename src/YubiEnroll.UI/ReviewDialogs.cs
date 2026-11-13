@@ -30,8 +30,8 @@ public partial class MainWindow
         body.Children.Add(ReviewText("Review before enrollment", 24));
         body.Children.Add(ReviewText($"Tenant: {provider.Name}\n\nUser: {user.Label}\n\nConfiguration profile: {profile.Name}\n\nRegistration name: {(string.IsNullOrWhiteSpace(KeyName.Text) ? "Default (serial number)" : KeyName.Text.Trim())}"));
         body.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(255, 242, 240)), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 16), Child = ReviewText(warning) });
-        body.Children.Add(ReviewText((_selectedKey == null ? "No key inspected." : "Inspected key: " + _selectedKey.Label) +
-            "\nYubiEnroll selects the enrollment device independently. Confirm the physical key in its prompts. Disconnect other keys to avoid selecting the wrong device."));
+        body.Children.Add(ReviewText((_selectedKey == null ? "No target key selected." : "Selected target: " + _selectedKey.Label) +
+            "\nYubiEnroll selects the enrollment device independently. Confirm the physical key in its prompts. The current CLI cannot bind enrollment to a USB serial. Keep only this key connected throughout the operation."));
         var detail = new Expander { Header = "Technical identifiers", Content = ReviewText($"Tenant ID: {provider.TenantId}\nUser ID: {user.Id}") };
         body.Children.Add(detail);
         return dialog.ShowDialog() == true;
@@ -40,11 +40,11 @@ public partial class MainWindow
     private void ShowRegisteredKeys(UserCandidate user, Provider provider, string output)
     {
         var dialog = ReviewWindow("Registered keys", 780);
-        dialog.Height = Math.Min(SystemParameters.WorkArea.Height, Math.Min(680, 420 + Math.Max(0, RegisteredCredentials.Parse(output).Count - 1) * 180));
+        dialog.Height = Math.Min(SystemParameters.WorkArea.Height, Math.Min(680, 350 + Math.Max(0, RegisteredCredentials.Parse(output).Count - 1) * 120));
         var layout = new DockPanel { Margin = new Thickness(24) }; dialog.Content = layout;
-        var title = ReviewText("Registered keys", 24);
+        var title = ReviewText(user.Label, 18);
         DockPanel.SetDock(title, Dock.Top); layout.Children.Add(title);
-        var note = ReviewText($"{user.Label}\nTenant: {provider.Name}");
+        var note = ReviewText($"Entra registrations · {provider.Name}", 12);
         DockPanel.SetDock(note, Dock.Top); layout.Children.Add(note);
         var buttons = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) }; DockPanel.SetDock(buttons, Dock.Bottom); layout.Children.Add(buttons);
         var close = new Button { Content = "Close", IsCancel = true }; close.Click += (_, _) => dialog.Close();
@@ -58,10 +58,12 @@ public partial class MainWindow
             foreach (var row in rows)
             {
                 var card = new StackPanel();
-                card.Children.Add(ReviewText(row.Name, 16)); card.Children.Add(ReviewText(row.Model));
+                card.Children.Add(new TextBlock { Text = row.Name, FontSize = 16, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 5) });
+                if (!string.Equals(row.Name, row.Model, StringComparison.OrdinalIgnoreCase))
+                    card.Children.Add(new TextBlock { Text = row.Model, FontSize = 14, Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) });
                 card.Children.Add(new TextBlock { Text = "Registration ID", FontSize = 12, Margin = new Thickness(0, 0, 0, 4) });
                 card.Children.Add(new TextBox { Text = row.Id, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontSize = 12, BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent, Padding = new Thickness(0) });
-                display.Children.Add(new Border { Style = (Style)FindResource("Card"), Child = card, Margin = new Thickness(0, 0, 0, 12) });
+                display.Children.Add(new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(220, 227, 235)), BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(0, 12, 0, 16), Child = card });
             }
             if (rows.Count == 0) display.Children.Add(ReviewText("No registered keys could be displayed. Try Refresh or verify the user’s registrations in Entra."));
         }
