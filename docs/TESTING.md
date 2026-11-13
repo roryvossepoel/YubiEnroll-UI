@@ -1,5 +1,21 @@
 # Manual acceptance checks for preview 0.4.2
 
+## Preview 0.4.3: current acceptance workflow
+
+Earlier version sections below are historical checks; use this workflow for the current navigation.
+
+- Choose a target explicitly on Overview or Enroll key. A sole discovered key is not selected automatically. Navigate between Overview, Enroll key and Settings: no discovery is triggered by navigation and the serial remains the same.
+- Connect an administrator key and target. Sign-in remains available. Before sign-in the UI says to authenticate first; afterward it lists the other serials to disconnect. Enrollment stays disabled until only the target remains. User search and Registered keys remain available.
+- Disconnect the administrator key: inventory refresh keeps the target and enables enrollment when the tenant, user and profile are ready. Disconnect the target instead: it must never be replaced by the administrator key.
+- While device discovery is pending, key actions are disabled immediately. Failed or unrecognized discovery cannot leave stale action readiness enabled. Explicit Refresh recovers normally.
+- Review the vertical target/tenant/user/profile steps and fixed action footer at 100%, 150% and 200% scaling. The target serial must remain visible when scrolling down to the profile. Inspect the compact registered-keys list and confirmation dialog.
+- Confirm **Change key** with a different device: the old user and registration name must be cleared; the tenant session and selected profile stay. Refreshing or confirming the same key must preserve a custom name and recipient.
+- Use a disposable target for enrollment. Confirm it in YubiEnroll’s native prompts and leave other keys disconnected until it finishes. If sign-in is requested again, cancel before reconnecting the administrator key; check any uncertain result before retrying.
+- Reset FIDO from Overview on a disposable target. Confirm the serial, follow native reinsertion/touch, and verify PIN read-back. With the administrator key also attached, reset must still address only the confirmed serial. Never use a production key for acceptance testing.
+- The inventory check is not a running-process device binding. Real CLI login, PIN generation, reset/enrollment and interrupted-operation outcomes require hardware acceptance; automated CI does not prove these.
+
+
+
 Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnroll version and key firmware. These checks have not yet been executed against physical hardware for this C# port.
 
 | Check | Expected result |

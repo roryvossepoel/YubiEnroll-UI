@@ -28,10 +28,10 @@ public partial class MainWindow
         var body = new StackPanel();
         layout.Children.Add(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         body.Children.Add(ReviewText("Review before enrollment", 24));
+        body.Children.Add(ReviewText("Target key: " + (_selectedKey?.Label ?? "Unavailable"), 16));
         body.Children.Add(ReviewText($"Tenant: {provider.Name}\n\nUser: {user.Label}\n\nConfiguration profile: {profile.Name}\n\nRegistration name: {(string.IsNullOrWhiteSpace(KeyName.Text) ? "Default (serial number)" : KeyName.Text.Trim())}"));
         body.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(255, 242, 240)), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 16), Child = ReviewText(warning) });
-        body.Children.Add(ReviewText((_selectedKey == null ? "No target key selected." : "Selected target: " + _selectedKey.Label) +
-            "\nYubiEnroll selects the enrollment device independently. Confirm the physical key in its prompts. The current CLI cannot bind enrollment to a USB serial. Keep only this key connected throughout the operation."));
+        body.Children.Add(ReviewText("Keep only this target connected until YubiEnroll finishes. Confirm the key in its touch and reinsertion prompts. If another sign-in is requested, cancel this attempt before reconnecting your administrator key."));
         var detail = new Expander { Header = "Technical identifiers", Content = ReviewText($"Tenant ID: {provider.TenantId}\nUser ID: {user.Id}") };
         body.Children.Add(detail);
         return dialog.ShowDialog() == true;

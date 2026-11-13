@@ -4,6 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.4.3-target-preview</Version>
+    <Version>0.4.3</Version>
   </PropertyGroup>
 </Project>

@@ -13,13 +13,19 @@ public partial class MainWindow
             throw new InvalidOperationException("YubiKey Manager CLI is required to verify the connected keys.");
         var runner = new CliRunner(executable);
         var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
-        await service.CheckVersionAsync();
-        var inventory = await service.DiscoverAsync();
-        try { EnrollmentTargetGuard.Require(target, inventory); }
+        InvalidateDeviceInventory();
+        try
+        {
+            await service.CheckVersionAsync();
+            var inventory = await service.DiscoverAsync();
+            ApplyInventory(inventory.Keys.Select(k => new KeyStatus(k, _knownKeys.FirstOrDefault(x => x.Key == k)?.Pin ?? FidoPinState.Unknown)).ToArray(), inventory.Unavailable);
+            EnrollmentTargetGuard.Require(target, inventory);
+        }
         catch
         {
-            // Invalidate stale UI state; never substitute the administrator's remaining key.
-            ApplyInventory(inventory.Keys.Select(k => new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable);
+            // Failed discovery cannot leave an old inventory enabled. A rejected fresh
+            // inventory remains visible so the operator can correct the physical setup.
+            if (_inventoryDirty) ApplyInventory(Array.Empty<KeyStatus>(), 0);
             throw;
         }
     }

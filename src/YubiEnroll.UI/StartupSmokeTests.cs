@@ -155,13 +155,23 @@ public partial class MainWindow
             UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
             Assert(_selectedKey == target && EnrollButton.IsEnabled, "Explicit Use this key commits the target");
             ApplyInventory(new[] { target, admin }, 0);
-            Assert(_selectedKey == target && !EnrollButton.IsEnabled && EnrollmentTargetNotice.Text.Contains("blocked"), "Two-key enrollment is blocked until the backend supports device targeting");
+            Assert(_selectedKey == target && !EnrollButton.IsEnabled && EnrollmentTargetNotice.Text.Contains(admin.Key.Serial) && FooterInstruction.Text.Contains("Disconnect"), "After sign-in, two-key guidance identifies which other key to disconnect");
+            _connectedProvider = null; UpdateSummary();
+            Assert(ConnectButton.IsEnabled && !EnrollButton.IsEnabled && EnrollmentTargetNotice.Text.Contains("Use your administrator key"), "Two keys are allowed for sign-in before the enrollment-only restriction");
+            _connectedProvider = SelectedProvider; UpdateSummary();
             CaptureWindow(this, "two-key-overview.png");
             ShowPage(PreparePage); CaptureWindow(this, "two-key-enrollment.png");
             ApplyInventory(new[] { admin }, 0);
             Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Removing target never substitutes the administrator key");
             ApplyInventory(new[] { target }, 0);
-            Assert(_selectedKey == target, "Reconnecting exact target restores its cached identity");
+            Assert(_selectedKey == target && EnrollButton.IsEnabled, "Reconnecting exact target restores its cached identity and single-key enrollment");
+            InvalidateDeviceInventory(); UpdateSummary();
+            Assert(!EnrollButton.IsEnabled && !ResetTargetButton.IsEnabled && !UseOverviewKey.IsEnabled && _selectedKey == target, "Device-change invalidation immediately blocks actions without replacing the selected target");
+            ApplyInventory(new[] { target }, 0);
+            ChangeTargetKey_Click(this, new System.Windows.RoutedEventArgs());
+            Assert(!EnrollButton.IsEnabled, "Changing target pauses enrollment until explicit confirmation");
+            UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
+            Assert(EnrollButton.IsEnabled && Users.SelectedItem != null, "Confirming the same key preserves the current user");
             Assert(KeyName.Text == "YubiKey 5C (12345678)", "Registration name is populated from model and serial without firmware");
             KeyName.Text = "My custom key";
             ApplyInventory(new[] { target with { Pin = FidoPinState.Set } }, 0);
@@ -177,6 +187,10 @@ public partial class MainWindow
             CaptureWindow(this, "enrollment-small-desktop.png");
             Width = 1120; Height = 860;
             CaptureWindow(this, "enrollment.png");
+            EnrollmentScroll.ScrollToBottom(); UpdateLayout();
+            CaptureWindow(this, "enrollment-profile.png");
+            Assert(PreparationCard.IsVisible && FooterTargetText.Text.Contains(target.Key.Serial), "Target identity stays visible beside the action when the profile is scrolled into view");
+            EnrollmentScroll.ScrollToTop();
             var reviewCapture = Dispatcher.InvokeAsync(() =>
             {
                 var review = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Confirm enrollment");
@@ -194,6 +208,15 @@ public partial class MainWindow
             ShowRegisteredKeys(SelectedUser, SelectedProvider, "Display name  Model  ID\nDemo key  YubiKey 5 NFC  synthetic-credential-id");
             await keysCapture.Task;
             AssertActionFooterVisible();
+            ApplyInventory(new[] { target, admin }, 0);
+            var connectedTenant = _connectedProvider;
+            var chosenProfile = Profiles.SelectedItem;
+            ChangeTargetKey_Click(this, new System.Windows.RoutedEventArgs());
+            OverviewKeys.SelectedIndex = 1;
+            UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
+            Assert(_selectedKey == admin && Users.SelectedItem == null && Query.Text.Length == 0 && !EnrollButton.IsEnabled && KeyName.Text == admin.Key.RegistrationName,
+                "Choosing the next key clears the previous recipient and name before another enrollment");
+            Assert(_connectedProvider == connectedTenant && ReferenceEquals(Profiles.SelectedItem, chosenProfile), "Changing physical target preserves tenant login and profile");
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);

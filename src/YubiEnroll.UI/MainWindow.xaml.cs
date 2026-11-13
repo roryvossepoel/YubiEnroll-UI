@@ -93,7 +93,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.4.3 target preview" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.4.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -177,11 +177,12 @@ public partial class MainWindow : Window
         if (!IsConnected) SelectedUserText.Text = "Connect to a tenant first.";
         PreparePanel.IsEnabled = IsConnected && Users.SelectedItem != null;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
-        EnrollButton.IsEnabled = IsConnected && Users.SelectedItem != null && profile != null && !_choosingTarget &&
+        EnrollButton.IsEnabled = IsConnected && Users.SelectedItem != null && profile != null && !_choosingTarget && !_inventoryDirty &&
             EnrollmentTargetGuard.CanStart(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys);
         CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
         CredentialsButton.Visibility = Users.SelectedItem != null ? Visibility.Visible : Visibility.Collapsed;
         SelectedUserText.Visibility = Users.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
+        UpdateEnrollmentGuidance();
     }
 
     private void ResetSelection()
@@ -239,7 +240,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.3 target preview\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.3\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -256,7 +257,7 @@ public partial class MainWindow : Window
 
     private async void ResetTarget_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || _choosingTarget || _selectedKey == null || !IsAdministrator()) return;
+        if (_busy || _inventoryDirty || _choosingTarget || _selectedKey == null || !IsAdministrator()) return;
         var target = _selectedKey.Key;
         int? resetExit = null;
         var resetCompleted = await RunWithResultAsync(async () =>
@@ -300,7 +301,8 @@ public partial class MainWindow : Window
         {
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, null);
             _connectedProvider = provider;
-            StatusText.Text = "Login completed. Search for the user who will receive this key.";
+            StatusText.Text = "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
+            _deviceRefresh?.Start();
         }
         else StatusText.Text = $"Could not connect to {provider.Name}. Select Connect to try again.";
         UpdateSummary();
@@ -419,7 +421,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_busy && !(_hostedWindow is KeyToolsWindow tools && tools.IsOperationActive)) return;
+        if (!_busy) return;
         e.Cancel = true;
         MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
     }

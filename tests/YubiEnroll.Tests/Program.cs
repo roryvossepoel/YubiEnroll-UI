@@ -367,6 +367,10 @@ Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey, targetKey },
 Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey with { Model = "Other model" } }, 0), "Changed target identity requires verification");
 try { EnrollmentTargetGuard.Require(targetKey, new(new[] { adminKey }, 0)); throw new Exception("Missing target accepted"); }
 catch (InvalidOperationException) { Check(true, "Fresh preflight rejects target removal"); }
+Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, false).Contains("Use your administrator key"), "Two keys before login explain administrator sign-in first");
+Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"serial: {adminKey.Serial}") &&
+    EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
+Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 

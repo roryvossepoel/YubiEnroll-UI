@@ -10,8 +10,8 @@ public partial class MainWindow
 {
     private void ResizePreparation()
     {
-        Users.MinHeight = ActualHeight < 800 ? 80 : 130;
-        Users.MaxHeight = ActualHeight < 800 ? 130 : 200;
+        Users.MinHeight = 80;
+        Users.MaxHeight = ActualHeight < 800 ? 130 : 180;
         var compact = ActualWidth < 880;
         SidebarColumn.Width = new GridLength(compact ? 120 : 210);
         BrandTitle.FontSize = compact ? 13 : 22;
@@ -36,7 +36,7 @@ public partial class MainWindow
     }
     private void ShowPage(FrameworkElement page)
     {
-        if (_busy || (_hostedWindow is KeyToolsWindow keyTools && keyTools.IsOperationActive)) return;
+        if (_busy) return;
         if (page != HostedPage) LeaveHostedPage();
         foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, HostedPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
@@ -86,13 +86,13 @@ public partial class MainWindow
     private async Task RefreshOverviewAsync()
     {
         if (_busy) return;
+        InvalidateDeviceInventory();
         await RunAsync(async () =>
         {
-
             KeyInfo.Text = "Reading connected keys…";
             KeyPinStatus.Text = ""; KeyRecovery.Visibility = Visibility.Collapsed;
             ReadinessText.Text = !IsAdministrator() ? "Restart as administrator to inspect FIDO PIN status and reset keys." : "";
-            if (!_cliReady) ReadinessText.Text += "\nInstall YubiEnroll to prepare keys.";
+            if (!_cliReady) ReadinessText.Text += "\nInstall YubiEnroll to enroll keys.";
             ReadinessCard.Visibility = ReadinessText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             OverviewElevate.Visibility = IsAdministrator() ? Visibility.Collapsed : Visibility.Visible;
             var path = KeyResetService.FindExecutable();
@@ -112,7 +112,7 @@ public partial class MainWindow
                     entries.Add(new(key, pin));
                 }
                 ApplyInventory(entries, inventory.Unavailable);
-                if (_selectedKey == null) KeyInfo.Text = entries.Count == 0 ? "No supported key detected. Connect the target key and refresh." : "Choose the key you want to work on, then select Use this key.";
+                if (_selectedKey == null && _lastKnownKey == null) KeyInfo.Text = entries.Count == 0 ? "No supported key detected. Connect the target key and refresh." : "Choose the key you want to work on, then select Use this key.";
                 if (inventory.Unavailable > 0) KeyInfo.Text += "\nSome devices could not be inspected. Check device access and FIDO support.";
             }
             catch { ApplyInventory(Array.Empty<KeyStatus>(), 0); KeyPinStatus.Text = ""; KeyInfo.Text = "Unable to inspect keys. Check prerequisites, close other key tools and refresh."; Record("Key inspection unavailable.", "Warning"); }
@@ -135,9 +135,11 @@ public partial class MainWindow
     }
     private IReadOnlyList<KeyStatus> _knownKeys = Array.Empty<KeyStatus>();
     private int _unavailableKeys;
+    private bool _inventoryDirty = true;
     private bool _choosingTarget = true;
     private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable)
     {
+        _inventoryDirty = false;
         _knownKeys = entries;
         _unavailableKeys = unavailable;
         _readingKeys = true;
@@ -157,11 +159,19 @@ public partial class MainWindow
         _readingKeys = true;
         try { OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = candidate; }
         finally { _readingKeys = false; }
-        UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = candidate != null;
+        UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = !_inventoryDirty && candidate != null;
     }
     private void UseTargetKey_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || OverviewKeys.SelectedItem is not KeyStatus key || !_knownKeys.Contains(key)) return;
+        if (_busy || _inventoryDirty || OverviewKeys.SelectedItem is not KeyStatus key || !_knownKeys.Contains(key)) return;
+        // A refresh keeps the recipient/name; intentionally choosing a different key starts a new assignment.
+        if (_lastKnownKey != null && _lastKnownKey != key.Key)
+        {
+            ResetSelection();
+            Query.Clear();
+            KeyName.Clear();
+            _suggestedName = "";
+        }
         _choosingTarget = false;
         SetSelectedKey(key);
         StatusText.Text = "Target key selected · serial " + key.Key.Serial;
@@ -185,9 +195,32 @@ public partial class MainWindow
         KeyInfo.Text = key == null ? (_lastKnownKey == null ? "No target key selected." : "Target key disconnected · serial " + _lastKnownKey.Serial) : key.Key.Model + " · Serial " + key.Key.Serial;
         EnrollmentTargetText.Text = key == null ? KeyInfo.Text : key.Key.Model + " · Serial " + key.Key.Serial;
         FooterTargetText.Text = key == null ? "No target key available" : "Target · " + key.Key.RegistrationName;
-        ResetTargetButton.IsEnabled = key != null && !choosing && IsAdministrator();
-        UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = OverviewKeys.SelectedItem is KeyStatus;
-        EnrollmentTargetNotice.Text = EnrollmentTargetGuard.Explain(key?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys);
+        ResetTargetButton.IsEnabled = key != null && !choosing && !_inventoryDirty && IsAdministrator();
+        UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = !_inventoryDirty && OverviewKeys.SelectedItem is KeyStatus;
+        UpdateEnrollmentGuidance();
+    }
+    private void UpdateEnrollmentGuidance()
+    {
+        if (EnrollmentTargetNotice == null || FooterInstruction == null) return;
+        var key = _selectedKey?.Key;
+        var message = _inventoryDirty ? "Checking connected keys… Select Refresh keys if this does not update." :
+            _choosingTarget ? "Choose the target key, then select Use this key to confirm." :
+            EnrollmentTargetGuard.Explain(key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys, IsConnected);
+        EnrollmentTargetNotice.Text = message;
+        EnrollmentTargetNotice.Foreground = !_inventoryDirty && key != null && (!_choosingTarget && (!IsConnected || _knownKeys.Count == 1 && _unavailableKeys == 0))
+            ? System.Windows.Media.Brushes.DarkSlateGray : System.Windows.Media.Brushes.SaddleBrown;
+        FooterInstruction.Text = _inventoryDirty || _choosingTarget || key == null ? message :
+            !IsConnected ? "Connect to the tenant to continue." :
+            !EnrollmentTargetGuard.CanStart(key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys) ? message :
+            Users.SelectedItem == null ? "Search for and select the user who will receive this key." :
+            Profiles.SelectedItem == null ? "Choose an enrollment profile." :
+            "Review the target, user and profile before starting.";
+    }
+    private void InvalidateDeviceInventory()
+    {
+        _inventoryDirty = true;
+        EnrollButton.IsEnabled = ResetTargetButton.IsEnabled = UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = false;
+        UpdateEnrollmentGuidance();
     }
     private string _suggestedName = "";
     private void SuggestRegistrationName()
@@ -207,17 +240,16 @@ public partial class MainWindow
         _deviceRefresh = new() { Interval = TimeSpan.FromSeconds(1) };
         _deviceRefresh.Tick += async (_, _) =>
         {
-            if (_busy || _hostedWindow is KeyToolsWindow { IsOperationActive: true }) return;
+            if (_busy) return;
             _deviceRefresh.Stop();
-            if (_hostedWindow is KeyToolsWindow tools) await tools.RefreshAsync();
-            else await RefreshOverviewAsync();
+            await RefreshOverviewAsync();
         };
         System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(DeviceMessage);
     }
     private IntPtr DeviceMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         // WM_DEVICECHANGE: debounce bursts, do not inspect while a native operation owns the key.
-        if (message == 0x0219) { _deviceRefresh?.Stop(); _deviceRefresh?.Start(); }
+        if (message == 0x0219) { InvalidateDeviceInventory(); _deviceRefresh?.Stop(); _deviceRefresh?.Start(); }
         return IntPtr.Zero;
     }
     private string _lastInteractiveFailure = "";
@@ -227,7 +259,7 @@ public partial class MainWindow
         if (!EmbeddedTerminal) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? "Enroll key — interactive operation" : login ? "Connect to tenant" : "Reset FIDO — interactive operation", enrollment, login);
+        var terminal = new TerminalPanel(enrollment ? "Enroll key · serial " + _selectedKey?.Key.Serial : login ? "Connect to tenant" : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }

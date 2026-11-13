@@ -7,7 +7,7 @@
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,24">
      <TextBlock x:Name="BrandTitle" Text="YubiEnroll UI" FontSize="22" FontWeight="SemiBold"/>
      <TextBlock x:Name="BrandSubtitle" Text="COMMUNITY PREVIEW" FontSize="10" Foreground="#617084" Margin="0,5,0,20"/>
-     <Border x:Name="SidebarKeyCard" Background="White" CornerRadius="8" Padding="12"><TextBlock x:Name="SelectedKeyCard" Text="No key selected" TextWrapping="Wrap" FontSize="12"/></Border>
+     <Border x:Name="SidebarKeyCard" Background="White" CornerRadius="8" Padding="12"><TextBlock x:Name="SelectedKeyCard" Text="No target key selected" TextWrapping="Wrap" FontSize="12"/></Border>
     </StackPanel>
     <StackPanel DockPanel.Dock="Bottom">
      <Button x:Name="SettingsButton" Style="{StaticResource NavigationButton}" Content="Settings" Click="Settings_Click" Margin="0,0,0,8"/>
@@ -54,9 +54,9 @@
      </ScrollViewer>
      <DockPanel x:Name="PreparePage" Visibility="Collapsed">
       <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#DCE3EB" BorderThickness="0,1,0,0" Padding="24,10">
-       <WrapPanel><Button x:Name="EnrollButton" Content="Enroll key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/><TextBlock x:Name="FooterTargetText" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/></WrapPanel>
+       <StackPanel><TextBlock x:Name="FooterInstruction" TextWrapping="Wrap" FontSize="12" Foreground="#526277" Margin="0,0,0,8"/><WrapPanel><Button x:Name="EnrollButton" Content="Enroll key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/><TextBlock x:Name="FooterTargetText" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/></WrapPanel></StackPanel>
       </Border>
-      <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <ScrollViewer x:Name="EnrollmentScroll" VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28,28,28,16">
        <TextBlock Text="Enroll key" FontSize="28" FontWeight="SemiBold"/>
        <TextBlock Text="Choose the target key, then the tenant and user who will receive it." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,24"/>
