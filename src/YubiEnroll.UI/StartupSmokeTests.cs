@@ -348,14 +348,26 @@ public partial class MainWindow
             try
             {
                 var deadline = DateTime.UtcNow.AddSeconds(10);
-                while ((!File.Exists(result) || File.ReadAllText(result).Length == 0) && DateTime.UtcNow < deadline) await Task.Delay(100);
-                Assert(File.ReadAllText(result) == "7", "External host records the native result before waiting for Enter");
+                string recorded = "";
+                while (recorded.Length == 0 && DateTime.UtcNow < deadline)
+                {
+                    // The host creates and writes this file before waiting for Enter.
+                    // Existence alone does not mean its write handle has closed.
+                    try { if (File.Exists(result)) recorded = File.ReadAllText(result); }
+                    catch (IOException) { }
+                    if (recorded.Length == 0) await Task.Delay(100);
+                }
+                Assert(recorded == "7", "External host records the native result before waiting for Enter");
                 process.Kill(); await process.WaitForExitAsync();
                 Assert(CliRunner.ReadNativeOutcome(result, process.ExitCode) == 7, "Closing the host preserves the recorded native result");
             }
             finally { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); } }
         }
-        finally { File.Delete(result); }
+        finally
+        {
+            // Cleanup must not hide an assertion or process failure.
+            try { File.Delete(result); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
         var terminal = new TerminalPanel("Login completion test", false, true);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
         try { Assert(await terminal.RunAsync(mockExecutable, ["--version"]).WaitAsync(TimeSpan.FromSeconds(10)) == 0, "Successful embedded login returns without a Done click"); }
