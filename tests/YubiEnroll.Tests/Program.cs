@@ -355,6 +355,22 @@ try
     Check(CliRunner.ReadNativeOutcome(exitFile, 0) != 0, "Missing native outcome cannot be interpreted as success");
 }
 finally { File.Delete(exitFile); }
+var targetKey = new ResetKey("12345678", "YubiKey 5C (5.7.1)");
+var adminKey = new ResetKey("87654321", "YubiKey 5C (5.7.1)");
+Check(!EnrollmentTargetGuard.CanStart(null, new[] { targetKey }, 0), "No implicit enrollment target for a single connected device");
+Check(EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey }, 0), "Single target permits the explicitly documented legacy CLI flow");
+Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey, adminKey }, 0), "Admin and target connected blocks untargeted enrollment");
+Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { adminKey }, 0), "Missing target is never substituted by admin key");
+Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey }, 1), "Unreadable extra device blocks enrollment");
+Check(!EnrollmentTargetGuard.CanStart(targetKey, Array.Empty<ResetKey>(), 0), "Disconnected target blocks enrollment");
+Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey, targetKey }, 0), "Ambiguous device inventory blocks enrollment");
+Check(!EnrollmentTargetGuard.CanStart(targetKey, new[] { targetKey with { Model = "Other model" } }, 0), "Changed target identity requires verification");
+try { EnrollmentTargetGuard.Require(targetKey, new(new[] { adminKey }, 0)); throw new Exception("Missing target accepted"); }
+catch (InvalidOperationException) { Check(true, "Fresh preflight rejects target removal"); }
+Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, false).Contains("Use your administrator key"), "Two keys before login explain administrator sign-in first");
+Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"serial: {adminKey.Serial}") &&
+    EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
+Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 
