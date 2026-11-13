@@ -151,7 +151,7 @@ public partial class MainWindow
             ApplyInventory(new[] { target }, 0);
             Assert(_selectedKey == null && !EnrollButton.IsEnabled, "Single discovered key is not selected without operator confirmation");
             OverviewKeys.SelectedIndex = 0;
-            Assert(_selectedKey == null && EnrollmentKeys.SelectedItem == target, "Chooser synchronizes both pages without committing a device");
+            Assert(_selectedKey == null && EnrollmentKeys.SelectedItem is KeyStatus candidate && candidate == target, "Chooser synchronizes both pages without committing a device");
             UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
             Assert(_selectedKey == target && EnrollButton.IsEnabled, "Explicit Use this key commits the target");
             ApplyInventory(new[] { target, admin }, 0);

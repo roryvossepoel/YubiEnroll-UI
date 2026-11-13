@@ -93,7 +93,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · preview 0.4.3 target preview" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.4.3 target preview" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -258,19 +258,31 @@ public partial class MainWindow : Window
     {
         if (_busy || _choosingTarget || _selectedKey == null || !IsAdministrator()) return;
         var target = _selectedKey.Key;
-        await RunAsync(async () =>
+        int? resetExit = null;
+        var resetCompleted = await RunWithResultAsync(async () =>
         {
             var path = KeyResetService.FindExecutable();
             if (path.Length == 0) throw new InvalidOperationException("Install YubiKey Manager CLI in Prerequisites.");
             var runner = new CliRunner(path);
             var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a));
-            var exit = await service.ResetAsync(target, key => MessageBox.Show(this,
+            var exit = resetExit = await service.ResetAsync(target, key => MessageBox.Show(this,
                 $"Target: {key.Label}\n\nErase all FIDO2/U2F passkeys and the PIN on this key? This cannot be undone. Registrations in Entra and other services remain.\n\nOther connected keys are not targeted. Confirm, reinsert and touch this same key in the following prompts.",
                 "Reset target key", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes);
-            StatusText.Text = exit switch { null => "Reset cancelled.", 0 => "FIDO reset completed. Refreshing target key status…", _ => "Reset failed or was interrupted. Check the target key before retrying." };
+            StatusText.Text = exit switch { null => "Reset cancelled.", 0 => "YubiKey Manager reported a successful FIDO reset. Reading target status…", _ => "Reset failed or was interrupted. Check the target key before retrying." };
             Record(StatusText.Text + " · serial " + target.Serial, exit is null or 0 ? "Info" : "Error");
         }, "Reset target key");
         await RefreshOverviewAsync();
+        if (resetCompleted && resetExit == 0)
+        {
+            var readBack = _selectedKey?.Key == target ? _selectedKey.Pin : FidoPinState.Unknown;
+            StatusText.Text = readBack switch
+            {
+                FidoPinState.NotSet => "Reset reported successful. Read-back: target PIN is not set. Entra registrations remain.",
+                FidoPinState.Set or FidoPinState.Blocked => "Reset reported successful, but a PIN is still set. Inspect the target before continuing.",
+                _ => "Reset reported successful, but target PIN status could not be verified. Reconnect the target and refresh."
+            };
+            Record(StatusText.Text + " · serial " + target.Serial, readBack == FidoPinState.NotSet ? "Info" : "Warning");
+        }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();

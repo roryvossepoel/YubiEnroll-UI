@@ -54,7 +54,7 @@
      </ScrollViewer>
      <DockPanel x:Name="PreparePage" Visibility="Collapsed">
       <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#DCE3EB" BorderThickness="0,1,0,0" Padding="24,10">
-       <WrapPanel><Button x:Name="EnrollButton" Content="Enroll key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/></WrapPanel>
+       <WrapPanel><Button x:Name="EnrollButton" Content="Enroll key" Click="Enroll_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"/><TextBlock x:Name="FooterTargetText" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" Margin="12,0,0,0"/></WrapPanel>
       </Border>
       <ScrollViewer VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="28,28,28,16">

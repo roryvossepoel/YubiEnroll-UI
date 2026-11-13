@@ -184,6 +184,7 @@ public partial class MainWindow
         KeyRecovery.Visibility = key?.Pin == FidoPinState.Blocked ? Visibility.Visible : Visibility.Collapsed;
         KeyInfo.Text = key == null ? (_lastKnownKey == null ? "No target key selected." : "Target key disconnected · serial " + _lastKnownKey.Serial) : key.Key.Model + " · Serial " + key.Key.Serial;
         EnrollmentTargetText.Text = key == null ? KeyInfo.Text : key.Key.Model + " · Serial " + key.Key.Serial;
+        FooterTargetText.Text = key == null ? "No target key available" : "Target · " + key.Key.RegistrationName;
         ResetTargetButton.IsEnabled = key != null && !choosing && IsAdministrator();
         UseOverviewKey.IsEnabled = UseEnrollmentKey.IsEnabled = OverviewKeys.SelectedItem is KeyStatus;
         EnrollmentTargetNotice.Text = EnrollmentTargetGuard.Explain(key?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys);
