@@ -79,7 +79,7 @@ if (args.Length == 2 && args[0] == "--check-ykman")
     if (inventory.Keys.Count != 0) throw new Exception("Unexpected hardware on CI runner.");
     var probe = await native.CaptureWithInputAsync(TimeSpan.FromSeconds(15), FidoCapabilityProbe.Script, "script", "--force", "-", "12345678");
     if (probe.ExitCode != 4 || probe.Output.Length != 0 || probe.Error.Length != 0)
-        throw new Exception("Bundled read-only probe failed to run in the native ykman scripting runtime.");
+        throw new Exception($"Bundled read-only probe failed in native ykman: exit {probe.ExitCode}; output: {probe.Output}; error: {probe.Error}");
     Console.WriteLine("PASS: bundled capability script runs through native ykman without Python/SDK installation and rejects an absent target.");
     Console.WriteLine("PASS: native ykman version, empty USB inventory and serial-targeted reset help; no reset executed.");
     return 0;
