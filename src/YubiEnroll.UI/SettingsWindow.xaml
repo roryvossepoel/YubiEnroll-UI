@@ -34,13 +34,10 @@
     <CheckBox x:Name="EmbeddedChoice" Content="Use embedded terminal (preview, this session)"/>
     <TextBlock Text="Try the Yubico prompts inside the app. Leave unchecked to use the external console. Select before starting; running commands are never restarted automatically." TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,16"/>
     </StackPanel></Expander>
-    <Expander Header="Technical details"><StackPanel Margin="0,12,0,0">
-     <TextBlock Text="YubiEnroll executable"/><TextBox x:Name="ExecutableInfo" IsReadOnly="True" Margin="0,6,0,16" TextWrapping="Wrap"/>
-     <TextBlock Text="Configuration file"/><TextBox x:Name="ConfigurationInfo" IsReadOnly="True" Margin="0,6,0,16" TextWrapping="Wrap"/>
-     <TextBlock Text=".NET 10 Desktop Runtime x64 must be installed before this application can start. Configuration and sign-in belong to the current Windows account." TextWrapping="Wrap" Foreground="#617084"/>
-    </StackPanel></Expander>
+
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Import / export"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
+    <TextBlock Text="This app uses YubiEnroll’s standard TOML configuration file (yubienroll.toml) for your Windows account. Tenant and profile changes are saved directly to that file." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16"><StackPanel>
      <TextBlock Text="Export configuration" Style="{StaticResource SectionTitle}"/>
      <TextBlock Text="Save your supported tenant and profile settings to a file." TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,8"/>
@@ -61,13 +58,16 @@
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Help &amp; About"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
     <StackPanel Orientation="Horizontal"><Image Source="{StaticResource BrandMark}" Width="32" Height="32" Margin="0,0,12,0"/><TextBlock Text="YubiEnroll UI" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/></StackPanel>
-    <TextBlock Text="Community preview 0.5.1 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
+    <TextBlock Text="Community preview 0.5.2 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
     <TextBlock Text="An independent open-source community project. Not affiliated with, sponsored by, or endorsed by Yubico. Yubico and YubiKey are trademarks of Yubico." TextWrapping="Wrap" Margin="0,0,0,18"/>
     <TextBlock Text="Our project" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
     <WrapPanel><Button Content="GitHub" Tag="https://github.com/roryvossepoel/YubiEnroll-UI" Click="Link_Click"/><Button Content="Report an issue" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/issues" Click="Link_Click"/><Button Content="Prerequisites" Click="Prerequisites_Click"/><Button Content="Testing guide" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/blob/feature/initial-wpf-app/docs/TESTING.md" Click="Link_Click"/></WrapPanel>
     <TextBlock Text="Yubico documentation" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
-    <WrapPanel><Button Content="YubiEnroll docs" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html" Click="Link_Click"/></WrapPanel>
-    <WrapPanel Margin="0,8,0,0"><Button Content="ykman docs" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/" Click="Link_Click"/><Button Content="Authenticator docs" Tag="https://docs.yubico.com/software/yubikey/tools/authenticator/auth-guide/index.html" Click="Link_Click"/></WrapPanel>
+    <WrapPanel>
+     <Button Content="YubiEnroll docs" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html" Click="Link_Click" Margin="0,0,8,8"/>
+     <Button Content="YubiKey Manager CLI (ykman)" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/" Click="Link_Click" Margin="0,0,8,8"/>
+     <Button Content="Authenticator docs" Tag="https://docs.yubico.com/software/yubikey/tools/authenticator/auth-guide/index.html" Click="Link_Click" Margin="0,0,8,8"/>
+    </WrapPanel>
     <TextBlock Text="License &amp; diagnostics" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
     <TextBlock Text="MIT licensed. LICENSE and THIRD-PARTY-NOTICES.md are included with the download. Yubico tools are installed separately. Activity and error details are available in Settings → Activity log; interactive console output and PINs are not saved to that log. External tools manage their own authentication and caches." TextWrapping="Wrap" Foreground="#617084"/>
    </StackPanel></ScrollViewer></TabItem>

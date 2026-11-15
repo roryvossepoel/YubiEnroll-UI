@@ -19,6 +19,7 @@ public partial class MainWindow
     private int _unavailableKeys;
     private bool _inventoryDirty = true;
     private bool _inventoryLoaded;
+    private int _deviceGeneration;
     private bool _choosingTarget = true;
     private string _suggestedName = "";
     private System.Windows.Threading.DispatcherTimer? _deviceRefresh;
@@ -103,13 +104,15 @@ public partial class MainWindow
     {
         if (_busy) return;
         InvalidateDeviceInventory();
+        var generation = _deviceGeneration;
         await RunAsync(async () =>
         {
             var path = KeyResetService.FindExecutable();
             if (path.Length == 0)
             {
-                ApplyInventory(Array.Empty<KeyStatus>(), 0);
-                SetInventoryMessage("Install YubiKey Manager CLI, then return to Settings → Prerequisites."); return;
+                if (TryApplyInventory(Array.Empty<KeyStatus>(), 0, generation))
+                    SetInventoryMessage("Install YubiKey Manager CLI, then return to Settings → Prerequisites.");
+                return;
             }
             var runner = new CliRunner(path);
             var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
@@ -124,11 +127,11 @@ public partial class MainWindow
                     if (IsAdministrator()) try { pin = await service.ReadPinStateAsync(key); } catch { }
                     entries.Add(new(key, pin));
                 }
-                ApplyInventory(entries, inventory.Unavailable);
+                TryApplyInventory(entries, inventory.Unavailable, generation);
             }
             catch
             {
-                ApplyInventory(Array.Empty<KeyStatus>(), 0);
+                if (!TryApplyInventory(Array.Empty<KeyStatus>(), 0, generation)) return;
                 SetInventoryMessage("Unable to read the connected keys. Check Settings → Prerequisites, close other key tools and Refresh.");
                 Record("Key inspection unavailable.", "Warning");
             }
@@ -146,9 +149,27 @@ public partial class MainWindow
         SuggestRegistrationName(); UpdateSummary();
         if (changed) Record(key == null ? "Selected key is unavailable." : $"Key selected · serial {key.Key.Serial} · {key.PinLabel}");
     }
+    private bool TryApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, int generation)
+    {
+        // A USB event during discovery makes that snapshot stale. The scheduled refresh will retry once idle.
+        if (generation != _deviceGeneration) return false;
+        ApplyInventory(entries, unavailable);
+        return true;
+    }
     private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable)
     {
+        var previousTarget = _selectedKey?.Key ?? _lastKnownKey;
+        var targetMissing = previousTarget != null && !entries.Any(x => x.Key == previousTarget);
         _inventoryDirty = false; _inventoryLoaded = true; _knownKeys = entries; _unavailableKeys = unavailable;
+        if (targetMissing)
+        {
+            _choosingTarget = true;
+            ResetAcknowledged.IsChecked = false;
+            _resetReviewTarget = null;
+            if (_resetStep == 1) _resetStep = 0;
+            if (_enrollStep is > 0 and < 4) _enrollStep = 0;
+            StatusText.Text = "Target unavailable · serial " + previousTarget!.Serial + ". Select a connected key to continue.";
+        }
         // Preserve an unconfirmed choice across a refresh, but never make the first choice for the operator.
         var candidate = (EnrollmentKeys.SelectedItem as KeyStatus)?.Key ?? _lastKnownKey;
         _readingKeys = true;
@@ -159,7 +180,7 @@ public partial class MainWindow
         }
         finally { _readingKeys = false; }
         SetInventoryMessage(unavailable > 0 ? "Some devices could not be identified. Check device access and FIDO support." :
-            entries.Count == 0 ? "No supported key detected. Connect the target key and Refresh." : "");
+            entries.Count == 0 ? "No supported key detected. Connect a key; the list updates automatically." : "");
         SetSelectedKey(entries.FirstOrDefault(x => x.Key == _lastKnownKey));
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)
@@ -224,7 +245,7 @@ public partial class MainWindow
         _deviceRefresh = new() { Interval = TimeSpan.FromSeconds(1) };
         _deviceRefresh.Tick += async (_, _) =>
         {
-            if (_busy) return;
+            if (_busy || _checkingRequirements) return;
             _deviceRefresh.Stop();
             if (_inventoryLoaded) await RefreshOverviewAsync();
         };
@@ -232,8 +253,15 @@ public partial class MainWindow
     }
     private IntPtr DeviceMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (message == 0x0219) { InvalidateDeviceInventory(); _deviceRefresh?.Stop(); _deviceRefresh?.Start(); }
+        if (message == 0x0219 && (wParam.ToInt64() is 0x0007 or 0x8000 or 0x8004)) ScheduleDeviceRefresh();
         return IntPtr.Zero;
+    }
+    private void ScheduleDeviceRefresh()
+    {
+        _deviceGeneration++;
+        InvalidateDeviceInventory();
+        _deviceRefresh?.Stop();
+        _deviceRefresh?.Start();
     }
     private async Task<int> RunInteractiveAsync(string executable, string[] args)
     {

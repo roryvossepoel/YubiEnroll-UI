@@ -1,4 +1,13 @@
-# Manual acceptance checks for preview 0.5.1
+# Manual acceptance checks for preview 0.5.2
+
+## Preview 0.5.2: USB refresh and UI acceptance
+
+- With a reviewed target on Reset FIDO, unplug it: automatic discovery must empty/update the key list, return to Key and remove the destructive action. The old checkbox approval must be cleared.
+- Reconnect the same key, or connect another key while the target is missing: a fresh choice/review is required. Never substitute the administrator key. Repeat during enrollment review; tenant login may remain but the target must be confirmed again.
+- Quickly plug/unplug during a refresh: stale discovery output must not re-enable actions. Check the manual Refresh button still works.
+- During an actual native reset/enrollment, follow its unplug/reinsert prompts: automatic discovery must wait until the running operation releases the key. Verify the result remains visible afterward.
+- Inspect Connect beside the tenant selector, no-tenants guidance, progress connectors, the enrollment/gear icons, and extra scrollbar spacing in tenant/profile editors.
+- Activity entries without details have no disclosure arrow; real diagnostic entries can still expand. Confirm Copy/Export still includes details.
 
 ## Preview 0.5.1: startup and visual acceptance
 
@@ -7,7 +16,7 @@
 - Install a missing tool in its standard location, then return to the app: the card updates automatically. No Recheck button is required. Open Home to continue when all checks pass.
 - Confirm that returning from documentation does not discard tenant login, user selection or target identity. No enrollment or reset may start from a software check.
 - Check Home, navigation, logo, titlebar and taskbar at 100%, 125%, 150% and 200% Windows scale. The app mark must be the same shape everywhere, with crisp contours. Cards have matching neutral borders at rest and visible hover/keyboard focus.
-- Prerequisites has two tool cards with status/download/docs; no administrator status or restart controls. Terminal preferences and technical paths remain expandable. Profiles explains the key PIN/reset scope.
+- Prerequisites has two tool cards with status/download/docs; no administrator status or restart controls. Terminal preferences remains expandable; Technical details is removed. Profiles explains the key PIN/reset scope.
 
 ## Preview 0.5.0: current acceptance workflow
 

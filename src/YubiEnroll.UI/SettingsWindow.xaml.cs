@@ -34,8 +34,6 @@ public partial class SettingsWindow : Window
         _path = path;
         InitializeComponent();
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
-        ExecutableInfo.Text = executable;
-        ConfigurationInfo.Text = path;
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
         Attempt(RefreshLists);
     }
@@ -48,7 +46,6 @@ public partial class SettingsWindow : Window
         var attention = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#854018")!;
         VersionInfo.Foreground = report.Enrollment.Ready ? neutral : attention;
         ManagerInfo.Foreground = report.Manager.Ready ? neutral : attention;
-        ExecutableInfo.Text = report.EnrollmentPath;
     }
 
     private void Attempt(Action action)

@@ -13,7 +13,8 @@ internal sealed class ActivityLogView : DockPanel
     private sealed record Entry(DateTime Time, string Level, string Message, string Detail)
     {
         public string Heading => $"{Time:yyyy-MM-dd HH:mm:ss} · {Level} · {Message}";
-        public string Text => Heading + (Detail.Length == 0 ? "" : "\n" + Detail);
+        public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
+        public string Text => Heading + (HasDetail ? "\n" + Detail : "");
     }
     private readonly ObservableCollection<Entry> _entries = new();
     private readonly ListCollectionView _view;
@@ -23,7 +24,7 @@ internal sealed class ActivityLogView : DockPanel
         Margin = new Thickness(18);
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
 
-        var help = new TextBlock { Text = "Actions and errors from this session. Expand an event for technical details. PINs and terminal transcripts are not recorded.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+        var help = new TextBlock { Text = "Actions and errors from this session. Events with additional details can be expanded. PINs and terminal transcripts are not recorded.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         SetDock(help, Dock.Top); Children.Add(help);
         var actions = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
         SetDock(actions, Dock.Top); Children.Add(actions);
@@ -44,7 +45,14 @@ internal sealed class ActivityLogView : DockPanel
         };
         actions.Children.Add(export);
         var list = new ItemsControl { ItemsSource = _view };
-        var expander = new FrameworkElementFactory(typeof(Expander));
+        var row = new FrameworkElementFactory(typeof(Grid));
+        var summary = new FrameworkElementFactory(typeof(TextBlock), "Summary");
+        summary.SetBinding(TextBlock.TextProperty, new Binding("Heading"));
+        summary.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        summary.SetValue(MarginProperty, new Thickness(20, 4, 0, 12));
+        summary.SetValue(VisibilityProperty, Visibility.Collapsed);
+        row.AppendChild(summary);
+        var expander = new FrameworkElementFactory(typeof(Expander), "Details");
         expander.SetBinding(Expander.HeaderProperty, new Binding("Heading"));
         var header = new FrameworkElementFactory(typeof(TextBlock));
         header.SetBinding(TextBlock.TextProperty, new Binding());
@@ -55,7 +63,14 @@ internal sealed class ActivityLogView : DockPanel
         detail.SetBinding(TextBlock.TextProperty, new Binding("Detail"));
         detail.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
         detail.SetValue(MarginProperty, new Thickness(20, 8, 0, 8));
-        expander.AppendChild(detail); list.ItemTemplate = new DataTemplate { VisualTree = expander };
+        expander.AppendChild(detail);
+        row.AppendChild(expander);
+        var template = new DataTemplate { VisualTree = row };
+        var noDetails = new DataTrigger { Binding = new Binding("HasDetail"), Value = false };
+        noDetails.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible, "Summary"));
+        noDetails.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed, "Details"));
+        template.Triggers.Add(noDetails);
+        list.ItemTemplate = template;
         var body = new Grid();
         body.Children.Add(new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         body.Children.Add(_empty); Children.Add(body);

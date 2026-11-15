@@ -24,12 +24,28 @@ public partial class MainWindow
         panel.Children.Clear();
         for (var i = 0; i < labels.Length; i++)
         {
-            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.Children.Add(new Border { Background = i <= step ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromRgb(234, 237, 238)),
                 CornerRadius = new CornerRadius(18), Width = 32, Height = 32,
                 Child = new TextBlock { Text = (i + 1).ToString(), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold } });
-            row.Children.Add(new TextBlock { Text = labels[i], Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Brush)FindResource(i == step ? "Heading" : "Muted"), FontWeight = i == step ? FontWeights.SemiBold : FontWeights.Normal });
+            var label = new TextBlock { Text = labels[i], Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                Foreground = (Brush)FindResource(i == step ? "Heading" : "Muted"), FontWeight = i == step ? FontWeights.SemiBold : FontWeights.Normal };
+            Grid.SetColumn(label, 1);
+            row.Children.Add(label);
+            if (i < labels.Length - 1)
+            {
+                var connector = new Border
+                {
+                    Height = 2, CornerRadius = new CornerRadius(1), VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(12, 0, 16, 0),
+                    Background = i < step ? (Brush)FindResource("Accent") : new SolidColorBrush(Color.FromRgb(221, 226, 228))
+                };
+                Grid.SetColumn(connector, 2);
+                row.Children.Add(connector);
+            }
             panel.Children.Add(row);
         }
     }
@@ -68,6 +84,7 @@ public partial class MainWindow
         KeyPinStatus.Text = _selectedKey is { } currentKey && currentKey.Key == _resetReviewTarget ? currentKey.PinLabel : "Target unavailable";
         ResetAvailability.Text = !IsAdministrator() ? "Restart as administrator from the startup requirements screen to reset this key." :
             !TargetReady || _selectedKey?.Key != _resetReviewTarget ? "The reviewed target is unavailable. Go back, reconnect it and Refresh." : "";
+        ResetAcknowledged.IsEnabled = !_busy && TargetReady && _selectedKey?.Key == _resetReviewTarget;
         ResetTargetButton.IsEnabled = !_busy && _resetStep == 1 && TargetReady && _selectedKey?.Key == _resetReviewTarget && IsAdministrator() && ResetAcknowledged.IsChecked == true;
     }
     private void ReadReviewWarning()

@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.5.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.5.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -16,6 +16,14 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
 - Offers **Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
+
+## Preview 0.5.2: interaction polish and USB refresh
+
+- USB arrival/removal automatically refreshes the discovered key list alongside the manual Refresh button. A target disappearing before an operation returns the relevant wizard to key selection and clears reset confirmation. Reconnecting does not restore the old confirmation; another key is never substituted.
+- Device changes during an in-flight discovery invalidate that snapshot. Refresh is deferred while an operation is running, so native reset/enrollment reinsertion prompts keep control of the key.
+- Connect sits beside the tenant selector. An empty tenant list points to Settings → Tenants. Both step indicators have progress connectors.
+- Enrollment uses the same slanted USB-key/plus icon on Home and in navigation; Settings uses an eight-tooth gear. Form fields have extra space beside scrollbars.
+- Activity rows only expand when they contain details. Prerequisites no longer has Technical details; Import / export explains the shared YubiEnroll TOML file, and documentation links share one row.
 
 ## Preview 0.5.1: startup requirements and visual refinement
 
@@ -90,7 +98,7 @@ Open **Settings → Tenants → Add tenant** and enter the tenant name, Director
 
 This form targets Microsoft Entra public cloud. For national clouds, use YubiEnroll’s native provider setup to configure the appropriate endpoints.
 
-The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** groups installation status and links by tool, with executable/configuration paths under Technical details. Administrator restart is offered on the startup requirements screen when needed. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
+The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** groups installation status and links by tool. Administrator restart is offered on the startup requirements screen when needed. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
 
 ### Manage multiple profiles
 

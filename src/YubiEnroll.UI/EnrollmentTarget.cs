@@ -14,11 +14,13 @@ public partial class MainWindow
         var runner = new CliRunner(executable);
         var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
         InvalidateDeviceInventory();
+        var generation = _deviceGeneration;
         try
         {
             await service.CheckVersionAsync();
             var inventory = await service.DiscoverAsync();
-            ApplyInventory(inventory.Keys.Select(k => new KeyStatus(k, _knownKeys.FirstOrDefault(x => x.Key == k)?.Pin ?? FidoPinState.Unknown)).ToArray(), inventory.Unavailable);
+            if (!TryApplyInventory(inventory.Keys.Select(k => new KeyStatus(k, _knownKeys.FirstOrDefault(x => x.Key == k)?.Pin ?? FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation))
+                throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
             EnrollmentTargetGuard.Require(target, inventory);
         }
         catch

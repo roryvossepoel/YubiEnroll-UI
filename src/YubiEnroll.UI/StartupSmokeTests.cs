@@ -23,6 +23,10 @@ public partial class MainWindow
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
             Assert(WorkPanel.IsEnabled && !EnrollButton.IsEnabled, "Setup remains usable without enrollment");
+            _enrollStep = 1; ShowPage(PreparePage); UpdateLayout();
+            Assert(EmptyTenants.IsVisible && !TenantConnectionRow.IsVisible, "An empty tenant list shows Settings guidance instead of an empty connection form");
+            CaptureWindow(this, "enroll-no-tenants.png");
+            _enrollStep = 0; ShowPage(OverviewPage);
             var path = ConfigReader.FindPath(root);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             TraceStartup("Initializing");
@@ -63,6 +67,7 @@ public partial class MainWindow
                     profileDialog.MinimumPinLength.Text = "8";
                     profileDialog.GeneratedPinLength.Text = "6";
                     Assert(!profileDialog.TrySave(), "Profile form rejects generated PIN shorter than minimum");
+                    CaptureWindow(profileDialog, "profile-editor.png");
                     profileDialog.GeneratedPinLength.Text = "10";
                     Assert(profileDialog.TrySave(), "Independent profile can be created");
                 }
@@ -204,7 +209,17 @@ public partial class MainWindow
             ShowPage(OverviewPage);
             Assert(double.IsPositiveInfinity(MaxWidth) && double.IsPositiveInfinity(MaxHeight), "Main window does not constrain maximization to a reduced work area");
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
-            OpenSettings(5); CaptureWindow(this, "activity-log.png");
+            _activityView.Add("Synthetic summary only.", "Info", "   ");
+            OpenSettings(5); UpdateLayout();
+            var disclosures = VisualDescendants<System.Windows.Controls.Expander>(_activityView).ToArray();
+            Assert(!disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic summary only.")).IsVisible,
+                "Activity entries with empty or whitespace details have no disclosure control");
+            var diagnostic = disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic operation failed."));
+            Assert(diagnostic.IsVisible, "Activity entries with diagnostics retain a disclosure control");
+            diagnostic.IsExpanded = true; UpdateLayout();
+            Assert(VisualDescendants<System.Windows.Controls.TextBlock>(diagnostic).Any(x => x.IsVisible && x.Text == "HTTP status: 405"),
+                "Expanding an activity diagnostic shows its actual details");
+            CaptureWindow(this, "activity-log.png");
             ShowPage(OverviewPage);
             Width = 800; Height = 580;
             CaptureWindow(this, "overview-compact.png");
@@ -335,7 +350,9 @@ public partial class MainWindow
         ApplyInventory(new[] { admin }, 0);
         Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Missing target is never replaced by the administrator key");
         ApplyInventory(new[] { target }, 0);
-        Assert(_selectedKey == target && EnrollButton.IsEnabled, "Exact target reconnect restores reviewed enrollment readiness");
+        Assert(_selectedKey == target && _enrollStep == 0 && !EnrollButton.IsEnabled, "Target reconnect requires choosing the key again before enrollment");
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Assert(_enrollStep == 3 && EnrollButton.IsEnabled, "Review is available again only after confirming the reconnected target");
         InvalidateDeviceInventory(); UpdateSummary();
         Assert(!EnrollButton.IsEnabled && !ResetTargetButton.IsEnabled && !EnrollNext.IsEnabled, "USB change immediately invalidates action readiness");
         ApplyInventory(new[] { target }, 0);
@@ -345,6 +362,12 @@ public partial class MainWindow
         KeyName.Clear(); SuggestRegistrationName();
         Assert(KeyName.Text == "YubiKey 5C NFC (12345678)", "Default name contains model and serial without firmware");
         CaptureWindow(this, "enroll-review.png"); AssertActionFooterVisible();
+        var staleGeneration = _deviceGeneration;
+        ScheduleDeviceRefresh();
+        Assert(!TryApplyInventory(new[] { target }, 0, staleGeneration) && _inventoryDirty && !EnrollButton.IsEnabled,
+            "USB changes discard an in-flight discovery snapshot instead of re-enabling stale actions");
+        TryApplyInventory(new[] { target }, 0, _deviceGeneration);
+        Assert(!_inventoryDirty && EnrollButton.IsEnabled, "The latest USB inventory restores readiness when the confirmed target remains present");
         var cached = _selectedKey;
         ShowPage(OverviewPage); ShowPage(PreparePage);
         Assert(ReferenceEquals(cached, _selectedKey) && _enrollStep == 3 && !_busy, "Navigation preserves target and step without reading hardware");
@@ -360,8 +383,12 @@ public partial class MainWindow
         InvalidateDeviceInventory();
         Assert(ResetAcknowledged.IsChecked == false && !ResetTargetButton.IsEnabled, "Device change revokes destructive acknowledgment");
         ApplyInventory(new[] { admin }, 0);
-        Assert(_resetReviewTarget == target.Key && !ResetTargetButton.IsEnabled, "Reset confirmation never retargets a remaining device");
+        Assert(_resetStep == 0 && _resetReviewTarget == null && ResetAcknowledged.IsChecked == false && !ResetTargetButton.IsVisible && EnrollmentKeys.SelectedItem == null,
+            "Removing the reviewed target returns to key selection, clears confirmation and never selects the admin key");
+        CaptureWindow(this, "reset-target-removed.png");
         ApplyInventory(new[] { target, admin }, 0);
+        Assert(_resetStep == 0 && !ResetTargetButton.IsEnabled, "Reconnecting a key does not restore the old destructive confirmation");
+        ResetNext_Click(this, e);
         ResetBack_Click(this, e);
         Assert(_resetStep == 0 && !ResetTargetButton.IsVisible, "Back from reset confirmation performs no operation");
         var tenant = _connectedProvider; var profile = Profiles.SelectedItem;
@@ -482,6 +509,16 @@ public partial class MainWindow
         panel.DismissCompleted();
         Assert(await run == 0, "Native terminal check returns successfully");
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
+    }
+
+    private static IEnumerable<T> VisualDescendants<T>(System.Windows.DependencyObject root) where T : System.Windows.DependencyObject
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var descendant in VisualDescendants<T>(child)) yield return descendant;
+        }
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)
