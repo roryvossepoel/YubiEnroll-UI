@@ -240,6 +240,7 @@ public partial class MainWindow
             "Missing tools never launch a version probe");
         ShowPage(StartupPage);
         await CheckRequirementsAsync(() => Task.FromResult(missing));
+        UpdateLayout();
         Assert(StartupPage.IsVisible && StartupElevate.IsVisible && StartupRequirements.IsVisible && SettingsButton.IsEnabled,
             "Missing requirements show recovery actions and leave Settings accessible");
         ShowPage(PreparePage);
@@ -249,6 +250,7 @@ public partial class MainWindow
         Assert(!toolsReady.Ready && toolsReady.Enrollment.Ready && toolsReady.Manager.Ready && calls == 2,
             "Installed tools do not bypass the administrator requirement");
         await CheckRequirementsAsync(() => Task.FromResult(toolsReady));
+        UpdateLayout();
         Assert(StartupElevate.IsVisible && !StartupRequirements.IsVisible && StartupPage.IsVisible,
             "Standard user sees only the elevation action when both tools are ready");
         CaptureWindow(this, "startup-admin.png");
@@ -294,6 +296,11 @@ public partial class MainWindow
         Assert(OverviewPage.IsVisible && !PreparePage.IsVisible && !ResetPage.IsVisible && !StatusBar.IsVisible,
             "Home starts with task choices and no device form or technical footer");
         Width = 1180; Height = 840; CaptureWindow(this, "home.png");
+        Assert(FindResource("BrandMark") is System.Windows.Media.DrawingImage &&
+            new[] { "HomeGlyph", "EnrollGlyph", "ResetGlyph", "SettingsGlyph" }.All(key => FindResource(key) is System.Windows.Media.DrawingImage),
+            "The shared app mark and navigation icons are vector resources");
+        CaptureWindow(this, "home-150-percent.png", 144);
+        CaptureWindow(this, "home-200-percent.png", 192);
         ShowPage(PreparePage);
         ApplyInventory(new[] { target, admin }, 0);
         Assert(_selectedKey == null && !EnrollNext.IsEnabled, "Discovery never selects a target automatically");
@@ -470,11 +477,11 @@ public partial class MainWindow
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
     }
 
-    private static void CaptureWindow(System.Windows.Window window, string file)
+    private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)
     {
         window.UpdateLayout();
         var content = (System.Windows.FrameworkElement)window.Content;
-        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)content.ActualWidth, (int)content.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth * dpi / 96), (int)Math.Ceiling(content.ActualHeight * dpi / 96), dpi, dpi, System.Windows.Media.PixelFormats.Pbgra32);
         var drawing = new System.Windows.Media.DrawingVisual();
         using (var dc = drawing.RenderOpen())
         {

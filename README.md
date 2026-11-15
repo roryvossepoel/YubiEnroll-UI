@@ -138,7 +138,7 @@ When enrollment fails or its console is closed early, a credential may already h
 
 ## Elevation
 
-The GUI starts with normal user rights. Yubico documents that YubiEnroll requests elevation when needed. If that does not work in your environment, **Settings → Prerequisites → Restart as administrator** provides an explicit fallback (equivalent to starting the app elevated).
+The GUI starts with the current Windows rights. If it is not elevated, the startup requirements screen offers **Restart as administrator** before key tasks are available. This opens the Windows UAC prompt. Cancelling leaves the existing app open; successful process launch closes the old instance. Settings remains accessible without elevation.
 
 If UAC uses a different Windows administrator account, the new process sees that account's `%APPDATA%`, configuration and authentication state. No configuration or tokens are copied between accounts. Recheck the tenant banner after restarting.
 
