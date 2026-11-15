@@ -1,4 +1,13 @@
-# Manual acceptance checks for preview 0.5.0
+# Manual acceptance checks for preview 0.5.1
+
+## Preview 0.5.1: startup and visual acceptance
+
+- Launch as a standard user: the startup requirements screen explains administrator access and offers restart. Cancel UAC and verify that the same app remains open with a readable cancellation message. Retry, including a different administrator account, and verify that only the new account’s configuration is loaded.
+- Launch elevated with both supported tools: go directly to Home, without key discovery. Missing or unsupported tools must route task navigation to requirements while Settings stays accessible.
+- Install a missing tool in its standard location, then return to the app: the card updates automatically. No Recheck button is required. Open Home to continue when all checks pass.
+- Confirm that returning from documentation does not discard tenant login, user selection or target identity. No enrollment or reset may start from a software check.
+- Check Home, navigation, logo, titlebar and taskbar at 100%, 125%, 150% and 200% Windows scale. The app mark must be the same shape everywhere, with crisp contours. Cards have matching neutral borders at rest and visible hover/keyboard focus.
+- Prerequisites has two tool cards with status/download/docs; no administrator status or restart controls. Terminal preferences and technical paths remain expandable. Profiles explains the key PIN/reset scope.
 
 ## Preview 0.5.0: current acceptance workflow
 
@@ -31,7 +40,7 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 | Check | Expected result |
 |---|---|
 | Missing .NET Desktop Runtime 10 x64 | On a clean test machine, the native launcher reports the missing runtime and offers a download before the GUI opens. Install the runtime, then restart. |
-| Missing YubiEnroll | Prerequisite status says it is not located; install it in the standard folder, then use Settings → Prerequisites → Recheck. |
+| Missing YubiEnroll | Prerequisite status says it is not located; install it in the standard folder, then return to Settings → Prerequisites for automatic detection. |
 | Missing config | Window points to Settings → Tenants → Add tenant without an exception; cancellation leaves the configuration absent. |
 | Add tenant | Invalid IDs/redirect/PIN length stay in the form; valid values save and load the tenant and selected profile. |
 | Existing configuration | Add a second tenant; existing text and active provider remain intact; a backup contains the original. |

@@ -11,7 +11,6 @@ public partial class SettingsWindow : Window
     private readonly string _path;
     private ConfigSnapshot? _importSnapshot;
     private string? _importText;
-    public event Action? Finished;
     private void TenantFilter_Changed(object sender, TextChangedEventArgs e)
     {
         if (TenantList?.ItemsSource == null) return;
@@ -24,8 +23,6 @@ public partial class SettingsWindow : Window
         public string Usage => Tenants.Length == 0 ? "Not assigned to a tenant" : $"Used by {Tenants.Length} tenant(s)";
     }
     public bool Changed { get; private set; }
-    public bool RecheckRequested { get; private set; }
-    public bool ElevationRequested { get; private set; }
 
     public SettingsWindow(string path, string executable, string version)
     {
@@ -35,9 +32,14 @@ public partial class SettingsWindow : Window
         ExecutableInfo.Text = executable;
         ConfigurationInfo.Text = path;
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
-        AccessInfo.Text = "Running with administrative permissions: " + (new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator) ? "Yes" : "No");
-        ManagerInfo.Text = KeyResetService.FindExecutable().Length == 0 ? "YubiKey Manager CLI: missing (required for target verification)" : "YubiKey Manager CLI: installed; version and device access checked when selecting a key.";
         Attempt(RefreshLists);
+    }
+
+    internal void SetRequirements(RequirementReport report)
+    {
+        VersionInfo.Text = report.Enrollment.Detail;
+        ManagerInfo.Text = report.Manager.Detail;
+        ExecutableInfo.Text = report.EnrollmentPath;
     }
 
     private void Attempt(Action action)
@@ -84,8 +86,6 @@ public partial class SettingsWindow : Window
         Changed = true;
         RefreshLists();
     });
-    private void Recheck_Click(object sender, RoutedEventArgs e) { RecheckRequested = true; Finish(); }
-    private void Elevate_Click(object sender, RoutedEventArgs e) { ElevationRequested = true; Finish(); }
 
     private void Export_Click(object sender, RoutedEventArgs e) => Attempt(() =>
     {
@@ -146,7 +146,6 @@ public partial class SettingsWindow : Window
         Feedback.Text = "Configuration imported. Reconnect to a tenant. " + (backup == null ? "No previous file needed backup." : "Backup: " + backup);
     }
 
-    private void Finish() { if (IsVisible) Close(); else Finished?.Invoke(); }
     private void CancelImport_Click(object sender, RoutedEventArgs e)
     {
         _importText = null; _importSnapshot = null; ImportReview.Visibility = Visibility.Collapsed; ImportButton.IsEnabled = false;

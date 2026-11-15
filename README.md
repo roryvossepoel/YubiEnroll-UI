@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.5.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.5.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -16,6 +16,14 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
 - Offers **Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
+
+## Preview 0.5.1: startup requirements and visual refinement
+
+At startup the app checks administrator access, YubiEnroll and a supported YubiKey Manager CLI version. If all checks pass it opens Home automatically. Otherwise the startup screen offers administrator restart and/or Prerequisites. Settings remains accessible. No key is enumerated or modified by these software checks.
+
+Prerequisites groups each tool’s status, download and documentation in its own card. Detection runs automatically when returning to the startup screen or Prerequisites after an installer/browser; it does not reload configuration, discard tenant sign-in or change the selected key. There is no manual Recheck button. Version probes time out after ten seconds. The .NET Desktop Runtime must already be present for the app itself to launch.
+
+The app mark is rendered as a vector inside the UI; the executable contains separately rendered icon sizes. Home cards use neutral resting borders and distinct hover/focus states. Profiles are explicitly described as YubiKey configuration profiles.
 
 ## Preview 0.5.0: guided tasks
 
@@ -57,7 +65,7 @@ Application assemblies are bundled into the two executables; the .NET runtime an
 
 If .NET 10 Desktop Runtime x64 is missing, the native .NET launcher reports the missing runtime before the C# window can open and offers a download link. The GUI cannot perform its own check until .NET is available. See [Microsoft startup troubleshooting](https://learn.microsoft.com/en-us/dotnet/core/runtime-discovery/troubleshoot-app-launch).
 
-A missing configuration folder/file is a normal first-run state: the window offers **Add tenant**, without a technical error. Configuration loading and executable discovery run independently, so Settings remains available to configure tenants and recheck prerequisites.
+A missing configuration folder/file is a normal first-run state: the window offers **Add tenant**, without a technical error. Configuration loading and executable discovery run independently, so Settings remains available to configure tenants and resolve prerequisites.
 
 Open **Settings → Activity log** for the failed step, exception type, HRESULT/native Windows error, Windows account, architecture and attempted paths. The log excludes configuration contents, arbitrary exception messages and enrollment console output. It does contain local account names and paths; redact those before posting publicly.
 
@@ -82,7 +90,7 @@ Open **Settings → Tenants → Add tenant** and enter the tenant name, Director
 
 This form targets Microsoft Entra public cloud. For national clouds, use YubiEnroll’s native provider setup to configure the appropriate endpoints.
 
-The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** shows the executable, version and configuration path, with **Recheck** and the administrator restart fallback. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
+The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** groups installation status and links by tool, with executable/configuration paths under Technical details. Administrator restart is offered on the startup requirements screen when needed. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
 
 ### Manage multiple profiles
 

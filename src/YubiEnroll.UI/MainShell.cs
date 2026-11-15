@@ -50,8 +50,9 @@ public partial class MainWindow
     private void ShowPage(FrameworkElement page)
     {
         if (_busy) return;
+        if ((page == OverviewPage || page == PreparePage || page == ResetPage) && RequirementsBlockTasks) page = StartupPage;
         if (page != HostedPage) LeaveHostedPage();
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, HostedPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
         foreach (var button in new[] { OverviewButton, PrepareButton, ResetButton, SettingsButton })
         {
@@ -60,19 +61,19 @@ public partial class MainWindow
             button.Tag = active ? "active" : null;
         }
         // A clean Home has no technical footer. Errors/requirements remain discoverable in Settings.
-        StatusBar.Visibility = page == OverviewPage || page == HostedPage ? Visibility.Collapsed : Visibility.Visible;
+        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage ? Visibility.Collapsed : Visibility.Visible;
         RenderWizard();
     }
     private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);
     private async void Prepare_Click(object sender, RoutedEventArgs e)
     {
         ShowPage(PreparePage);
-        if (!_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
     }
     private async void ResetPage_Click(object sender, RoutedEventArgs e)
     {
         ShowPage(ResetPage);
-        if (!_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
     }
     private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(5);
     private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(2);
@@ -89,14 +90,9 @@ public partial class MainWindow
         LeaveHostedPage();
         var settings = new SettingsWindow(_configPath, _exePath, _versionText) { EmbeddedTerminal = EmbeddedTerminal };
         settings.SettingsTabs.SelectedIndex = tab; settings.ActivityHost.Content = _activityView;
-        settings.Finished += async () =>
-        {
-            var elevate = settings.ElevationRequested; var recheck = settings.RecheckRequested;
-            ShowPage(OverviewPage);
-            if (recheck) { await InitializeAsync(); await RefreshOverviewAsync(); }
-            if (elevate) Elevate_Click(this, new RoutedEventArgs());
-        };
+        if (_requirements != null) settings.SetRequirements(_requirements);
         Host(settings);
+        if (!_smokeTest && _startupChecksComplete) _ = CheckRequirementsAsync();
     }
     private async void RefreshKeys_Click(object sender, RoutedEventArgs e) => await RefreshOverviewAsync();
     private async Task RefreshOverviewAsync()
@@ -109,7 +105,7 @@ public partial class MainWindow
             if (path.Length == 0)
             {
                 ApplyInventory(Array.Empty<KeyStatus>(), 0);
-                SetInventoryMessage("Install YubiKey Manager CLI, then recheck under Settings → Prerequisites."); return;
+                SetInventoryMessage("Install YubiKey Manager CLI, then return to Settings → Prerequisites."); return;
             }
             var runner = new CliRunner(path);
             var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());

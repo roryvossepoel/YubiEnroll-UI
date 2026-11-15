@@ -15,6 +15,7 @@ public partial class MainWindow
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         try
         {
+            await TestStartupRequirementsAsync(mockExecutable);
             await TestKeyToolsAsync();
             await TestEmbeddedTerminalAsync(mockExecutable);
             await TestExternalOutcomeAsync(mockExecutable);
@@ -141,6 +142,13 @@ public partial class MainWindow
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
             TestGuidedWorkflow();
+            var connectedBeforeProbe = _connectedProvider;
+            var targetBeforeProbe = _selectedKey;
+            var inventoryBeforeProbe = _knownKeys;
+            await CheckRequirementsAsync(() => Task.FromResult(new RequirementReport(true, new(true, "YubiEnroll version: 1.2.0"), new(true, "Installed · version 5.9.2"), mockExecutable)));
+            Assert(connectedBeforeProbe != null && ReferenceEquals(connectedBeforeProbe, _connectedProvider) &&
+                ReferenceEquals(targetBeforeProbe, _selectedKey) && ReferenceEquals(inventoryBeforeProbe, _knownKeys),
+                "Automatic software detection preserves the authenticated tenant and selected target");
             var keysCapture = Dispatcher.InvokeAsync(() =>
             {
                 var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
@@ -216,6 +224,65 @@ public partial class MainWindow
             SetThreadErrorMode(previousErrorMode, out _);
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    private async Task TestStartupRequirementsAsync(string mockExecutable)
+    {
+        _startupChecksComplete = true;
+        var calls = 0;
+        Task<CliResult> ReadyVersion(string path)
+        {
+            calls++;
+            return Task.FromResult(new CliResult(0, "YubiKey Manager (ykman) version: 5.9.2", ""));
+        }
+        var missing = await Requirements.ProbeAsync(false, "", "", ReadyVersion);
+        Assert(!missing.Ready && !missing.Enrollment.Ready && !missing.Manager.Ready && calls == 0,
+            "Missing tools never launch a version probe");
+        ShowPage(StartupPage);
+        await CheckRequirementsAsync(() => Task.FromResult(missing));
+        Assert(StartupPage.IsVisible && StartupElevate.IsVisible && StartupRequirements.IsVisible && SettingsButton.IsEnabled,
+            "Missing requirements show recovery actions and leave Settings accessible");
+        ShowPage(PreparePage);
+        Assert(StartupPage.IsVisible && !PreparePage.IsVisible && !_inventoryLoaded, "Missing requirements route task navigation to recovery without reading keys");
+        CaptureWindow(this, "startup-missing.png");
+        var toolsReady = await Requirements.ProbeAsync(false, mockExecutable, mockExecutable, ReadyVersion);
+        Assert(!toolsReady.Ready && toolsReady.Enrollment.Ready && toolsReady.Manager.Ready && calls == 2,
+            "Installed tools do not bypass the administrator requirement");
+        await CheckRequirementsAsync(() => Task.FromResult(toolsReady));
+        Assert(StartupElevate.IsVisible && !StartupRequirements.IsVisible && StartupPage.IsVisible,
+            "Standard user sees only the elevation action when both tools are ready");
+        CaptureWindow(this, "startup-admin.png");
+        var outdated = await Requirements.ProbeAsync(true, mockExecutable, mockExecutable,
+            _ => Task.FromResult(new CliResult(0, "YubiKey Manager (ykman) version: 5.8.0", "")));
+        Assert(!outdated.Ready && !outdated.Manager.Ready && outdated.Manager.Detail.Contains("Unsupported"),
+            "Installed unsupported ykman is not reported ready");
+        var failed = await Requirements.ProbeAsync(true, mockExecutable, mockExecutable,
+            _ => Task.FromResult(new CliResult(2, "private error marker", "private error marker")));
+        Assert(!failed.Ready && !failed.Manager.Detail.Contains("private error marker"),
+            "Failed version checks are not ready and do not display raw output");
+        var timedOut = await Requirements.ProbeAsync(true, mockExecutable, mockExecutable,
+            _ => Task.FromException<CliResult>(new TimeoutException()));
+        Assert(!timedOut.Ready && timedOut.Enrollment.Detail.Contains("timed out"), "A stalled version probe has an actionable state");
+        var ready = toolsReady with { Administrator = true };
+        await CheckRequirementsAsync(() => Task.FromResult(ready));
+        Assert(OverviewPage.IsVisible && !StartupPage.IsVisible && !_inventoryLoaded,
+            "Successful startup opens Home without discovering hardware");
+        var settings = new SettingsWindow(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "absent.toml"), mockExecutable, "Checking…");
+        Host(settings); settings.SettingsTabs.SelectedIndex = 2;
+        // Preserve the actual object reference; probing must not reload the config or clear a session.
+        var session = _connectedProvider;
+        var inventory = _knownKeys;
+        await CheckRequirementsAsync(() => Task.FromResult(ready));
+        Assert(ReferenceEquals(_connectedProvider, session) && ReferenceEquals(_knownKeys, inventory) && HostedPage.IsVisible,
+            "Returning to Prerequisites checks software without changing login or key inventory");
+        Assert(settings.ManagerInfo.Text.Contains("5.9.2") && settings.VersionInfo.Text == ready.Enrollment.Detail,
+            "Prerequisite cards display the latest detected tool status");
+        CaptureWindow(this, "prerequisites-ready.png");
+        await CheckRequirementsAsync(() => Task.FromResult(missing with { Administrator = true }));
+        Assert(settings.ManagerInfo.Text == "Not installed", "Removal is reflected in the prerequisite cards");
+        CaptureWindow(this, "prerequisites-missing.png");
+        _requirements = null; _startupChecksComplete = false;
+        ShowPage(OverviewPage);
     }
 
     private void TestGuidedWorkflow()

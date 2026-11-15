@@ -35,7 +35,7 @@ public partial class MainWindow : Window
     private UserCandidate SelectedUser => Users.SelectedItem as UserCandidate
         ?? throw new InvalidOperationException("Search and select a user first.");
     private CliRunner Runner => File.Exists(_exePath) ? new(_exePath)
-        : throw new InvalidOperationException("Install Yubico YubiEnroll in its standard location, then recheck in Settings → Prerequisites.");
+        : throw new InvalidOperationException("Install Yubico YubiEnroll in its standard location, then return to Settings → Prerequisites.");
 
     public MainWindow(bool smokeTest = false)
     {
@@ -43,13 +43,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
+        Activated += Window_Activated;
         SizeChanged += (_, _) => ResizePreparation();
         ShowPage(OverviewPage);
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        if (!_smokeTest) await InitializeAsync();
+        if (!_smokeTest) await StartApplicationAsync();
     }
 
     private async Task InitializeAsync(string? appDataOverride = null, string? executableOverride = null)
@@ -72,7 +73,7 @@ public partial class MainWindow : Window
         else
         {
             _versionText = "YubiEnroll is not installed";
-            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → Prerequisites → Recheck.");
+            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → Prerequisites.");
         }
         // Config loading is independent of executable discovery/version probing. An error in one
         // must not hide the other or disable Settings and prerequisite recovery.
@@ -85,7 +86,7 @@ public partial class MainWindow : Window
         if (issues.Count > 0 && _config?.Providers.Count == 0) StatusText.Text += "\n" + SetupOrReadyMessage();
         if (issues.Count > 0)
         {
-            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then recheck in Settings → Prerequisites.";
+            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then return to Settings → Prerequisites.";
 
         }
     }
@@ -93,7 +94,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.0" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.1" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -139,7 +140,7 @@ public partial class MainWindow : Window
 
     private async Task CheckVersionAsync()
     {
-        var result = await Runner.CaptureAsync("--version");
+        var result = await Runner.CaptureWithTimeoutAsync(TimeSpan.FromSeconds(10), "--version");
         RequireSuccess(result, "Version check");
         _versionText = result.Output.Trim();
         _cliReady = true;
@@ -239,7 +240,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.0\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.1\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -406,16 +407,14 @@ public partial class MainWindow : Window
     private void Elevate_Click(object sender, RoutedEventArgs e)
     {
         if (IsAdministrator()) { StatusText.Text = "Already running as administrator."; return; }
-        if (MessageBox.Show(this, "YubiEnroll normally requests elevation when required. Use this fallback only if needed. " +
-            "If you enter a different administrator account, that account has its own YubiEnroll configuration and sign-in. Continue?",
-            "Restart as administrator", MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes) return;
         try
         {
             // No arguments/config/tokens cross the account boundary. The new instance reloads its own config.
-            Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas" });
+            var restarted = Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas" });
+            if (restarted == null) { StartupFeedback.Text = "Unable to start the elevated instance. Please try again."; return; }
             Close();
         }
-        catch (Win32Exception) { StatusText.Text = "Administrator restart cancelled or unavailable."; }
+        catch (Win32Exception) { StartupFeedback.Text = "Administrator restart cancelled or unavailable. No changes were made. You can try again or close the app."; }
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
