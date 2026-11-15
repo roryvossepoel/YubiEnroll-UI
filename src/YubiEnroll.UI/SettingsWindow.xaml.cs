@@ -39,6 +39,10 @@ public partial class SettingsWindow : Window
     {
         VersionInfo.Text = report.Enrollment.Detail;
         ManagerInfo.Text = report.Manager.Detail;
+        var neutral = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#263238")!;
+        var attention = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#854018")!;
+        VersionInfo.Foreground = report.Enrollment.Ready ? neutral : attention;
+        ManagerInfo.Foreground = report.Manager.Ready ? neutral : attention;
         ExecutableInfo.Text = report.EnrollmentPath;
     }
 

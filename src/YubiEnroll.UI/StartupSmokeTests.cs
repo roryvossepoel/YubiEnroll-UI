@@ -233,7 +233,7 @@ public partial class MainWindow
         Task<CliResult> ReadyVersion(string path)
         {
             calls++;
-            return Task.FromResult(new CliResult(0, "YubiKey Manager (ykman) version: 5.9.2", ""));
+            return Task.FromResult(new CliResult(0, calls % 2 == 1 ? "YubiEnroll version: 1.2.0" : "YubiKey Manager (ykman) version: 5.9.2", ""));
         }
         var missing = await Requirements.ProbeAsync(false, "", "", ReadyVersion);
         Assert(!missing.Ready && !missing.Enrollment.Ready && !missing.Manager.Ready && calls == 0,
@@ -258,6 +258,9 @@ public partial class MainWindow
             _ => Task.FromResult(new CliResult(0, "YubiKey Manager (ykman) version: 5.8.0", "")));
         Assert(!outdated.Ready && !outdated.Manager.Ready && outdated.Manager.Detail.Contains("Unsupported"),
             "Installed unsupported ykman is not reported ready");
+        var unrecognized = await Requirements.ProbeAsync(true, mockExecutable, mockExecutable,
+            _ => Task.FromResult(new CliResult(0, "unrecognized output", "")));
+        Assert(!unrecognized.Ready && !unrecognized.Enrollment.Ready, "Unrecognized YubiEnroll output is not reported ready");
         var failed = await Requirements.ProbeAsync(true, mockExecutable, mockExecutable,
             _ => Task.FromResult(new CliResult(2, "private error marker", "private error marker")));
         Assert(!failed.Ready && !failed.Manager.Detail.Contains("private error marker"),
@@ -479,6 +482,8 @@ public partial class MainWindow
 
     private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)
     {
+        // Let the native resize and deferred templates settle before sampling the actual client area.
+        window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
         window.UpdateLayout();
         var content = (System.Windows.FrameworkElement)window.Content;
         var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth * dpi / 96), (int)Math.Ceiling(content.ActualHeight * dpi / 96), dpi, dpi, System.Windows.Media.PixelFormats.Pbgra32);

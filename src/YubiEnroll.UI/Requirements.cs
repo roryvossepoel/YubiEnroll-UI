@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using YubiEnroll.Core;
 
 namespace YubiEnroll.UI;
@@ -36,9 +37,9 @@ internal static class Requirements
                     try { return new(true, "Installed · version " + KeyResetService.ParseVersion(result.Output)); }
                     catch (InvalidOperationException) { return new(false, "Unsupported version · install 5.9.2 or newer within 5.x"); }
                 }
-                // Keep the native version text, but do not expose arbitrary multi-line output in the launcher.
-                var line = result.Output.Trim().Split('\n')[0].Trim();
-                return new(true, line[..Math.Min(line.Length, 160)]);
+                var match = Regex.Match(result.Output.Trim(), @"\AYubiEnroll,?\s+(?:version:?\s*)?(?<version>\d+\.\d+\.\d+)(?:[-+][A-Za-z0-9.]+)?\z", RegexOptions.IgnoreCase);
+                return match.Success ? new(true, "Installed · version " + match.Groups["version"].Value) :
+                    new(false, "Installed, but the YubiEnroll version was not recognized");
             }
             catch (TimeoutException) { return new(false, "Installed, but the version check timed out"); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)

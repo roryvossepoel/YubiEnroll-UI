@@ -13,23 +13,21 @@
     </ListBox>
    </DockPanel></TabItem>
    <TabItem Header="Profiles"><DockPanel Margin="18"><TextBlock DockPanel.Dock="Top" Text="YubiKey configuration profiles" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
-    <TextBlock DockPanel.Dock="Top" Text="YubiKey configuration profiles define PIN settings and whether FIDO credentials are reset during enrollment. A profile can be shared by multiple tenants." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock DockPanel.Dock="Top" Text="Define PIN settings and whether FIDO credentials are reset during enrollment. A profile can be shared by multiple tenants." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
     <WrapPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="New profile" Click="NewProfile_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="EditProfileButton" Content="Edit profile" Click="EditProfile_Click" IsEnabled="False"/><Button x:Name="RemoveProfileButton" Content="Remove" Click="RemoveProfile_Click" IsEnabled="False"/></WrapPanel>
     <ListBox x:Name="ProfileList" SelectionChanged="Selection_Changed" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Usage}" Foreground="#617084" FontSize="12" Margin="0,5,0,8"/><ItemsControl ItemsSource="{Binding Tenants}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Background="#E7F1F2" CornerRadius="12" Padding="9,4" Margin="0,0,6,6"><TextBlock Text="{Binding}" MaxWidth="300" TextWrapping="Wrap" Foreground="#175C61" FontSize="12"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></DataTemplate></ListBox.ItemTemplate><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="12"/></Style></ListBox.ItemContainerStyle></ListBox>
    </DockPanel></TabItem>
    <TabItem Header="Prerequisites"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
     <TextBlock Text="Required software" Style="{StaticResource SectionTitle}"/>
     <TextBlock Text="Install both tools in their standard locations. Detection updates automatically when you return to the app." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,20"/>
-    <Border Style="{StaticResource Card}" Margin="0,0,0,16"><StackPanel>
-     <TextBlock Text="YubiEnroll" Style="{StaticResource SectionTitle}"/>
+    <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,0,0,12"><StackPanel>
+     <DockPanel><TextBlock x:Name="VersionInfo" DockPanel.Dock="Right" Text="Checking…" TextWrapping="Wrap" MaxWidth="220" FontSize="13" Margin="16,2,0,0"/><TextBlock Text="YubiEnroll" Style="{StaticResource SectionTitle}" TextWrapping="Wrap"/></DockPanel>
      <TextBlock Text="Registers the key in Entra and applies your PIN and configuration profile settings." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,12"/>
-     <TextBlock x:Name="VersionInfo" Text="Checking…" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,12"/>
      <WrapPanel><Button Content="Get YubiEnroll" Tag="https://www.yubico.com/products/yubienroll/" Click="Link_Click"/><Button Content="Documentation" Style="{StaticResource QuietButton}" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html" Click="Link_Click"/></WrapPanel>
     </StackPanel></Border>
-    <Border Style="{StaticResource Card}"><StackPanel>
-     <TextBlock Text="YubiKey Manager CLI" Style="{StaticResource SectionTitle}"/>
+    <Border Style="{StaticResource Card}" Padding="20,16"><StackPanel>
+     <DockPanel><TextBlock x:Name="ManagerInfo" DockPanel.Dock="Right" Text="Checking…" TextWrapping="Wrap" MaxWidth="220" FontSize="13" Margin="16,2,0,0"/><TextBlock Text="YubiKey Manager CLI" Style="{StaticResource SectionTitle}" TextWrapping="Wrap"/></DockPanel>
      <TextBlock Text="Identifies connected keys, reads their PIN status and resets FIDO. Requires version 5.9.2 or newer within 5.x." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,12"/>
-     <TextBlock x:Name="ManagerInfo" Text="Checking…" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,12"/>
      <WrapPanel><Button Content="Get YubiKey Manager CLI" Tag="https://developers.yubico.com/yubikey-manager/" Click="Link_Click"/><Button Content="Documentation" Style="{StaticResource QuietButton}" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/" Click="Link_Click"/></WrapPanel>
     </StackPanel></Border>
     <Expander Header="Terminal preferences" Margin="0,22,0,16"><StackPanel Margin="0,12,0,0">
