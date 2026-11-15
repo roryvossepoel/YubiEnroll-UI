@@ -3,7 +3,7 @@
  <DockPanel TextElement.FontFamily="Segoe UI" TextElement.FontSize="14" TextElement.Foreground="#263238" Margin="28">
   <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20"><TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/><TextBlock Text="Manage tenants, configuration profiles and application preferences." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,0"/></StackPanel>
   <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0"><TextBlock x:Name="Feedback" TextWrapping="Wrap" Foreground="#526277" VerticalAlignment="Center"/></DockPanel>
-  <TabControl x:Name="SettingsTabs">
+  <TabControl x:Name="SettingsTabs" SelectionChanged="SettingsTab_Changed">
    <TabItem Header="Tenants"><DockPanel Margin="18">
     <TextBlock DockPanel.Dock="Top" Text="Configure tenants here. Connect to a tenant on the Enroll a key page." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
     <WrapPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="Add tenant" Click="AddTenant_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="EditTenantButton" Content="Edit tenant" Click="EditTenant_Click" IsEnabled="False"/><Button x:Name="RemoveTenantButton" Content="Remove" Click="RemoveTenant_Click" IsEnabled="False"/></WrapPanel>

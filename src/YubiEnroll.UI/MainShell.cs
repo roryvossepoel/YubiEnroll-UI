@@ -90,6 +90,10 @@ public partial class MainWindow
         LeaveHostedPage();
         var settings = new SettingsWindow(_configPath, _exePath, _versionText) { EmbeddedTerminal = EmbeddedTerminal };
         settings.SettingsTabs.SelectedIndex = tab; settings.ActivityHost.Content = _activityView;
+        settings.PrerequisitesOpened += async () =>
+        {
+            if (!_smokeTest && _startupChecksComplete && !_busy) await CheckRequirementsAsync();
+        };
         if (_requirements != null) settings.SetRequirements(_requirements);
         Host(settings);
         if (!_smokeTest && _startupChecksComplete) _ = CheckRequirementsAsync();

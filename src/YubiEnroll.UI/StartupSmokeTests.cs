@@ -273,7 +273,11 @@ public partial class MainWindow
         Assert(OverviewPage.IsVisible && !StartupPage.IsVisible && !_inventoryLoaded,
             "Successful startup opens Home without discovering hardware");
         var settings = new SettingsWindow(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "absent.toml"), mockExecutable, "Checking…");
-        Host(settings); settings.SettingsTabs.SelectedIndex = 2;
+        Host(settings);
+        var prerequisiteVisits = 0;
+        settings.PrerequisitesOpened += () => prerequisiteVisits++;
+        settings.SettingsTabs.SelectedIndex = 2;
+        Assert(prerequisiteVisits == 1, "Opening the Prerequisites tab requests automatic detection");
         // Preserve the actual object reference; probing must not reload the config or clear a session.
         var session = _connectedProvider;
         var inventory = _knownKeys;

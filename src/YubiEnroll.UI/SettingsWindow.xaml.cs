@@ -8,6 +8,11 @@ namespace YubiEnroll.UI;
 
 public partial class SettingsWindow : Window
 {
+    public event Action? PrerequisitesOpened;
+    private void SettingsTab_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.Source == SettingsTabs && SettingsTabs.SelectedIndex == 2) PrerequisitesOpened?.Invoke();
+    }
     private readonly string _path;
     private ConfigSnapshot? _importSnapshot;
     private string? _importText;
