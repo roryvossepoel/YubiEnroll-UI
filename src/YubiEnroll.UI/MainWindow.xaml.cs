@@ -94,7 +94,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.2" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -244,7 +244,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.2\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.3\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -365,13 +365,15 @@ public partial class MainWindow : Window
         RequireConnection();
         var current = ConfigReader.Read(_configPath);
         ConfigReader.EnsureUnchanged(current, provider, profile);
-        var reset = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name).Reset;
+        var setup = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name);
+        var reset = setup.Reset;
         var arguments = EnrollmentCommand.Build(user.Id, profile.Name, KeyName.Text, reset);
         var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
-        await CheckEnrollmentTargetAsync(target);
+        await CheckEnrollmentTargetAsync(target, setup);
         // The Review step is the confirmation; never silently skip its fresh target checks.
         await ActivateAsync(provider, profile);
-        await CheckEnrollmentTargetAsync(target);
+        await CheckEnrollmentTargetAsync(target, setup);
+        ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {profile.Name} · reset {reset}.");
         StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         var code = await RunInteractiveAsync(_exePath, arguments);

@@ -14,15 +14,19 @@
     <TextBlock Text="Profile name"/><TextBox x:Name="ProfileName" MaxLength="80" Margin="0,4,0,12"/>
     <TextBlock x:Name="UsageText" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,16"/>
     <ItemsControl x:Name="LinkedTenants" Margin="0,0,0,16"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Background="#E7F1F2" CornerRadius="12" Padding="10,5" Margin="0,0,6,6"><TextBlock Text="{Binding}" TextWrapping="Wrap" MaxWidth="360" Foreground="#175C61"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    <TextBlock Text="Starting settings" FontWeight="SemiBold"/><WrapPanel Margin="0,6,0,8"><Button x:Name="BasicPreset" Content="Basic FIDO2" Click="Basic_Click"/><Button x:Name="ManagedPreset" Content="Managed PIN" Click="Managed_Click"/></WrapPanel>
+    <TextBlock x:Name="RequirementsText" TextWrapping="Wrap" Foreground="#0B536F" Margin="0,0,0,16"/>
     <CheckBox x:Name="ResetProfile" Content="Reset FIDO before enrollment" IsThreeState="True" Margin="0,0,0,10"/>
     <TextBlock Text="Reset erases existing FIDO credentials. This profile controls reset during enrollment. You must confirm the destructive action before enrollment starts." TextWrapping="Wrap" Foreground="#A4262C" Margin="0,0,0,14"/>
-    <TextBlock Text="Minimum PIN length (4–63; empty = CLI default)"/><TextBox x:Name="MinimumPinLength" Margin="0,4,0,12"/>
+    <TextBlock Text="Enforced minimum PIN length (4–63; empty = no override)"/><TextBox x:Name="MinimumPinLength" Margin="0,4,0,12"/>
     <CheckBox x:Name="AlwaysUv" Content="Require user verification for every operation (Always UV)" IsThreeState="True" Margin="0,0,0,12"/>
     <CheckBox x:Name="EnterpriseAttestation" Content="Require enterprise attestation" IsThreeState="True" Margin="0,0,0,12"/>
     <CheckBox x:Name="ForcePinChange" Content="Force PIN change on first use" IsThreeState="True" Margin="0,0,0,12"/>
     <CheckBox x:Name="RandomPin" Content="Generate a random PIN" IsThreeState="True" Margin="0,0,0,12"/>
     <TextBlock Text="Generated PIN length (4–63; empty = CLI default)"/><TextBox x:Name="GeneratedPinLength" Margin="0,4,0,12"/>
-    <TextBlock Text="Checkboxes: checked = enabled, unchecked = disabled, dash = CLI default (reset may erase existing FIDO credentials). Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. Enterprise attestation requires a supporting key and configuration." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
+    <TextBlock Text="Basic FIDO2 leaves enforced minimum length empty and forced PIN change off. A random initial PIN is still supported on older FIDO2 keys. FIDO reset erases credentials; forced PIN change only requires the recipient to choose a new PIN.
+
+Checkboxes: checked = enabled, unchecked = disabled, dash = CLI default. Set explicit values for compatibility checks. Profiles can be saved without a key; the selected key is checked before enrollment." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
     <TextBlock Text="Existing configuration is backed up before saving. Close other YubiEnroll sessions while editing." TextWrapping="Wrap" Foreground="#42536A"/>
    </StackPanel>
   </ScrollViewer>

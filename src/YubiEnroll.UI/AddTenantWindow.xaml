@@ -26,8 +26,8 @@
       <TextBlock Text="Minimum and generated PIN length" VerticalAlignment="Center"/>
       <TextBox x:Name="PinLength" Text="6" Width="60" Margin="12,0,0,0"/>
      </StackPanel>
-     <CheckBox x:Name="ForcePinChange" Content="Require PIN change on first use (YubiKey firmware 5.5+)" Margin="0,0,0,8"/>
-     <TextBlock Text="New profile: random PIN enabled; key reset, Always UV and enterprise attestation disabled. Minimum PIN length requires firmware 5.5+." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
+     <CheckBox x:Name="ForcePinChange" Content="Require PIN change on first use (supporting keys only)" Margin="0,0,0,8"/>
+     <TextBlock Text="New profile: random PIN enabled; key reset, Always UV and enterprise attestation disabled. This enforces a minimum PIN length and requires a supporting key (standard YubiKey 5: generally firmware 5.7+). For older keys, create a Basic FIDO2 profile in Settings → Profiles." TextWrapping="Wrap" Foreground="#42536A" Margin="0,0,0,12"/>
     </StackPanel>
     <Expander Header="App registration setup help" Margin="0,4,0,12"><TextBlock Text="Use a public-client app registration with the Mobile and desktop applications platform and a matching redirect URI. Public client describes the application type, not public access to your tenant. Configure the required delegated permissions and administrator consent using the YubiEnroll documentation." TextWrapping="Wrap" Margin="0,8,0,0"/></Expander>
     <TextBlock Text="Saving updates local settings. The Entra app registration, delegated permissions and administrator consent must already be configured. Existing configuration is backed up before saving. Close other YubiEnroll sessions first." TextWrapping="Wrap" Foreground="#42536A"/>

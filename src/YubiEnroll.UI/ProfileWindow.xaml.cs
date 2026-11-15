@@ -18,10 +18,26 @@ public partial class ProfileWindow : Window
         _editName = editName;
         InitializeComponent();
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
-        var profile = editName == null ? new ProfileSetup("") : ProfileConfigWriter.Read(snapshot.Text ?? "", editName);
+        var profile = editName == null ? ProfileCompatibility.Basic("") : ProfileConfigWriter.Read(snapshot.Text ?? "", editName);
         Heading.Text = editName == null ? "New configuration profile" : "Edit configuration profile";
         ProfileName.Text = profile.Name;
         ProfileName.IsReadOnly = false;
+        ApplySettings(profile);
+        var linked = ConfigReader.Parse(snapshot.Text ?? "").Providers.Where(x => x.Profile == editName).Select(x => x.Name).ToArray();
+        LinkedTenants.ItemsSource = linked;
+        UsageText.Text = linked.Length > 0 ? $"Used by {linked.Length} tenant(s). Changes apply to all of them." :
+            "Select this profile in the main window to use it for enrollment.";
+        foreach (var box in new[] { ResetProfile, AlwaysUv, EnterpriseAttestation, ForcePinChange, RandomPin })
+        {
+            box.Checked += (_, _) => UpdateRequirements(); box.Unchecked += (_, _) => UpdateRequirements();
+            box.Indeterminate += (_, _) => UpdateRequirements();
+        }
+        MinimumPinLength.TextChanged += (_, _) => UpdateRequirements();
+        GeneratedPinLength.TextChanged += (_, _) => UpdateRequirements();
+    }
+
+    private void ApplySettings(ProfileSetup profile)
+    {
         ResetProfile.IsChecked = profile.Reset;
         MinimumPinLength.Text = profile.MinPinLength?.ToString(CultureInfo.InvariantCulture) ?? "";
         AlwaysUv.IsChecked = profile.RequireAlwaysUv;
@@ -29,10 +45,16 @@ public partial class ProfileWindow : Window
         ForcePinChange.IsChecked = profile.ForcePinChange;
         RandomPin.IsChecked = profile.RandomPin;
         GeneratedPinLength.Text = profile.RandomPinLength?.ToString(CultureInfo.InvariantCulture) ?? "";
-        var linked = ConfigReader.Parse(snapshot.Text ?? "").Providers.Where(x => x.Profile == editName).Select(x => x.Name).ToArray();
-        LinkedTenants.ItemsSource = linked;
-        UsageText.Text = linked.Length > 0 ? $"Used by {linked.Length} tenant(s). Changes apply to all of them." :
-            "Select this profile in the main window to use it for enrollment.";
+        UpdateRequirements();
+    }
+    private void Basic_Click(object sender, RoutedEventArgs e) => ApplySettings(ProfileCompatibility.Basic(ProfileName.Text) with { Reset = ResetProfile.IsChecked });
+    private void Managed_Click(object sender, RoutedEventArgs e) => ApplySettings(ProfileCompatibility.Managed(ProfileName.Text) with { Reset = ResetProfile.IsChecked });
+    private void UpdateRequirements()
+    {
+        int? Length(string text) => int.TryParse(text, out var value) ? value : null;
+        RequirementsText.Text = ProfileCompatibility.Requirements(new ProfileSetup(ProfileName.Text, ResetProfile.IsChecked,
+            Length(MinimumPinLength.Text), AlwaysUv.IsChecked, EnterpriseAttestation.IsChecked, ForcePinChange.IsChecked,
+            RandomPin.IsChecked, Length(GeneratedPinLength.Text)));
     }
 
     private void Save_Click(object sender, RoutedEventArgs e) => TrySave();

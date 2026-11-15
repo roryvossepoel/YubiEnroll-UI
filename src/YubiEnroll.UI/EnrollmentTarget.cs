@@ -4,7 +4,7 @@ namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
-    private async Task CheckEnrollmentTargetAsync(ResetKey target)
+    private async Task CheckEnrollmentTargetAsync(ResetKey target, ProfileSetup profile)
     {
         if (_choosingTarget || _selectedKey?.Key != target)
             throw new InvalidOperationException("Confirm the target key before starting enrollment.");
@@ -19,9 +19,13 @@ public partial class MainWindow
         {
             await service.CheckVersionAsync();
             var inventory = await service.DiscoverAsync();
-            if (!TryApplyInventory(inventory.Keys.Select(k => new KeyStatus(k, _knownKeys.FirstOrDefault(x => x.Key == k)?.Pin ?? FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation))
-                throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
             EnrollmentTargetGuard.Require(target, inventory);
+            var pin = await service.ReadPinStateAsync(target);
+            var capabilities = await FidoCapabilityProbe.ReadAsync(runner, target);
+            if (!TryApplyInventory(inventory.Keys.Select(k => k == target ? new KeyStatus(k, pin, capabilities) : new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation))
+                throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
+            var compatibility = ProfileCompatibility.Evaluate(profile, capabilities, pin);
+            if (!compatibility.Compatible) throw new InvalidOperationException(compatibility.Message);
         }
         catch
         {

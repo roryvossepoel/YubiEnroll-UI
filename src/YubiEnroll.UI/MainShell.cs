@@ -125,7 +125,9 @@ public partial class MainWindow
                 {
                     var pin = FidoPinState.Unknown;
                     if (IsAdministrator()) try { pin = await service.ReadPinStateAsync(key); } catch { }
-                    entries.Add(new(key, pin));
+                    FidoCapabilities? capabilities = null;
+                    if (IsAdministrator()) try { capabilities = await FidoCapabilityProbe.ReadAsync(runner, key); } catch { }
+                    entries.Add(new(key, pin, capabilities));
                 }
                 TryApplyInventory(entries, inventory.Unavailable, generation);
             }

@@ -90,18 +90,23 @@ public partial class MainWindow
     private void ReadReviewWarning()
     {
         _reviewValid = false;
+        ProfileCompatibilityText.Text = "Choose a profile and a connected target to check compatibility.";
         try
         {
             var provider = SelectedProvider; var profile = SelectedProfile;
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
-            var reset = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name).Reset;
+            var setup = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name);
+            var reset = setup.Reset;
             ReviewWarning.Text = reset switch
             {
                 true => "This profile erases all existing FIDO credentials and resets the FIDO PIN before enrollment.",
                 false => "This profile preserves existing FIDO credentials. YubiEnroll will apply the selected PIN and enrollment settings.",
                 null => "Reset is not specified. YubiEnroll’s default may erase existing FIDO credentials."
             };
-            _reviewValid = true;
+            var compatibility = ProfileCompatibility.Evaluate(setup, TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
+            ProfileCompatibilityText.Text = compatibility.Message;
+            ProfileCompatibilityText.Foreground = compatibility.Compatible ? (Brush)FindResource("Heading") : new SolidColorBrush(Color.FromRgb(164, 38, 44));
+            _reviewValid = compatibility.Compatible;
         }
         catch { ReviewWarning.Text = "The configuration could not be verified. Check Settings and select the tenant and profile again."; }
     }

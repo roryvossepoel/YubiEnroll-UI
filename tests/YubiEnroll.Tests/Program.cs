@@ -77,6 +77,10 @@ if (args.Length == 2 && args[0] == "--check-ykman")
         throw new Exception("Native reset help did not accept the serial-targeted command.");
     var inventory = await service.DiscoverAsync();
     if (inventory.Keys.Count != 0) throw new Exception("Unexpected hardware on CI runner.");
+    var probe = await native.CaptureWithInputAsync(TimeSpan.FromSeconds(15), FidoCapabilityProbe.Script, "script", "--force", "-", "12345678");
+    if (probe.ExitCode != 4 || probe.Output.Length != 0 || probe.Error.Length != 0)
+        throw new Exception("Bundled read-only probe failed to run in the native ykman scripting runtime.");
+    Console.WriteLine("PASS: bundled capability script runs through native ykman without Python/SDK installation and rejects an absent target.");
     Console.WriteLine("PASS: native ykman version, empty USB inventory and serial-targeted reset help; no reset executed.");
     return 0;
 }
@@ -95,6 +99,55 @@ void Reject(Action action, string name)
     { Check(true, name); return; }
     throw new Exception("FAIL: " + name);
 }
+
+// Capability-based compatibility: firmware is identity metadata, never a substitute for CTAP options.
+const string modernCapabilities = """
+{"schema":1,"serial":"12345678","firmware":"5.7.1","options":{"clientPin":false,"rk":true,"authnrCfg":true,"setMinPINLength":true,"alwaysUv":false},"minimumPinLength":4,"maximumPinLength":63,"resetBlocked":false,"resetOverUsb":true,"alwaysUvLocked":false}
+""";
+var capTarget = new ResetKey("12345678", "YubiKey 5 NFC (5.7.1)");
+var modernCap = FidoCapabilities.Parse(modernCapabilities, capTarget);
+var oldCap = modernCap with { Firmware = "5.1.2", PinPolicy = false, AlwaysUvSupported = false };
+var basicProfile = ProfileCompatibility.Basic("Older keys");
+var managedProfile = ProfileCompatibility.Managed("Managed keys");
+Check(ProfileCompatibility.Evaluate(basicProfile, oldCap).Compatible, "Basic profile supports older FIDO2 keys with a generated initial PIN");
+Check(!ProfileCompatibility.Evaluate(managedProfile, oldCap).Compatible, "Older key rejects advanced PIN policy");
+Check(ProfileCompatibility.Evaluate(managedProfile, modernCap).Compatible, "Modern CTAP capabilities permit managed PIN profile");
+Check(ProfileCompatibility.Evaluate(managedProfile, modernCap with { Firmware = "5.5.0" }).Compatible, "Capabilities, not an ambiguous 5.5 version threshold, determine support");
+Check(!ProfileCompatibility.Evaluate(managedProfile, modernCap with { PinPolicy = false }).Compatible, "New firmware without advertised PIN policy is not assumed compatible");
+Check(!ProfileCompatibility.Evaluate(basicProfile, null).Compatible, "Missing probe fails closed even for a basic profile");
+Check(modernCap.ClientPin, "clientPin false means supported but not yet configured");
+Check(!ProfileCompatibility.Evaluate(basicProfile, modernCap with { ClientPin = false }).Compatible, "FIDO2 PIN support is required");
+Check(!ProfileCompatibility.Evaluate(basicProfile, modernCap with { ResidentKey = false }).Compatible, "Discoverable credential support is required");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { ForcePinChange = true }, oldCap).Compatible, "Force PIN change checked independently of minimum length");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { MinPinLength = 4 }, oldCap).Compatible, "Explicit minimum still requires capability even when equal to factory floor");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { RequireAlwaysUv = true }, oldCap).Compatible, "Always UV request rejected on unsupported key");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { RequireEa = true }, modernCap).Compatible, "New firmware alone does not establish enterprise provisioning");
+Check(ProfileCompatibility.Evaluate(basicProfile with { RequireEa = true }, modernCap with { EnterpriseAttestation = true }).Compatible, "Provisioned but disabled enterprise attestation is supported");
+Check(!ProfileCompatibility.Evaluate(basicProfile, modernCap with { AlwaysUvLocked = true }).Compatible, "FIPS locked Always UV cannot be disabled");
+Check(ProfileCompatibility.Evaluate(basicProfile with { RequireAlwaysUv = true }, modernCap with { AlwaysUvLocked = true }).Compatible, "Locked Always UV can be required");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { Reset = true }, modernCap with { ResetBlocked = true }).Compatible, "Reset blocked by another application prevents enrollment reset");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { Reset = true }, modernCap with { ResetOverUsb = false }).Compatible, "Reset transport restriction checked");
+Check(ProfileCompatibility.Evaluate(basicProfile, modernCap with { ResetBlocked = true }).Compatible, "Non-reset profile does not require reset capability");
+Check(!ProfileCompatibility.Evaluate(basicProfile, oldCap, FidoPinState.Blocked).Compatible, "Blocked PIN requires an explicit reset profile");
+Check(ProfileCompatibility.Evaluate(basicProfile with { Reset = true }, oldCap, FidoPinState.Blocked).Compatible, "Legacy reset is distinct from unsupported forced PIN change");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { RandomPinLength = 6 }, modernCap with { MinimumPinLength = 8 }).Compatible, "Generated PIN respects the actual key minimum");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { RandomPinLength = 10 }, modernCap with { MaximumPinLength = 8 }).Compatible, "Bio shared PIN upper limit enforced");
+Check(!ProfileCompatibility.Evaluate(managedProfile, modernCap with { MinimumPinLength = 8 }).Compatible, "Requested policy may not lower the reported key minimum");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { ForcePinChange = null }, modernCap).Compatible, "Ambiguous CLI defaults require an explicit choice");
+Check(!ProfileCompatibility.Evaluate(basicProfile with { RandomPinLength = null }, modernCap).Compatible, "Random PIN length must be known before enrollment");
+Check(ProfileCompatibility.Evaluate(basicProfile with { RandomPin = false, RandomPinLength = null }, oldCap).Compatible, "Manual PIN entry does not require a generated length");
+Reject(() => FidoCapabilities.Parse(modernCapabilities.Replace("12345678", "87654321"), capTarget), "Capability snapshot from another serial rejected");
+Reject(() => FidoCapabilities.Parse(modernCapabilities.Replace("5.7.1", "5.7.2"), capTarget), "Capability firmware must match selected device identity");
+Reject(() => FidoCapabilities.Parse(modernCapabilities.Replace("\"schema\":1", "\"schema\":2"), capTarget), "Unknown probe schema rejected");
+Reject(() => FidoCapabilities.Parse(modernCapabilities.Replace("\"resetBlocked\":false,", ""), capTarget), "Incomplete probe is not treated as supported");
+Reject(() => FidoCapabilities.Parse(modernCapabilities.Replace("\"rk\":true", "\"rk\":\"true\""), capTarget), "Malformed capability type rejected");
+Reject(() => FidoCapabilities.Parse(modernCapabilities.Replace("\"schema\":1", "\"schema\":1,\"schema\":1"), capTarget), "Duplicate probe fields rejected");
+Reject(() => FidoCapabilities.Parse("not-json", capTarget), "Malformed capability output rejected");
+Check(!FidoCapabilities.Parse(modernCapabilities.Replace("\"setMinPINLength\":true,", ""), capTarget).PinPolicy, "Missing optional CTAP capability means unsupported");
+Check(FidoCapabilities.Parse(modernCapabilities.Replace("\"alwaysUv\":false", "\"alwaysUv\":false,\"ep\":false"), capTarget).EnterpriseAttestation, "False EA flag means available but not enabled");
+var basicToml = ProfileConfigWriter.Build(null, basicProfile);
+Check(ProfileConfigWriter.Read(basicToml, basicProfile.Name) == basicProfile && !basicToml.Contains("min_pin_length"), "Basic preset round-trips without a minimum-policy override");
+Check(ProfileCompatibility.Requirements(managedProfile).Contains("forced PIN change") && ProfileCompatibility.Requirements(basicProfile).Contains("Basic FIDO2"), "Editor explains distinct profile capability requirements");
 
 const string id = "11111111-2222-3333-4444-555555555555";
 var configText = """

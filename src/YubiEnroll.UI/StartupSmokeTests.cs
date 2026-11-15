@@ -63,6 +63,14 @@ public partial class MainWindow
             {
                 try
                 {
+                    Assert(profileDialog.MinimumPinLength.Text.Length == 0 && profileDialog.ForcePinChange.IsChecked == false,
+                        "New profile starts with basic settings suitable for older FIDO2 keys");
+                    profileDialog.ManagedPreset.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                    Assert(profileDialog.MinimumPinLength.Text == "6" && profileDialog.ForcePinChange.IsChecked == true && profileDialog.RequirementsText.Text.Contains("forced PIN change"),
+                        "Managed preset sets policy and displays live capability requirements");
+                    profileDialog.BasicPreset.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                    Assert(profileDialog.MinimumPinLength.Text.Length == 0 && profileDialog.RandomPin.IsChecked == true && profileDialog.ForcePinChange.IsChecked == false,
+                        "Basic preset keeps initial PIN generation separate from enforced PIN change");
                     profileDialog.ProfileName.Text = "Second profile";
                     profileDialog.MinimumPinLength.Text = "8";
                     profileDialog.GeneratedPinLength.Text = "6";
@@ -312,7 +320,8 @@ public partial class MainWindow
     private void TestGuidedWorkflow()
     {
         var e = new System.Windows.RoutedEventArgs();
-        var target = new KeyStatus(new ResetKey("12345678", "YubiKey 5C NFC (5.7.1)"), FidoPinState.Blocked);
+        var target = new KeyStatus(new ResetKey("12345678", "YubiKey 5C NFC (5.7.1)"), FidoPinState.Blocked,
+            new FidoCapabilities("12345678", "5.7.1", true, true, true, true, false, false, 4, 63, false, true, false));
         var admin = new KeyStatus(new ResetKey("87654321", "YubiKey 5 NFC (5.7.1)"), FidoPinState.Set);
         ShowPage(OverviewPage);
         Assert(OverviewPage.IsVisible && !PreparePage.IsVisible && !ResetPage.IsVisible && !StatusBar.IsVisible,
@@ -362,6 +371,13 @@ public partial class MainWindow
         KeyName.Clear(); SuggestRegistrationName();
         Assert(KeyName.Text == "YubiKey 5C NFC (12345678)", "Default name contains model and serial without firmware");
         CaptureWindow(this, "enroll-review.png"); AssertActionFooterVisible();
+        ApplyInventory(new[] { target with { Capabilities = target.Capabilities! with { PinPolicy = false } } }, 0);
+        Assert(!EnrollButton.IsEnabled && ProfileCompatibilityText.Text.Contains("Forced PIN change"), "Unsupported PIN policy blocks enrollment with an actionable explanation");
+        CaptureWindow(this, "profile-incompatible.png");
+        ApplyInventory(new[] { target with { Capabilities = null } }, 0);
+        Assert(!EnrollButton.IsEnabled && ProfileCompatibilityText.Text.Contains("unavailable"), "Unreadable capabilities cannot reuse an old successful check");
+        ApplyInventory(new[] { target }, 0);
+        Assert(EnrollButton.IsEnabled, "A fresh compatible capability snapshot restores enrollment");
         var staleGeneration = _deviceGeneration;
         ScheduleDeviceRefresh();
         Assert(!TryApplyInventory(new[] { target }, 0, staleGeneration) && _inventoryDirty && !EnrollButton.IsEnabled,

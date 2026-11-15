@@ -1,4 +1,14 @@
-# Manual acceptance checks for preview 0.5.2
+# Manual acceptance checks for preview 0.5.3
+
+## Preview 0.5.3: profile compatibility
+
+- Create Basic FIDO2 and Managed PIN profiles. Basic must omit `min_pin_length`, keep `force_pin_change = false`, and independently permit explicit reset. Verify live requirements update while editing; existing profiles and tenant assignments must not change without Save.
+- On a 5.1.2/5.4.x standard key, basic profile must pass if PIN/reset state permits; a managed profile must identify unsupported minimum policy / forced change and disable enrollment.
+- On a supporting 5.7 key, managed profile must pass; requiring enterprise attestation must fail unless provisioned, regardless of firmware.
+- Test the key's reported minimum and (Bio multi-protocol) maximum PIN lengths; do not assume every FIDO key has a 4-character floor or a 63-character maximum. Never test reset on a production Bio/PIV key.
+- Unplug/replug, deny device access or close ykman during inspection: no stale compatible result may enable enrollment. Profile change must immediately re-evaluate. No PIN prompt/touch request or mutation is permitted during inspection.
+- Check a profile with unspecified checkboxes: save remains possible without changing the shared TOML; enrollment explains that explicit values are needed.
+- Before real enrollment, verify two-key admin authentication then target-only preflight. No PIN or credential payload may appear in the activity log.
 
 ## Preview 0.5.2: USB refresh and UI acceptance
 

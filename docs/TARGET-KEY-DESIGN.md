@@ -1,6 +1,6 @@
 # Explicit target key and YubiEnroll workflow
 
-Decision (2026-11-13): retain YubiEnroll for enrollment, PIN generation and profiles. Preview 0.5.2 supports administrator sign-in followed by enrollment with only the confirmed target connected. Direct SDK integration is deferred.
+Decision (2026-11-13): retain YubiEnroll for enrollment, PIN generation and profiles. Preview 0.5.3 supports administrator sign-in followed by enrollment with only the confirmed target connected. Direct SDK integration is deferred.
 
 ## Operator workflow
 

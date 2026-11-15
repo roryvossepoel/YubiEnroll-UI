@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.5.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.5.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -16,6 +16,14 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
 - Offers **Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
+
+## Preview 0.5.3: profile compatibility
+
+- Profile editor offers Basic FIDO2 and Managed PIN starting settings, with live requirement descriptions. Basic keeps generated initial PINs while omitting enforced minimum length and forced PIN change; FIDO reset remains a separate explicit choice.
+- Read-only capability discovery runs a bundled, fixed Python script through the installed ykman scripting runtime. No additional Python installation or SDK is required. It reads only the selected USB serial's CTAP GetInfo and device metadata; it never requests a PIN, verifies a PIN, reads credentials or changes a key.
+- Enrollment checks configurable minimum length / forced change, Always UV, enterprise provisioning, PIN limits, reset restrictions and FIDO2 support. Unknown or malformed readings block enrollment. The same checks run again on fresh data before native enrollment. Unsupported settings are never silently dropped or used to rewrite a shared profile.
+- CLI-default checkboxes and generated PIN lengths must be made explicit for verification; existing TOML is preserved until the operator edits it. Current minimum PIN length is a conservative floor even when reset is requested. No destructive probe is used to discover the factory floor.
+- Firmware is checked for identity consistency but is not the feature gate. Native YubiEnroll still performs enrollment and final PIN/complexity checks; platform/IdP support and physical hardware tests remain necessary.
 
 ## Preview 0.5.2: interaction polish and USB refresh
 
@@ -92,7 +100,7 @@ Configuration must belong to the Windows account running the app. Configure prov
 
 ### Add your first tenant
 
-Open **Settings → Tenants → Add tenant** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Select an existing enrollment profile or create a new one. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forcing a PIN change require firmware 5.5+.
+Open **Settings → Tenants → Add tenant** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Select an existing enrollment profile or create a new one. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forced PIN change require actual CTAP capability support (standard YubiKey 5: generally firmware 5.7+). Use Settings → Profiles → Basic FIDO2 for older keys.
 
 **Save tenant** validates the fields, creates the directory if necessary, and adds the provider/profile. It preserves original configuration text and makes a timestamped `.bak` file before replacing an existing file. Duplicate names and configuration changes since opening the form are rejected. Cancel makes no changes. Close other YubiEnroll sessions while saving; their external writes cannot be locked by this GUI. Close Settings, select the tenant and use **Connect** to activate it and authenticate.
 
@@ -184,7 +192,7 @@ GUI and helper source: [MIT](LICENSE). YubiEnroll is installed separately and re
 
 ## Yubico workflow reference
 
-The interface follows Yubico's [Entra provider setup](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#adding-microsoft-entra-id), [profile creation](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#creating-enrollment-profiles) and [profile setting descriptions](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#profile-settings). Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. First-use PIN-change prompting also depends on the end user's platform. Omitted reset is treated as potentially destructive rather than assuming a safe default.
+The interface follows Yubico's [Entra provider setup](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#adding-microsoft-entra-id), [profile creation](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#creating-enrollment-profiles) and [profile setting descriptions](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#profile-settings). Minimum PIN length, Always UV and forced PIN change are validated using the selected key’s reported capabilities, not a universal firmware threshold. First-use PIN-change prompting also depends on the end user's platform. Omitted reset is treated as potentially destructive rather than assuming a safe default.
 
 
 ## Earlier previews (historical)
