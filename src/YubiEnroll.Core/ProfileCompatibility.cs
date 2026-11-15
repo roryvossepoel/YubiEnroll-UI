@@ -122,6 +122,8 @@ public static class FidoCapabilityProbe
     {
         // Validate the serial with the existing strict validator; never use a shell or substitute the first key.
         _ = KeyResetService.ResetArguments(target.Serial);
+        // --force suppresses only ykman's script prompt for this fixed read-only resource.
+        // It is never passed to enrollment, reset or any configuration operation.
         var result = await runner.CaptureWithInputAsync(TimeSpan.FromSeconds(15), Script,
             "script", "--force", "-", target.Serial);
         if (result.ExitCode != 0) throw new InvalidOperationException("Could not read FIDO capabilities for the selected key. Reconnect it, close other key tools and Refresh.");
