@@ -65,7 +65,7 @@ public partial class MainWindow
         ResetNext.IsEnabled = !_busy && (_resetStep == 2 || CandidateReady);
         ResetBack.Content = _resetStep == 1 ? "←  Back" : "Back to Home";
         ResetTargetText.Text = _resetReviewTarget?.Label ?? "No target selected";
-        KeyPinStatus.Text = _selectedKey?.Key == _resetReviewTarget ? _selectedKey.PinLabel : "Target unavailable";
+        KeyPinStatus.Text = _selectedKey is { } currentKey && currentKey.Key == _resetReviewTarget ? currentKey.PinLabel : "Target unavailable";
         ResetAvailability.Text = !IsAdministrator() ? "Restart as administrator under Settings → Prerequisites to reset this key." :
             !TargetReady || _selectedKey?.Key != _resetReviewTarget ? "The reviewed target is unavailable. Go back, reconnect it and Refresh." : "";
         ResetTargetButton.IsEnabled = !_busy && _resetStep == 1 && TargetReady && _selectedKey?.Key == _resetReviewTarget && IsAdministrator() && ResetAcknowledged.IsChecked == true;
