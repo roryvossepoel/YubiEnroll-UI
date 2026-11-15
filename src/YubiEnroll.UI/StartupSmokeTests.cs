@@ -140,83 +140,14 @@ public partial class MainWindow
             await settingsOperation.Task;
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
-            _connectedProvider = SelectedProvider; // Synthetic completed connection; never performs real login.
-            UpdateSummary();
-            Assert(SearchPanel.IsEnabled && !PreparePanel.IsEnabled, "User selection required after connection");
-            Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") };
-            Users.SelectedIndex = 0;
-            Assert(PreparePanel.IsEnabled && !EnrollButton.IsEnabled, "User and profile alone never choose a target key");
-            var target = new KeyStatus(new ResetKey("12345678", "YubiKey 5C (5.7.1)"), FidoPinState.Blocked);
-            var admin = new KeyStatus(new ResetKey("87654321", "YubiKey 5 NFC (5.7.1)"), FidoPinState.Set);
-            ApplyInventory(new[] { target }, 0);
-            Assert(_selectedKey == null && !EnrollButton.IsEnabled, "Single discovered key is not selected without operator confirmation");
-            OverviewKeys.SelectedIndex = 0;
-            Assert(_selectedKey == null && EnrollmentKeys.SelectedItem is KeyStatus candidate && candidate == target, "Chooser synchronizes both pages without committing a device");
-            UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
-            Assert(_selectedKey == target && EnrollButton.IsEnabled, "Explicit Use this key commits the target");
-            ApplyInventory(new[] { target, admin }, 0);
-            Assert(_selectedKey == target && !EnrollButton.IsEnabled && EnrollmentTargetNotice.Text.Contains(admin.Key.Serial) && FooterInstruction.Text.Contains("Disconnect"), "After sign-in, two-key guidance identifies which other key to disconnect");
-            _connectedProvider = null; UpdateSummary();
-            Assert(ConnectButton.IsEnabled && !EnrollButton.IsEnabled && EnrollmentTargetNotice.Text.Contains("Use your administrator key"), "Two keys are allowed for sign-in before the enrollment-only restriction");
-            _connectedProvider = SelectedProvider; UpdateSummary();
-            CaptureWindow(this, "two-key-overview.png");
-            ShowPage(PreparePage); CaptureWindow(this, "two-key-enrollment.png");
-            ApplyInventory(new[] { admin }, 0);
-            Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Removing target never substitutes the administrator key");
-            ApplyInventory(new[] { target }, 0);
-            Assert(_selectedKey == target && EnrollButton.IsEnabled, "Reconnecting exact target restores its cached identity and single-key enrollment");
-            InvalidateDeviceInventory(); UpdateSummary();
-            Assert(!EnrollButton.IsEnabled && !ResetTargetButton.IsEnabled && !UseOverviewKey.IsEnabled && _selectedKey == target, "Device-change invalidation immediately blocks actions without replacing the selected target");
-            ApplyInventory(new[] { target }, 0);
-            ChangeTargetKey_Click(this, new System.Windows.RoutedEventArgs());
-            Assert(!EnrollButton.IsEnabled, "Changing target pauses enrollment until explicit confirmation");
-            UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
-            Assert(EnrollButton.IsEnabled && Users.SelectedItem != null, "Confirming the same key preserves the current user");
-            Assert(KeyName.Text == "YubiKey 5C (12345678)", "Registration name is populated from model and serial without firmware");
-            KeyName.Text = "My custom key";
-            ApplyInventory(new[] { target with { Pin = FidoPinState.Set } }, 0);
-            Assert(KeyName.Text == "My custom key", "Device refresh preserves a custom registration name");
-            KeyName.Clear(); SuggestRegistrationName();
-            var cached = _selectedKey;
-            Overview_Click(this, new System.Windows.RoutedEventArgs());
-            Assert(ReferenceEquals(cached, _selectedKey) && !_busy, "Overview navigation keeps the existing inspection without a device read");
-            Assert(TaskbarIdentity.HasWindowIcons(this), "Published window exposes both large and small taskbar/title icons");
-            ReadinessText.Text = "YubiEnroll: installed · Administrator: yes\nConfiguration: 1 tenant · 2 profiles";
-            CaptureWindow(this, "overview.png");
-            ShowPage(PreparePage);
-            CaptureWindow(this, "enrollment-small-desktop.png");
-            Width = 1120; Height = 860;
-            CaptureWindow(this, "enrollment.png");
-            EnrollmentScroll.ScrollToBottom(); UpdateLayout();
-            CaptureWindow(this, "enrollment-profile.png");
-            Assert(PreparationCard.IsVisible && FooterTargetText.Text.Contains(target.Key.Serial), "Target identity stays visible beside the action when the profile is scrolled into view");
-            EnrollmentScroll.ScrollToTop();
-            var reviewCapture = Dispatcher.InvokeAsync(() =>
-            {
-                var review = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Confirm enrollment");
-                CaptureWindow(review, "enrollment-review.png");
-                review.Close();
-            });
-            Assert(!ConfirmEnrollment(SelectedProvider, SelectedProfile, SelectedUser, "This profile erases existing FIDO credentials."), "Closing enrollment review cancels without launching a tool");
-            await reviewCapture.Task;
+            TestGuidedWorkflow();
             var keysCapture = Dispatcher.InvokeAsync(() =>
             {
                 var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
-                CaptureWindow(keys, "registered-keys.png");
-                keys.Close();
+                CaptureWindow(keys, "registered-keys.png"); keys.Close();
             });
             ShowRegisteredKeys(SelectedUser, SelectedProvider, "Display name  Model  ID\nDemo key  YubiKey 5 NFC  synthetic-credential-id");
             await keysCapture.Task;
-            AssertActionFooterVisible();
-            ApplyInventory(new[] { target, admin }, 0);
-            var connectedTenant = _connectedProvider;
-            var chosenProfile = Profiles.SelectedItem;
-            ChangeTargetKey_Click(this, new System.Windows.RoutedEventArgs());
-            OverviewKeys.SelectedIndex = 1;
-            UseTargetKey_Click(this, new System.Windows.RoutedEventArgs());
-            Assert(_selectedKey == admin && Users.SelectedItem == null && Query.Text.Length == 0 && !EnrollButton.IsEnabled && KeyName.Text == admin.Key.RegistrationName,
-                "Choosing the next key clears the previous recipient and name before another enrollment");
-            Assert(_connectedProvider == connectedTenant && ReferenceEquals(Profiles.SelectedItem, chosenProfile), "Changing physical target preserves tenant login and profile");
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);
@@ -287,12 +218,96 @@ public partial class MainWindow
         }
     }
 
+    private void TestGuidedWorkflow()
+    {
+        var e = new System.Windows.RoutedEventArgs();
+        var target = new KeyStatus(new ResetKey("12345678", "YubiKey 5C NFC (5.7.1)"), FidoPinState.Blocked);
+        var admin = new KeyStatus(new ResetKey("87654321", "YubiKey 5 NFC (5.7.1)"), FidoPinState.Set);
+        ShowPage(OverviewPage);
+        Assert(OverviewPage.IsVisible && !PreparePage.IsVisible && !ResetPage.IsVisible && !StatusBar.IsVisible,
+            "Home starts with task choices and no device form or technical footer");
+        Width = 1180; Height = 840; CaptureWindow(this, "home.png");
+        ShowPage(PreparePage);
+        ApplyInventory(new[] { target, admin }, 0);
+        Assert(_selectedKey == null && !EnrollNext.IsEnabled, "Discovery never selects a target automatically");
+        EnrollmentKeys.SelectedIndex = 0;
+        Assert(_selectedKey == null && OverviewKeys.SelectedItem is KeyStatus candidate && candidate == target && EnrollNext.IsEnabled,
+            "Both task lists share an unconfirmed candidate");
+        CaptureWindow(this, "enroll-key.png");
+        EnrollNext_Click(this, e);
+        Assert(_selectedKey == target && _enrollStep == 1 && TenantStep.IsVisible && !UserCard.IsVisible && !PreparationCard.IsVisible,
+            "Continue commits target and shows only tenant step");
+        Assert(ConnectButton.IsEnabled && !EnrollNext.IsEnabled, "Tenant step requires login while allowing two keys for authentication");
+        EnrollNext_Click(this, e);
+        Assert(_enrollStep == 1, "Cannot skip authentication through the event handler");
+        _connectedProvider = SelectedProvider; UpdateSummary();
+        Assert(EnrollNext.IsEnabled && EnrollmentTargetNotice.Text.Contains(admin.Key.Serial), "Signed-in tenant identifies other keys to disconnect");
+        CaptureWindow(this, "enroll-tenant.png");
+        EnrollNext_Click(this, e);
+        Assert(_enrollStep == 2 && UserCard.IsVisible && !TenantStep.IsVisible && !EnrollNext.IsEnabled, "Recipient is a separate gated step");
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") };
+        Users.SelectedIndex = 0;
+        CaptureWindow(this, "enroll-user.png");
+        EnrollNext_Click(this, e);
+        Assert(_enrollStep == 3 && PreparationCard.IsVisible && !EnrollButton.IsEnabled && ReviewTargetNotice.Text.Contains(admin.Key.Serial),
+            "Review blocks enrollment while another key is attached");
+        ApplyInventory(new[] { admin }, 0);
+        Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Missing target is never replaced by the administrator key");
+        ApplyInventory(new[] { target }, 0);
+        Assert(_selectedKey == target && EnrollButton.IsEnabled, "Exact target reconnect restores reviewed enrollment readiness");
+        InvalidateDeviceInventory(); UpdateSummary();
+        Assert(!EnrollButton.IsEnabled && !ResetTargetButton.IsEnabled && !EnrollNext.IsEnabled, "USB change immediately invalidates action readiness");
+        ApplyInventory(new[] { target }, 0);
+        KeyName.Text = "My custom key";
+        ApplyInventory(new[] { target with { Pin = FidoPinState.Set } }, 0);
+        Assert(KeyName.Text == "My custom key", "Refresh preserves the custom registration name");
+        KeyName.Clear(); SuggestRegistrationName();
+        Assert(KeyName.Text == "YubiKey 5C NFC (12345678)", "Default name contains model and serial without firmware");
+        CaptureWindow(this, "enroll-review.png"); AssertActionFooterVisible();
+        var cached = _selectedKey;
+        ShowPage(OverviewPage); ShowPage(PreparePage);
+        Assert(ReferenceEquals(cached, _selectedKey) && _enrollStep == 3 && !_busy, "Navigation preserves target and step without reading hardware");
+        Assert(TaskbarIdentity.HasWindowIcons(this), "Published app exposes the shared icon at both native sizes");
+        // A reset is an independent task and cannot start from enrollment selection alone.
+        ShowPage(ResetPage); CaptureWindow(this, "reset-key.png");
+        Assert(!ResetTargetButton.IsVisible && ResetNext.IsEnabled, "Reset begins with selection rather than a destructive button");
+        ResetNext_Click(this, e);
+        Assert(_resetStep == 1 && _resetReviewTarget == target.Key && !ResetTargetButton.IsEnabled, "Reset review captures exact target and requires acknowledgment");
+        ResetAcknowledged.IsChecked = true;
+        Assert(ResetTargetButton.IsEnabled == IsAdministrator(), "Reset action also requires Windows administrator access");
+        CaptureWindow(this, "reset-confirm.png");
+        InvalidateDeviceInventory();
+        Assert(ResetAcknowledged.IsChecked == false && !ResetTargetButton.IsEnabled, "Device change revokes destructive acknowledgment");
+        ApplyInventory(new[] { admin }, 0);
+        Assert(_resetReviewTarget == target.Key && !ResetTargetButton.IsEnabled, "Reset confirmation never retargets a remaining device");
+        ApplyInventory(new[] { target, admin }, 0);
+        ResetBack_Click(this, e);
+        Assert(_resetStep == 0 && !ResetTargetButton.IsVisible, "Back from reset confirmation performs no operation");
+        var tenant = _connectedProvider; var profile = Profiles.SelectedItem;
+        OverviewKeys.SelectedIndex = 1; ResetNext_Click(this, e);
+        Assert(_selectedKey == admin && Users.SelectedItem == null && KeyName.Text == admin.Key.RegistrationName,
+            "Confirming a different target clears the previous recipient and name");
+        Assert(_connectedProvider == tenant && ReferenceEquals(Profiles.SelectedItem, profile), "Changing target retains tenant login and profile");
+        ResetResultText.Text = "Synthetic result: reset reported successful. Read-back: target PIN is not set. Entra registrations remain.";
+        _resetStep = 2; RenderWizard(); CaptureWindow(this, "reset-result.png");
+        ResetNext_Click(this, e);
+        Assert(_resetStep == 0 && _selectedKey == null && !ResetNext.IsEnabled, "Reset another key requires a fresh explicit selection");
+        ShowPage(PreparePage);
+        EnrollmentKeys.SelectedIndex = 0; EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
+        EnrollNext_Click(this, e); ApplyInventory(new[] { target }, 0);
+        ShowEnrollmentResult("Synthetic result: YubiEnroll reported success. Review registered keys and test sign-in.");
+        CaptureWindow(this, "enroll-result.png");
+        Assert(_enrollStep == 4 && !EnrollButton.IsVisible && EnrollNext.IsEnabled, "Enrollment result offers another key without repeating enrollment");
+    }
+
     private void AssertActionFooterVisible()
     {
         UpdateLayout();
         var root = (System.Windows.FrameworkElement)Content;
-        var bottom = EnrollButton.TranslatePoint(new System.Windows.Point(0, EnrollButton.ActualHeight), root);
-        Assert(EnrollButton.IsVisible && EnrollButton.ActualHeight > 0 && bottom.Y <= root.ActualHeight,
+        var action = EnrollButton.IsVisible ? EnrollButton : EnrollNext;
+        var bottom = action.TranslatePoint(new System.Windows.Point(0, action.ActualHeight), root);
+        Assert(action.IsVisible && action.ActualHeight > 0 && bottom.Y <= root.ActualHeight,
             "Prepare action remains visible outside the scrolling form");
     }
 

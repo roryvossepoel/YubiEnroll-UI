@@ -1,6 +1,15 @@
-# Manual acceptance checks for preview 0.4.3
+# Manual acceptance checks for preview 0.5.0
 
-## Preview 0.4.3: current acceptance workflow
+## Preview 0.5.0: current acceptance workflow
+
+- Home shows only two task choices. Enroll key and Reset FIDO each show one step at a time. Settings stays reachable before operations.
+- Continue is disabled before explicit key selection. Tenant/user gates cannot be skipped by keyboard or event invocation. Back and navigation preserve the confirmed target without rediscovery.
+- Review shows the selected target, tenant, recipient, profile/name and current reset warning. The final action is disabled for multiple/unidentified devices, a disconnected target or changed configuration.
+- Reset review captures the selected serial. It requires acknowledgment and administrator rights; a device change revokes acknowledgment. No reset occurs merely by entering Confirm or going Back.
+- Verify result messages for success, failure, cancellation and unknown PIN read-back. Another key begins with no selection and clears the previous recipient. Native operations are never retried automatically.
+- Compare Home, both key selectors, every intermediate step and both results at small and large window sizes and Windows 100/150/200% scaling. Use the same icon at sidebar, title bar, taskbar and executable.
+
+## Preview 0.4.3: earlier acceptance workflow
 
 Earlier version sections below are historical checks; use this workflow for the current navigation.
 

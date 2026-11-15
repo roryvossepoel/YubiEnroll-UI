@@ -9,5 +9,5 @@
     <AssemblyName>YubiEnroll.UI</AssemblyName>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../YubiEnroll.Core/YubiEnroll.Core.csproj" /></ItemGroup>
-  <ItemGroup><Resource Include="Assets/App.ico" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets/App.ico" /><Resource Include="Assets/App.png" /></ItemGroup>
 </Project>
