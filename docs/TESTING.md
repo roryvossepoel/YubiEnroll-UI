@@ -1,4 +1,14 @@
-# Manual acceptance checks for preview 0.5.3
+# Manual acceptance checks for preview 0.5.4
+
+## Preview 0.5.4: registration records
+
+- Start with logging off: perform enrollment, login and standalone reset. No registration files should be created. Existing records remain readable when disabled.
+- Enable logging under Settings → Registration log and select a writable folder. Restart with the same Windows account and confirm the saved preference. Elevation into a different account must not reuse the original account's history silently.
+- Enroll two disposable keys for different test users and tenants. Compare each record with its original review, especially serial, UPN versus email, profile, reset and first-use PIN flags. Check the actual CLI table format; missing identity fields must never be guessed.
+- Cancel or interrupt enrollment. Confirm it is not labelled successful; check Entra before retrying because a partial registration may exist. Simulate app termination after native launch: the saved attempt must remain unknown.
+- Deny folder write access before enrollment: the command must not start. Deny access after it starts: a successful native result must remain successful while the app clearly reports the unsaved log and offers save-only retry. Restore access, retry and verify one row with the same attempt ID. Navigate to another key while a result is pending; closing must warn about losing its final result. Do not use production keys for this test.
+- Export all rows and then filter by tenant, date and success. Compare CSV row counts and details in Excel, including names with accents/commas and serial numbers with leading zeroes. Confirm no PIN, token or console transcript is present.
+- Inspect the Registration log tab at small window sizes and 100/150/200% scale; fields/actions must remain reachable. Confirm existing tenant/profile tabs are unchanged.
 
 ## Preview 0.5.3: profile compatibility
 

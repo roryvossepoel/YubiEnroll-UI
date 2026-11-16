@@ -2,7 +2,7 @@
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.5.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.5.4 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -16,6 +16,18 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
 - Offers **Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
+
+## Preview 0.5.4: optional registration log
+
+Enable **Settings → Registration log → Save enrollment records**, choose a folder and save the preference. Logging is off by default. Preferences are stored separately from the shared YubiEnroll TOML in `%LOCALAPPDATA%/YubiEnroll.UI/registration-log-settings.json`. They apply to the current Windows account; elevation into a different account uses that account's preference and history.
+
+Each attempt records its unique ID, start/result timestamps with offsets, tenant name/ID, user display name/UPN/email/object ID, confirmed target model/serial, profile and registration name, configured reset/first-use PIN-change flags and native outcome. Identity fields are read only from recognised labelled CLI columns/fields. An absent or unrecognised email is left blank, never copied from UPN. No PINs, tokens, authentication caches or terminal output are accepted by the log schema. These are personal data stored as local JSON, not an encrypted or tamper-proof audit trail; choose a folder with appropriate access.
+
+An unknown attempt is durably written before enrollment starts. If this fails, enrollment does not start while logging is enabled. Native success is recorded separately from failed/interrupted or unknown outcomes; even a nonzero exit may already have created a credential. Success means YubiEnroll reported completion, not an independent sign-in test or a serial binding of the native tool. The target serial is the UI-confirmed target. The result timestamp is when the app receives the native outcome (after returning from the interactive console), not the Entra credential creation time. Reset and first-use PIN flags describe the reviewed configuration, not later user behavior.
+
+One JSON file per attempt is replaced atomically under a file lock. A crash or unsaved final result leaves the previous unknown record. If the final write fails, the app retains the outcome in memory and offers **Retry saving registration log**, without repeating enrollment. Pending outcomes survive navigation to another key within the session; closing warns before discarding them. Restore folder access and retry before changing folders. Disabling logging stops new records and retains history.
+
+Filter the registration list by tenant, local date range and successful outcome; **Export CSV…** exports the filtered rows with UTF-8 BOM and the current Windows comma/semicolon list separator. Serial numbers are exported as text to preserve leading zeroes; spreadsheet-formula prefixes are escaped. Unsaved in-memory outcomes supersede their unknown disk rows in exports. A damaged/unreadable record blocks export rather than silently dropping history. Exports contain personal data and should be shared deliberately. Standalone FIDO resets and logins do not create registration rows; existing Entra registrations are not backfilled.
 
 ## Preview 0.5.3: profile compatibility
 
@@ -165,7 +177,7 @@ If UAC uses a different Windows administrator account, the new process sees that
 - Search parsing accepts GUID-first table rows and `ID:` blocks. It intentionally rejects unknown formats. Unrecognized output is not used for enrollment; real output from the installed YubiEnroll version still needs validation.
 - No automated bulk enrollment, cloud credential deletion or automatic PIN delivery. A temporary batch register with protected PIN handover is tracked separately in issue #19 and is not implemented in this preview. Overview inspects connected serial-addressable FIDO keys. Enrollment requires only the confirmed target to remain connected; multiple keys are permitted for login and serial-targeted standalone reset.
 - One operation at a time within each GUI window. **Do not use a second GUI instance or another YubiEnroll session concurrently:** the CLI has a shared active provider. Configuration checks detect changes before commands but cannot lock out external tools.
-- No persistent audit file or telemetry. Activity can contain user and tenant identifiers; redact them before sharing screenshots or bug reports. The official CLI's own logging settings are outside this GUI's control.
+- No telemetry. The optional registration log persists issuance records separately from the session-only activity log. Activity can contain user and tenant identifiers; redact them before sharing screenshots or bug reports. The official CLI's own logging settings are outside this GUI's control.
 - Closing the console prematurely is treated as unsuccessful/unknown; wait for the CLI result and press Enter instead.
 
 ## Build from source

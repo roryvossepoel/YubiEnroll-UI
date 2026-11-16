@@ -426,6 +426,7 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0,
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"serial: {adminKey.Serial}") &&
     EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
+RegistrationJournalTests.Run(Check);
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 

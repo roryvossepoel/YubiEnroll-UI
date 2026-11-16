@@ -29,10 +29,11 @@ public partial class SettingsWindow : Window
     }
     public bool Changed { get; private set; }
 
-    public SettingsWindow(string path, string executable, string version)
+    public SettingsWindow(string path, string executable, string version, RegistrationJournal? registrationJournal = null)
     {
         _path = path;
         InitializeComponent();
+        RegistrationHost.Content = new RegistrationLogView(registrationJournal ?? new RegistrationJournal(RegistrationJournal.DefaultSettingsPath));
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
         Attempt(RefreshLists);

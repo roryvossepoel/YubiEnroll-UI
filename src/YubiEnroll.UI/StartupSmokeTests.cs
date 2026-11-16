@@ -121,12 +121,12 @@ public partial class MainWindow
             });
             tenantEditor.ShowDialog();
             await tenantEditOperation.Task;
-            var settings = new SettingsWindow(path, mockExecutable, "Mock CLI") { Owner = this };
+            var settings = new SettingsWindow(path, mockExecutable, "Mock CLI", _registrationJournal) { Owner = this };
             var settingsOperation = settings.Dispatcher.InvokeAsync(() =>
             {
                 try
                 {
-                    Assert(settings.SettingsTabs.Items.Count == 6 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                    Assert(settings.SettingsTabs.Items.Count == 7 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
                         "Settings separates tenants, profiles, system and transfer");
                     var transfer = ConfigTransfer.Export(File.ReadAllText(path));
                     var beforePreview = File.ReadAllText(path);
@@ -147,6 +147,7 @@ public partial class MainWindow
                     CaptureWindow(settings, "settings-transfer.png");
                     settings.SettingsTabs.SelectedIndex = 4;
                     CaptureWindow(settings, "settings-about.png");
+                    TestRegistrationLogView(settings);
                 }
                 finally { settings.Close(); }
             });
@@ -295,7 +296,7 @@ public partial class MainWindow
         await CheckRequirementsAsync(() => Task.FromResult(ready));
         Assert(OverviewPage.IsVisible && !StartupPage.IsVisible && !_inventoryLoaded,
             "Successful startup opens Home without discovering hardware");
-        var settings = new SettingsWindow(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "absent.toml"), mockExecutable, "Checking…");
+        var settings = new SettingsWindow(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "absent.toml"), mockExecutable, "Checking…", _registrationJournal);
         Host(settings);
         var prerequisiteVisits = 0;
         settings.PrerequisitesOpened += () => prerequisiteVisits++;

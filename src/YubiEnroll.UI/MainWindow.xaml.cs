@@ -40,6 +40,9 @@ public partial class MainWindow : Window
     public MainWindow(bool smokeTest = false)
     {
         _smokeTest = smokeTest;
+        _registrationJournal = new RegistrationJournal(smokeTest
+            ? Path.Combine(Path.GetTempPath(), "YubiEnroll-log-test-" + Guid.NewGuid().ToString("N"), "preferences.json")
+            : RegistrationJournal.DefaultSettingsPath);
         InitializeComponent();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
@@ -94,7 +97,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.4" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -244,7 +247,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.3\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.4\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -374,9 +377,19 @@ public partial class MainWindow : Window
         await ActivateAsync(provider, profile);
         await CheckEnrollmentTargetAsync(target, setup);
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
+        var registration = BeginRegistrationRecord(provider, user, target, setup, KeyName.Text);
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {profile.Name} · reset {reset}.");
         StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
-        var code = await RunInteractiveAsync(_exePath, arguments);
+        int code;
+        try { code = await RunInteractiveAsync(_exePath, arguments); }
+        catch
+        {
+            CompleteRegistrationRecord(registration, null);
+            ShowEnrollmentResult("The enrollment outcome is unknown. Check Registered keys and Entra before retrying.");
+            throw;
+        }
+        // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
+        CompleteRegistrationRecord(registration, code);
         _deviceRefresh?.Start(); // Refresh status after enrollment, once the operation has released the key.
         Record(code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.", code == 0 ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
         if (code != 0)
@@ -425,8 +438,12 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_busy) return;
-        e.Cancel = true;
-        MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
+        if (_busy)
+        {
+            e.Cancel = true;
+            MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
+        }
+        else if (_registrationJournal.PendingCount > 0)
+            e.Cancel = MessageBox.Show(this, $"{_registrationJournal.PendingCount} enrollment result(s) have not been saved. Closing loses their final outcomes; the on-disk attempts will remain unknown. Close anyway?", "Unsaved enrollment records", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes;
     }
 }

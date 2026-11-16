@@ -89,7 +89,7 @@ public partial class MainWindow
     {
         if (_busy) return;
         LeaveHostedPage();
-        var settings = new SettingsWindow(_configPath, _exePath, _versionText) { EmbeddedTerminal = EmbeddedTerminal };
+        var settings = new SettingsWindow(_configPath, _exePath, _versionText, _registrationJournal) { EmbeddedTerminal = EmbeddedTerminal };
         settings.SettingsTabs.SelectedIndex = tab; settings.ActivityHost.Content = _activityView;
         settings.PrerequisitesOpened += async () =>
         {

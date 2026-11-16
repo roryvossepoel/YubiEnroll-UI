@@ -52,6 +52,7 @@ public partial class MainWindow
     private void RenderWizard()
     {
         if (ResetHeading == null || EnrollHeading == null || ResetAcknowledged == null) return;
+        RenderRegistrationLogStatus();
         RenderProgress(EnrollProgress, ["Key", "Tenant", "User", "Review"], Math.Min(_enrollStep, 3));
         RenderProgress(ResetProgress, ["Key", "Confirm", "Result"], _resetStep);
         EnrollHeading.Text = new[] { "Choose the key to enroll", "Connect to a tenant", "Choose the recipient", "Review and enroll", "Enrollment result" }[_enrollStep];
