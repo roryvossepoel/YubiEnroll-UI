@@ -41,6 +41,14 @@ public partial class MainWindow
         view.ThroughDate.SelectedDate = DateTime.Today;
         Assert(view.Records.Items.Count == 0 && !view.ExportButton.IsEnabled, "Invalid date range cannot export unrelated records");
         view.FromDate.SelectedDate = null; view.ThroughDate.SelectedDate = null; view.SuccessOnly.IsChecked = false;
+        view.TenantFilter.SelectedIndex = 1;
+        var originalFolder = _registrationJournal.Preferences.Directory;
+        _registrationJournal.Configure(true, originalFolder + "-empty");
+        view.RefreshRecords();
+        Assert(view.TenantFilter.SelectedIndex == 1 && view.Records.Items.Count == 0 && !view.ExportButton.IsEnabled, "Refresh cannot silently widen a tenant filter when its records disappear");
+        _registrationJournal.Configure(true, originalFolder);
+        view.RefreshRecords();
+        view.TenantFilter.SelectedIndex = 0;
         view.Records.SelectedIndex = 2;
         CaptureWindow(settings, "settings-registration-log.png");
         Assert(!view.LoggingPreferences.IsExpanded, "Enabled logging keeps storage preferences collapsed so records stay prominent");

@@ -44,7 +44,7 @@ public partial class RegistrationLogView : UserControl
     internal void RefreshRecords()
     {
         _loading = true;
-        var selected = (TenantFilter.SelectedItem as TenantChoice)?.Id;
+        var selected = TenantFilter.SelectedItem as TenantChoice;
         Feedback.Text = "";
         PreferenceStatus.Text = _journal.Preferences.Enabled
             ? "Enabled for future enrollments. Files are stored under this Windows account's chosen folder."
@@ -53,9 +53,12 @@ public partial class RegistrationLogView : UserControl
         try
         {
             _records = _journal.Read();
-            TenantFilter.ItemsSource = new[] { new TenantChoice(null, "All tenants") }.Concat(_records.GroupBy(r => r.TenantId)
-                .Select(g => new TenantChoice(g.Key, g.First().TenantName)).OrderBy(t => t.Label)).ToArray();
-            TenantFilter.SelectedItem = TenantFilter.Items.Cast<TenantChoice>().FirstOrDefault(t => t.Id == selected) ?? TenantFilter.Items[0];
+            var tenants = new[] { new TenantChoice(null, "All tenants") }.Concat(_records.GroupBy(r => r.TenantId)
+                .Select(g => new TenantChoice(g.Key, g.First().TenantName)).OrderBy(t => t.Label)).ToList();
+            // Refresh/export must not silently widen a tenant filter when its files disappear.
+            if (selected?.Id != null && tenants.All(t => t.Id != selected.Id)) tenants.Add(selected);
+            TenantFilter.ItemsSource = tenants;
+            TenantFilter.SelectedItem = tenants.FirstOrDefault(t => t.Id == selected?.Id) ?? tenants[0];
             if (_journal.PendingCount > 0) Feedback.Text = $"{_journal.PendingCount} result(s) are not saved. Keep the app open and retry saving. CSV export includes these in-memory results.";
         }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
