@@ -28,7 +28,7 @@
     <Style TargetType="DataGridColumnHeader"><Setter Property="Padding" Value="10,8"/><Setter Property="Background" Value="#F3F6F7"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="BorderBrush" Value="#DCE3EB"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
    </DataGrid.Resources>
    <DataGrid.Columns>
-    <DataGridTextColumn Header="Recorded at" Binding="{Binding TimeLabel}" Width="195"/>
+    <DataGridTextColumn Header="Recorded at" Binding="{Binding ListTimeLabel}" Width="195"/>
     <DataGridTextColumn Header="User" Binding="{Binding UserLabel}" Width="180"/>
     <DataGridTextColumn Header="Tenant" Binding="{Binding TenantName}" Width="150"/>
     <DataGridTextColumn Header="Target serial" Binding="{Binding TargetSerial}" Width="110"/>

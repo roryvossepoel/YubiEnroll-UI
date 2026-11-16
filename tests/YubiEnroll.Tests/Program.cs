@@ -21,6 +21,14 @@ if (args.FirstOrDefault() == "--echo")
     return 0;
 }
 
+if (args.FirstOrDefault() == "--pin-summary-probe")
+{
+    Console.WriteLine("YubiKey configuration summary:");
+    Console.WriteLine("Serial number: 00123456");
+    Console.WriteLine("Temporary PIN: 001234");
+    return 0;
+}
+
 if (args.FirstOrDefault() == "--login-probe")
 {
     Console.WriteLine("Authenticating to ENTRA using the following parameters:");

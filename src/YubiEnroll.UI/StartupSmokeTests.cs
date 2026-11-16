@@ -506,6 +506,18 @@ public partial class MainWindow
         while (!live.IsCompleted) { panel.DismissCompleted(); await Task.Delay(50); }
         Assert(await live == 7 && !panel.Screen.Text.Contains("synthetic-pin"), "Live renderer retains outcome and clears hidden-input session");
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
+        foreach (var capture in new[] { false, true })
+        {
+            var pinPanel = new TerminalPanel("Synthetic PIN summary", true, captureSerial: capture ? "00123456" : null);
+            TerminalOverlay.Content = pinPanel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
+            var pinRun = pinPanel.RunAsync(mockExecutable, ["--pin-summary-probe"]);
+            var end = DateTime.UtcNow.AddSeconds(10);
+            while (pinPanel.CompletedExitCode == null && DateTime.UtcNow < end) await Task.Delay(50);
+            Assert(pinPanel.CompletedExitCode == 0 && pinPanel.GeneratedPin == (capture ? "001234" : null),
+                "Published terminal captures the generated summary PIN only with explicit opt-in: " + capture);
+            pinPanel.DismissCompleted(); await pinRun;
+        }
+        TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
         var screen = new TerminalScreen(); screen.Feed(output.ToString());
         Assert(screen.Text.Contains("VT_OK"), "Embedded terminal renders native VT output");
     }

@@ -85,7 +85,7 @@ public partial class RegistrationLogView : UserControl
     {
         if (Records.SelectedItem is not RegistrationRecord r) return;
         string Known(string value) => string.IsNullOrEmpty(value) ? "Not provided by YubiEnroll" : value;
-        SelectionDetails.Text = $"UPN: {Known(r.UserPrincipalName)} · Email: {Known(r.Email)}\nKey: {r.KeyModel} · target serial {r.TargetSerial} · Profile: {r.ProfileName}\nReset before enrollment: {(r.ResetBeforeEnrollment ? "Yes" : "No")} · PIN change on first use: {(r.ForcePinChangeOnFirstUse ? "Yes" : "No")}\nAttempt: {r.AttemptId}";
+        SelectionDetails.Text = $"Recorded at: {r.TimeLabel}\nUPN: {Known(r.UserPrincipalName)} · Email: {Known(r.Email)}\nKey: {r.KeyModel} · target serial {r.TargetSerial} · Profile: {r.ProfileName}\nReset before enrollment: {(r.ResetBeforeEnrollment ? "Yes" : "No")} · PIN change on first use: {(r.ForcePinChangeOnFirstUse ? "Yes" : "No")}\nAttempt: {r.AttemptId}";
         if (r.GeneratedPin != null) SelectionDetails.Text += "\nGenerated initial PIN: " + r.GeneratedPin;
     }
     private void Export_Click(object sender, RoutedEventArgs e)
