@@ -13,6 +13,9 @@ $exe = (Get-ChildItem $destination -Filter yubienroll.exe -Recurse -File | Selec
 if (-not $exe) { throw 'YubiEnroll executable not found in extracted package' }
 & $exe --version
 if ($LASTEXITCODE -ne 0) { throw 'YubiEnroll version check failed' }
+# Login has no force option; our dedicated screen uses the documented browser suppression flag.
+$loginHelp = & $exe login --help 2>&1
+if ($LASTEXITCODE -ne 0 -or ($loginHelp -join "`n") -notmatch '--no-launch-browser') { throw 'Missing native login browser option' }
 # Confirm the documented enrollment contract against the exact supported executable.
 $enrollmentHelp = & $exe credentials add --help 2>&1
 $enrollmentHelpCode = $LASTEXITCODE

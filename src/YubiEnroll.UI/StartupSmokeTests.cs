@@ -24,7 +24,7 @@ public partial class MainWindow
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
             Assert(WorkPanel.IsEnabled && !EnrollButton.IsEnabled, "Setup remains usable without enrollment");
-            _enrollStep = 1; ShowPage(PreparePage); UpdateLayout();
+            _enrollStep = TenantStepIndex; ShowPage(PreparePage); UpdateLayout();
             Assert(EmptyTenants.IsVisible && !TenantConnectionRow.IsVisible, "An empty tenant list shows Settings guidance instead of an empty connection form");
             CaptureWindow(this, "enroll-no-tenants.png");
             _enrollStep = 0; ShowPage(OverviewPage);
@@ -144,6 +144,7 @@ public partial class MainWindow
                     CaptureWindow(settings, "settings-tenants.png");
                     settings.SettingsTabs.SelectedIndex = 1;
                     CaptureWindow(settings, "settings-profiles.png");
+                    settings.SetRequirements(new RequirementReport(true, new(true, "Installed · version 1.2.0"), new(true, "Installed · version 5.9.2"), mockExecutable));
                     settings.SettingsTabs.SelectedIndex = 2;
                     CaptureWindow(settings, "settings-system.png");
                     settings.SettingsTabs.SelectedIndex = 3;
@@ -312,11 +313,11 @@ public partial class MainWindow
         await CheckRequirementsAsync(() => Task.FromResult(ready));
         Assert(ReferenceEquals(_connectedProvider, session) && ReferenceEquals(_knownKeys, inventory) && HostedPage.IsVisible,
             "Returning to Prerequisites checks software without changing login or key inventory");
-        Assert(settings.ManagerInfo.Text.Contains("5.9.2") && settings.VersionInfo.Text == ready.Enrollment.Detail,
+        Assert(settings.ManagerInfo.Text.Contains("5.9.2") && settings.VersionInfo.Text == "Version 1.2.0" && settings.EnrollmentStatus.Text == "Installed" && settings.RuntimeVersion.Text.StartsWith("Version 10."),
             "Prerequisite cards display the latest detected tool status");
         CaptureWindow(this, "prerequisites-ready.png");
         await CheckRequirementsAsync(() => Task.FromResult(missing with { Administrator = true }));
-        Assert(settings.ManagerInfo.Text == "Not installed", "Removal is reflected in the prerequisite cards");
+        Assert(settings.ManagerStatus.Text == "Not installed" && ((System.Windows.Controls.Border)settings.ManagerInfo.Parent).Visibility == System.Windows.Visibility.Collapsed, "Removal is reflected in the prerequisite cards");
         CaptureWindow(this, "prerequisites-missing.png");
         _requirements = null; _startupChecksComplete = false;
         ShowPage(OverviewPage);

@@ -15,9 +15,9 @@
     <Border Style="{StaticResource Card}"><StackPanel>
      <TextBlock Text="Administrator access" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="StartupAdminStatus" Text="Checking…" TextWrapping="Wrap" Margin="0,8,0,0"/>
      <Border Height="1" Background="#E5E8E5" Margin="0,20"/>
-     <TextBlock Text="YubiEnroll" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="StartupEnrollStatus" Text="Checking…" TextWrapping="Wrap" Margin="0,8,0,0"/>
+     <TextBlock Text="YubiEnroll CLI" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="StartupEnrollStatus" Text="Checking…" TextWrapping="Wrap" Margin="0,8,0,0"/>
      <Border Height="1" Background="#E5E8E5" Margin="0,20"/>
-     <TextBlock Text="YubiKey Manager CLI" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="StartupManagerStatus" Text="Checking…" TextWrapping="Wrap" Margin="0,8,0,0"/>
+     <TextBlock Text="YubiKey Manager CLI (ykman)" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="StartupManagerStatus" Text="Checking…" TextWrapping="Wrap" Margin="0,8,0,0"/>
     </StackPanel></Border>
     <TextBlock x:Name="StartupFeedback" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,18,0,0"/>
     <WrapPanel Margin="0,24,0,0"><Button x:Name="StartupElevate" Content="Restart as administrator" Click="Elevate_Click" Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="0,0,12,12"/><Button x:Name="StartupRequirements" Content="Open prerequisites" Click="Prerequisites_Click" Visibility="Collapsed" Margin="0,0,12,12"/></WrapPanel>
