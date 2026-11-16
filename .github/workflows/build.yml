@@ -19,6 +19,9 @@ jobs:
       - name: Test and publish
         shell: pwsh
         run: ./build.ps1 -Runtime win-x64
+      - name: Verify internal signing on disposable copies
+        shell: pwsh
+        run: ./tests/Test-InternalSigning.ps1
       - name: Test published executables and actual startup paths
         shell: pwsh
         run: |

@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [ValidateSet('win-x64')][string]$Runtime = 'win-x64',
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [string]$SigningCertificateThumbprint,
+    [string]$TimestampServer
 )
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
@@ -21,5 +23,9 @@ try {
     Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md -Destination "$out/app"
     $files = @(Get-ChildItem -LiteralPath "$out/app" -Recurse -File)
     if ($files.Count -ne 5) { throw "Expected two executables and three documentation files; got $($files.Count) files." }
+    if ($TimestampServer -and -not $SigningCertificateThumbprint) { throw 'TimestampServer requires SigningCertificateThumbprint.' }
+    if ($SigningCertificateThumbprint) {
+        & "$PSScriptRoot/scripts/Sign-App.ps1" -AppDirectory "$out/app" -CertificateThumbprint $SigningCertificateThumbprint -TimestampServer $TimestampServer
+    }
     Compress-Archive -Path "$out/app/*" -DestinationPath "$out/YubiEnroll-UI-$Runtime.zip" -Force
 } finally { Pop-Location }

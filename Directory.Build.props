@@ -5,5 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Version>0.5.3</Version>
+    <Product>YubiEnroll UI</Product>
+    <Company>Rory Vossepoel</Company>
   </PropertyGroup>
 </Project>

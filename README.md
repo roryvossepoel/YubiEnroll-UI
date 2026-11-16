@@ -170,6 +170,8 @@ If UAC uses a different Windows administrator account, the new process sees that
 
 ## Build from source
 
+The product is **YubiEnroll UI**, published by **Rory Vossepoel**. For optional self-signed internal builds, see [internal code signing](docs/SIGNING.md). Standard GitHub preview downloads remain unsigned.
+
 On Windows, install the .NET 10 SDK, then run:
 
 ```powershell
