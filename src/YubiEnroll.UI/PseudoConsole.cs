@@ -8,12 +8,14 @@ using YubiEnroll.Core;
 namespace YubiEnroll.UI;
 
 // Windows-only ConPTY transport. No shell, console transcript, command retry or operation timeout.
-internal sealed class PseudoConsole : IDisposable
+internal sealed class PseudoConsole(int columns = 100) : IDisposable
 {
     private IntPtr _console;
     private FileStream? _input;
     private FileStream? _output;
     private IntPtr _process;
+    private int _processId;
+    private readonly TaskCompletionSource _exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _writeLock = new();
     public event Action<string>? Output;
     public bool HasStarted { get; private set; }
@@ -40,6 +42,7 @@ internal sealed class PseudoConsole : IDisposable
             finally { Array.Clear(bytes); Array.Clear(chars); }
         });
         await Task.Run(() => WaitForSingleObject(_process, 0xffffffff));
+        _exited.TrySetResult();
         if (!GetExitCodeProcess(_process, out var code)) throw new Win32Exception();
         var exit = unchecked((int)code);
         // ClosePseudoConsole can block while output drains; do it away from the UI thread.
@@ -61,6 +64,21 @@ internal sealed class PseudoConsole : IDisposable
         }
     }
 
+    // Invoked only by the sign-in panel. Enrollment/reset never call this method.
+    public async Task CancelLoginAsync()
+    {
+        Write("\x03");
+        if (await Task.WhenAny(_exited.Task, Task.Delay(1500)) == _exited.Task) return;
+        if (_processId == 0 || _exited.Task.IsCompleted) return;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(_processId);
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+        }
+        catch (ArgumentException) { }
+        catch (InvalidOperationException) { }
+    }
+
     private void Start(string executable, string[] args)
     {
         SafeFileHandle? inputRead = null, inputWrite = null, outputRead = null, outputWrite = null;
@@ -69,7 +87,7 @@ internal sealed class PseudoConsole : IDisposable
         {
             if (!CreatePipe(out inputRead, out inputWrite, IntPtr.Zero, 0) ||
                 !CreatePipe(out outputRead, out outputWrite, IntPtr.Zero, 0)) throw new Win32Exception();
-            var hr = CreatePseudoConsole(new Coord(100, 28), inputRead, outputWrite, 0, out _console);
+            var hr = CreatePseudoConsole(new Coord(checked((short)columns), 28), inputRead, outputWrite, 0, out _console);
             Marshal.ThrowExceptionForHR(hr);
             inputRead.Dispose(); outputWrite.Dispose();
             nuint size = 0;
@@ -90,7 +108,7 @@ internal sealed class PseudoConsole : IDisposable
             if (!CreateProcess(executable, command, IntPtr.Zero, IntPtr.Zero, false, 0x00080000 | 0x00000400,
                 environment, Path.GetDirectoryName(executable), ref startup, out var info)) throw new Win32Exception();
             HasStarted = true;
-            _process = info.Process;
+            _process = info.Process; _processId = info.ProcessId;
             CloseHandle(info.Thread);
         }
         finally

@@ -1,30 +1,82 @@
 # YubiEnroll UI
 
+## Preview 0.5.6
+
+- Home offers **Set up a key**, **Add a passkey**, and **Reset FIDO**.
+- Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
+- Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
+- Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
+- The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-enrollment-*` profile; it can be removed in Settings. Configuration backups retain the previous TOML, as for other edits. Basic setup profiles with an omitted PIN floor also use a temporary, complete native profile with the freshly detected floor: YubiEnroll 1.2.0 requires this field even when no policy change is intended. The reusable profile stays unchanged.
+- Both tasks keep the existing single-target USB preflight restriction. YubiEnroll has no USB serial selector; keep only the intended key connected throughout the native operation. NFC is not implemented in this preview.
+- Help & About includes a manual GitHub update check, including published previews. No release yet and network failures have separate messages. Updates open the release page; installation remains manual.
+- Prerequisites includes .NET Desktop Runtime 10 x64 alongside YubiEnroll CLI and YubiKey Manager CLI (ykman).
+- Review deduplicates the user's sign-in/email information. Task icons share one background; the reset button has explicit readable active/hover/focus/disabled states.
+
+Real hardware testing remains required, especially adding a credential while checking that existing credentials, PIN, and key settings remain usable.
+
+
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.4.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.5.6 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
 - Reads existing YubiEnroll tenants and profiles, and adds Entra tenants through an Add tenant form. Existing configuration is preserved and backed up before additions.
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
-- Starts on Overview with an explicit target-key selection. Enroll key and Settings share the same window; FIDO reset is an action on Overview.
-- Hosts YubiEnroll login and enrollment in an embedded terminal preview, with an external-console fallback under Settings → Prerequisites.
+- Starts on Home with Enroll key and Reset FIDO as separate guided tasks. Settings remains available in the same window.
+- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → Prerequisites. Opted-in generated-PIN logging uses the in-app terminal for setup.
 - Reports the CLI exit code and retrieves the registered credential list after a successful command.
-- Keeps the UI responsive and prevents another operation or application shutdown while an operation is active.
+- Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
-- Offers **Overview → Reset FIDO…** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
+- Offers **Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
 
-## Preview 0.4.3 changes
+## Preview 0.5.4: optional registration log
 
-- Confirm a target key once using its model and serial; navigation keeps the selection. Refresh never substitutes a different key.
-- Follow the vertical **Enroll key** steps: target, tenant, user and profile/name. The target remains visible beside the final action.
-- Sign in with your administrator key, then disconnect it and leave only the target connected for enrollment. The app identifies other connected serials and checks again before launching YubiEnroll.
-- Device changes immediately disable key actions while refreshing. Choosing a different target clears the previous recipient/name, while retaining the tenant session and profile.
-- Reset FIDO directly from Overview, retaining serial-addressed native reset and PIN read-back.
-- View registered keys in a compact list with selectable IDs. Activity is available directly under Settings.
+Enable **Settings → Registration log → Save enrollment records**, choose a folder and save the preference. Logging is off by default. Preferences are stored separately from the shared YubiEnroll TOML in `%LOCALAPPDATA%/YubiEnroll.UI/registration-log-settings.json`. They apply to the current Windows account; elevation into a different account uses that account's preference and history.
+
+Each attempt records its unique ID, start/result timestamps with offsets, tenant name/ID, user display name/UPN/email/object ID, confirmed target model/serial, profile and registration name, configured reset/first-use PIN-change flags and native outcome. Identity fields are read only from recognised labelled CLI columns/fields. An absent or unrecognised email is left blank, never copied from UPN. PIN storage is off by default. Enable **Save generated PINs in the registration log** to include the generated initial PIN in the same JSON record and CSV export. Existing, manually entered PINs are never captured. Tokens, authentication caches and terminal transcripts are excluded. These are personal data stored as local JSON, not an encrypted or tamper-proof audit trail; choose a folder with appropriate access.
+
+An unknown attempt is durably written before enrollment starts. If this fails, enrollment does not start while logging is enabled. Native success is recorded separately from failed/interrupted or unknown outcomes; even a nonzero exit may already have created a credential. Success means YubiEnroll reported completion, not an independent sign-in test or a serial binding of the native tool. The target serial is the UI-confirmed target. The result timestamp is when the app receives the native outcome (after returning from the interactive console), not the Entra credential creation time. Reset and first-use PIN flags describe the reviewed configuration, not later user behavior.
+
+One JSON file per attempt is replaced atomically under a file lock. A crash or unsaved final result leaves the previous unknown record. If the final write fails, the app retains the outcome in memory and offers **Retry saving registration log**, without repeating enrollment. Pending outcomes survive navigation to another key within the session; closing warns before discarding them. Restore folder access and retry before changing folders. Disabling logging stops new records and retains history.
+
+Filter the registration list by tenant, local date range and successful outcome; **Export CSV…** exports the filtered rows with UTF-8 BOM and the current Windows comma/semicolon list separator. Serial numbers are exported as text to preserve leading zeroes; spreadsheet-formula prefixes are escaped. Unsaved in-memory outcomes supersede their unknown disk rows in exports. A damaged/unreadable record blocks export rather than silently dropping history. Exports contain personal data and should be shared deliberately. Standalone FIDO resets and logins do not create registration rows; existing Entra registrations are not backfilled.
+
+## Preview 0.5.3: profile compatibility
+
+- Profile editor offers Basic FIDO2 and Managed PIN starting settings, with live requirement descriptions. Basic keeps generated initial PINs while omitting enforced minimum length and forced PIN change; FIDO reset remains a separate explicit choice.
+- Read-only capability discovery runs a bundled, fixed Python script through the installed ykman scripting runtime. No additional Python installation or SDK is required. It reads only the selected USB serial's CTAP GetInfo and device metadata; it never requests a PIN, verifies a PIN, reads credentials or changes a key.
+- Enrollment checks configurable minimum length / forced change, Always UV, enterprise provisioning, PIN limits, reset restrictions and FIDO2 support. Unknown or malformed readings block enrollment. The same checks run again on fresh data before native enrollment. Unsupported settings are never silently dropped or used to rewrite a shared profile.
+- CLI-default checkboxes and generated PIN lengths must be made explicit for verification; existing TOML is preserved until the operator edits it. Current minimum PIN length is a conservative floor even when reset is requested. No destructive probe is used to discover the factory floor.
+- Firmware is checked for identity consistency but is not the feature gate. Native YubiEnroll still performs enrollment and final PIN/complexity checks; platform/IdP support and physical hardware tests remain necessary.
+
+## Preview 0.5.2: interaction polish and USB refresh
+
+- USB arrival/removal automatically refreshes the discovered key list alongside the manual Refresh button. A target disappearing before an operation returns the relevant wizard to key selection and clears reset confirmation. Reconnecting does not restore the old confirmation; another key is never substituted.
+- Device changes during an in-flight discovery invalidate that snapshot. Refresh is deferred while an operation is running, so native reset/enrollment reinsertion prompts keep control of the key.
+- Connect sits beside the tenant selector. An empty tenant list points to Settings → Tenants. Both step indicators have progress connectors.
+- Enrollment uses the same slanted USB-key/plus icon on Home and in navigation; Settings uses an eight-tooth gear. Form fields have extra space beside scrollbars.
+- Activity rows only expand when they contain details. Prerequisites no longer has Technical details; Import / export explains the shared YubiEnroll TOML file, and documentation links share one row.
+
+## Preview 0.5.1: startup requirements and visual refinement
+
+At startup the app checks administrator access, YubiEnroll and a supported YubiKey Manager CLI version. If all checks pass it opens Home automatically. Otherwise the startup screen offers administrator restart and/or Prerequisites. Settings remains accessible. No key is enumerated or modified by these software checks.
+
+Prerequisites groups each tool’s status, download and documentation in its own card. Detection runs automatically when returning to the startup screen or Prerequisites after an installer/browser; it does not reload configuration, discard tenant sign-in or change the selected key. There is no manual Recheck button. Version probes time out after ten seconds. The .NET Desktop Runtime must already be present for the app itself to launch.
+
+The app mark is rendered as a vector inside the UI; the executable contains separately rendered icon sizes. Home cards use neutral resting borders and distinct hover/focus states. Profiles are explicitly described as YubiKey configuration profiles.
+
+## Preview 0.5.0: guided tasks
+
+Home offers two tasks: **Enroll a key** and **Reset FIDO**. Enrollment shows one step at a time: Key → Tenant → User → Review, followed by an explicit result. Reset follows Key → Confirm → Result. Choose a device by model and serial, then use Continue to confirm it. Discovery never chooses a target automatically.
+
+The approved visual system uses `#84BD00` accents, `#0B536F` headings, and one original community key mark. `Assets/App.png` and the multi-resolution executable/taskbar `App.ico` are generated together by `tools/build_icon.py`; `App.svg` describes the same mark. No official Yubico wordmark is included.
+
+Navigation preserves the target and task step without rediscovery. A different confirmed target clears the previous recipient/name. Missing targets never substitute the remaining administrator key. USB changes invalidate readiness and revoke any reset acknowledgment. Reset requires a reviewed serial, explicit acknowledgment and administrator access; native ykman confirmations and same-key reinsertion remain enabled.
+
+The SDK remains deferred. YubiEnroll still performs enrollment and PIN handling. Sign in with the administrator key, disconnect it, and keep only the chosen target connected during enrollment. Fresh inventory checks do not bind the running CLI to a USB serial.
 
 The embedded terminal is enabled by default. Its toggle under Settings → Prerequisites applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
@@ -36,7 +88,7 @@ Only standalone **FIDO reset** is currently available. Additional application-sp
 2. Under **Artifacts**, download `YubiEnroll-UI-win-x64` for an Intel/AMD Windows PC. GitHub may require you to sign in.
 3. Extract the downloaded artifact once. Keep `YubiEnroll.UI.exe` and `YubiEnroll.ConsoleHost.exe` together.
 4. Install the **[.NET 10 Desktop Runtime for Windows x64](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**. Choose **Desktop Runtime**, not just the base .NET Runtime. Visual Studio and the SDK are not required.
-5. Install in the standard location and configure [Yubico YubiEnroll](https://www.yubico.com/products/yubienroll/) separately.
+5. Install in the standard location and configure [Yubico YubiEnroll](https://www.yubico.com/support/download/#h-yubienroll) separately.
 6. Install **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or a newer 5.x release** in its standard location. It is required for target verification, inspection and standalone reset.
 7. Start `YubiEnroll.UI.exe`. The app displays the prerequisites and checks for YubiEnroll at startup.
 
@@ -56,7 +108,7 @@ Application assemblies are bundled into the two executables; the .NET runtime an
 
 If .NET 10 Desktop Runtime x64 is missing, the native .NET launcher reports the missing runtime before the C# window can open and offers a download link. The GUI cannot perform its own check until .NET is available. See [Microsoft startup troubleshooting](https://learn.microsoft.com/en-us/dotnet/core/runtime-discovery/troubleshoot-app-launch).
 
-A missing configuration folder/file is a normal first-run state: the window offers **Add tenant**, without a technical error. Configuration loading and executable discovery run independently, so Settings remains available to configure tenants and recheck prerequisites.
+A missing configuration folder/file is a normal first-run state: the window offers **Add tenant**, without a technical error. Configuration loading and executable discovery run independently, so Settings remains available to configure tenants and resolve prerequisites.
 
 Open **Settings → Activity log** for the failed step, exception type, HRESULT/native Windows error, Windows account, architecture and attempted paths. The log excludes configuration contents, arbitrary exception messages and enrollment console output. It does contain local account names and paths; redact those before posting publicly.
 
@@ -75,31 +127,31 @@ Configuration must belong to the Windows account running the app. Configure prov
 
 ### Add your first tenant
 
-Open **Settings → Tenants → Add tenant** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Select an existing enrollment profile or create a new one. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forcing a PIN change require firmware 5.5+.
+Open **Settings → Tenants → Add tenant** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Configuration profiles are independent: choose one later in the separate Profile step of Set up a key. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forced PIN change require actual CTAP capability support (standard YubiKey 5: generally firmware 5.7+). Use Settings → Profiles → Basic FIDO2 for older keys.
 
-**Save tenant** validates the fields, creates the directory if necessary, and adds the provider/profile. It preserves original configuration text and makes a timestamped `.bak` file before replacing an existing file. Duplicate names and configuration changes since opening the form are rejected. Cancel makes no changes. Close other YubiEnroll sessions while saving; their external writes cannot be locked by this GUI. Close Settings, select the tenant and use **Connect** to activate it and authenticate.
+**Save tenant** validates the fields, creates the directory if necessary, and adds the provider. It preserves original configuration text and makes a timestamped `.bak` file before replacing an existing file. Duplicate names and configuration changes since opening the form are rejected. Cancel makes no changes. Close other YubiEnroll sessions while saving; their external writes cannot be locked by this GUI. Close Settings, select the tenant and use **Connect** to activate it and authenticate.
 
 This form targets Microsoft Entra public cloud. For national clouds, use YubiEnroll’s native provider setup to configure the appropriate endpoints.
 
-The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** shows the executable, version and configuration path, with **Recheck** and the administrator restart fallback. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
+The executable is detected in the standard Yubico installation folder under Program Files. **Settings → Prerequisites** groups installation status and links by tool. Administrator restart is offered on the startup requirements screen when needed. No Yubico executable or configuration containing tenant-specific values is committed to this repository.
 
 ### Manage multiple profiles
 
 Open **Settings → Profiles** to create and edit named profiles. All seven settings are available: reset, minimum PIN length, Always UV, enterprise attestation, forced PIN change, random PIN and random PIN length. Minimum and generated PIN lengths are separate fields. Empty numeric fields and indeterminate checkboxes preserve CLI defaults.
 
-Each tenant can reference a profile; multiple tenants can share the same profile. The editor lists the tenants that use it, since saving changes affects all of them. Choose an existing profile when adding a tenant. Selecting another profile in the main window overrides it for that enrollment without changing the tenant's default. Renaming a profile updates all linked tenant references in the same backed-up save. Remove a profile only after reassigning its linked tenants.
+Profiles are independent of tenants. Choose a compatible profile for each setup in its own wizard step, immediately after selecting the key. The editor shows its PIN/reset requirements. Renaming or deleting a profile also updates or removes legacy native tenant references, but the UI never uses those references to choose a profile automatically.
 
 Profile saves preserve configuration values, including provider endpoints and other profiles. TOML formatting and comments may change; the exact original file is backed up first. Stale saves and duplicate names are rejected. **Reset now follows the selected profile.** A profile with `reset = true` displays a warning and requires confirmation before enrollment. `false` sends `--no-reset`; an omitted setting leaves the native default/prompt intact. The old duplicate reset checkbox has been removed.
 
 ## Enroll a key
 
-1. Open **Enroll key**, choose the intended target by model and serial, and select **Use this key**. Do not select your administrator sign-in key.
-2. Select a tenant and click **Connect**. Complete YubiEnroll’s confirmation and browser sign-in with your administrator key. Successful embedded login returns automatically; the external console requires Enter.
+1. Open **Set up a key**, choose the intended target by model and serial, and select **Continue to profile**, choose a compatible profile, then continue to the tenant. Do not select your administrator sign-in key.
+2. Select a tenant and click **Connect**. Complete browser sign-in with your administrator key. The app verifies and confirms the native login parameters. **Open browser again** reopens the same session; **Cancel sign-in** returns to tenant selection. Sign-in times out after five minutes. Closing the app offers to cancel sign-in; enrollment/reset retain their busy guard.
 3. After sign-in, **disconnect the administrator key and all other security keys**, leaving only the target. The app refreshes on USB changes; **Refresh keys** is also available. User search and registered-key lookup remain available while multiple keys are connected, but enrollment is blocked.
-4. Search for and select the intended recipient. Choose the profile and review the suggested editable key name.
-5. Click **Enroll key**. Review the target serial, tenant, user, profile and reset warning. The app rechecks the inventory before review and after provider activation before launching YubiEnroll.
+4. Search for and select the intended recipient, then review the suggested editable registration name.
+5. Continue to **Review**. Check the target serial, tenant, user, profile and reset warning. Select **Start enrollment** after reviewing the details. The app rechecks the inventory before and after provider activation before launching YubiEnroll.
 6. Keep only the target connected until YubiEnroll finishes. Follow its native PIN, touch and same-key reinsertion prompts. If authentication is requested again, cancel that attempt before reconnecting the administrator key; inspect any uncertain outcome before restarting.
-7. Record any generated PIN securely. Review **Registered keys…** and test sign-in. For the next key, select **Change key** and confirm it; the previous user/name are cleared, while the tenant connection and profile remain.
+7. Record any generated PIN securely. Review **Registered keys…** and test sign-in. For the next key, select **Enroll another key** and confirm the next target; the previous user/name are cleared, while the tenant connection and profile remain.
 
 **The UI does not bind the YubiEnroll process to a USB serial.** YubiEnroll 1.2.0 has no documented USB serial selector. Inventory checks cannot prevent a device swap during the native operation; physical confirmation and the one-key rule remain necessary. The app never disables or modifies the administrator key to hide it from the CLI. SDK-based enrollment is deferred.
 
@@ -107,9 +159,9 @@ Switching tenants or reloading configuration requires Connect again. A successfu
 
 ### Erase a key without enrollment
 
-Open **Overview → Reset FIDO…**. Target verification and this reset feature require **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it blocks enrollment until target verification is available.
+Open **Reset FIDO**. Target verification and this reset feature require **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it blocks enrollment until target verification is available.
 
-Run the GUI as administrator, connect the key via USB, Refresh, and select its model/serial number. Each entry shows the FIDO PIN status read from that key (set, not set, blocked, disabled/unsupported or unknown). No tenant connection or user selection is required. After the GUI confirmation, follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI reloads the connected keys and their PIN status, restoring the same selected key if it is still available. After exit 0 it reports whether the PIN is now unset; an unreadable status stays unknown, and a PIN still present requires inspection. This checks PIN state, not every passkey or cloud registration. A different key is never selected automatically. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
+Run the GUI as administrator, connect the key via USB, Refresh, and select its model/serial number. Each entry shows the FIDO PIN status read from that key (set, not set, blocked, disabled/unsupported or unknown). No tenant connection or user selection is required. Select **Review reset**, check the serial, acknowledge the erasure and select **Erase FIDO passkeys and PIN**. Then follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI reloads the connected keys and their PIN status, restoring the same selected key if it is still available. After exit 0 it reports whether the PIN is now unset; an unreadable status stays unknown, and a PIN still present requires inspection. This checks PIN state, not every passkey or cloud registration. A different key is never selected automatically. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
 
 **This permanently resets all FIDO2/U2F credentials and the FIDO PIN on the selected key, for all accounts. Entra and other service registrations remain and must be removed separately.** PIV, OATH, OpenPGP and OTP are outside this reset. Native restrictions and model-specific warnings still apply (including YubiKey 4 FIPS attestation warnings); if ykman refuses the reset, the GUI does not bypass it. Read [Yubico's FIDO reset documentation](https://docs.yubico.com/software/yubikey/tools/ykman/FIDO_Commands.html).
 
@@ -129,21 +181,23 @@ When enrollment fails or its console is closed early, a credential may already h
 
 ## Elevation
 
-The GUI starts with normal user rights. Yubico documents that YubiEnroll requests elevation when needed. If that does not work in your environment, **Settings → Prerequisites → Restart as administrator** provides an explicit fallback (equivalent to starting the app elevated).
+The GUI starts with the current Windows rights. If it is not elevated, the startup requirements screen offers **Restart as administrator** before key tasks are available. This opens the Windows UAC prompt. Cancelling leaves the existing app open; successful process launch closes the old instance. Settings remains accessible without elevation.
 
 If UAC uses a different Windows administrator account, the new process sees that account's `%APPDATA%`, configuration and authentication state. No configuration or tokens are copied between accounts. Recheck the tenant banner after restarting.
 
 ## Preview limitations
 
 - Entra ID only; other provider types are not shown.
-- Multiple tenants and profiles can be created and edited under Settings. Names can be changed, including spaces. Profile renaming updates linked tenants; tenant renaming updates active_provider. Tenants can be removed locally; a profile must be unassigned from all tenants before removal. Tenant edits preserve custom cloud endpoints; configure those through native setup or import.
+- Multiple tenants and profiles can be created and edited under Settings. Names can be changed, including spaces. Tenant renaming updates active_provider. Tenants and profiles can be removed locally; deleting a profile clears any legacy native tenant references. Tenant edits preserve custom cloud endpoints; configure those through native setup or import.
 - Search parsing accepts GUID-first table rows and `ID:` blocks. It intentionally rejects unknown formats. Unrecognized output is not used for enrollment; real output from the installed YubiEnroll version still needs validation.
-- No automated bulk enrollment, cloud credential deletion or automatic PIN delivery. A temporary batch register with protected PIN handover is tracked separately in issue #19 and is not implemented in this preview. Overview inspects connected serial-addressable FIDO keys. Enrollment requires only the confirmed target to remain connected; multiple keys are permitted for login and serial-targeted standalone reset.
+- No automated bulk enrollment, cloud credential deletion or automatic PIN delivery. The optional registration log records issuance metadata and exports CSV; generated initial PINs are included only when enabled. Key selection lists connected serial-addressable FIDO keys. Enrollment requires only the confirmed target to remain connected; multiple keys are permitted for login and serial-targeted standalone reset.
 - One operation at a time within each GUI window. **Do not use a second GUI instance or another YubiEnroll session concurrently:** the CLI has a shared active provider. Configuration checks detect changes before commands but cannot lock out external tools.
-- No persistent audit file or telemetry. Activity can contain user and tenant identifiers; redact them before sharing screenshots or bug reports. The official CLI's own logging settings are outside this GUI's control.
+- No telemetry. The optional registration log persists issuance records separately from the session-only activity log. Activity can contain user and tenant identifiers; redact them before sharing screenshots or bug reports. The official CLI's own logging settings are outside this GUI's control.
 - Closing the console prematurely is treated as unsuccessful/unknown; wait for the CLI result and press Enter instead.
 
 ## Build from source
+
+The product is **YubiEnroll UI**, published by **Rory Vossepoel**. For optional self-signed internal builds, see [internal code signing](docs/SIGNING.md). Standard GitHub preview downloads remain unsigned.
 
 On Windows, install the .NET 10 SDK, then run:
 
@@ -167,13 +221,13 @@ GUI and helper source: [MIT](LICENSE). YubiEnroll is installed separately and re
 
 ## Yubico workflow reference
 
-The interface follows Yubico's [Entra provider setup](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#adding-microsoft-entra-id), [profile creation](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#creating-enrollment-profiles) and [profile setting descriptions](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#profile-settings). Minimum PIN length, Always UV and forced PIN change require firmware 5.5+. First-use PIN-change prompting also depends on the end user's platform. Omitted reset is treated as potentially destructive rather than assuming a safe default.
+The interface follows Yubico's [Entra provider setup](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#adding-microsoft-entra-id), [profile creation](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#creating-enrollment-profiles) and [profile setting descriptions](https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html#profile-settings). Minimum PIN length, Always UV and forced PIN change are validated using the selected key’s reported capabilities, not a universal firmware threshold. First-use PIN-change prompting also depends on the end user's platform. Omitted reset is treated as potentially destructive rather than assuming a safe default.
 
 
 ## Earlier previews (historical)
 
 ### Preview 0.4.1 polish
-Overview focuses on the connected key; Key Management shares its selection and refreshes after USB changes. Settings contains Help & About and one session Activity log. Registered keys open beside the selected user in their own dialog. The embedded terminal is now the default; successful login returns automatically. Native confirmations remain and enrollment device targeting is still performed by YubiEnroll. The app icon is an original community-project asset, not a Yubico mark.
+Overview focuses on the connected key; Key Management shares its selection and refreshes after USB changes. Settings contains Help & About and one session Activity log. Registered keys open beside the selected user in their own dialog. The embedded terminal is now the default; successful login returns automatically. Native key-operation confirmations remain and enrollment device targeting is still performed by YubiEnroll. The app icon is an original community-project asset, not a Yubico mark.
 
 
 ### Preview 0.4.2 polish

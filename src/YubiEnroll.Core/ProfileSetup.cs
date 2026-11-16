@@ -103,10 +103,11 @@ public static class ProfileConfigWriter
     public static string Remove(string text, string name)
     {
         Read(text, name);
-        if (ConfigReader.Parse(text).Providers.Any(x => x.Profile == name))
-            throw new InvalidOperationException("This profile is used by tenants. Assign a different profile to those tenants before removing it.");
         var model = Model(text);
         Profiles(model).Remove(name);
+        if (model.TryGetValue("providers", out var value) && value is TomlTable tenants)
+            foreach (var tenant in tenants.Values.OfType<TomlTable>())
+                if (tenant.TryGetValue("profile", out var reference) && reference is string p && p == name) tenant.Remove("profile");
         return Toml.FromModel(model);
     }
 }

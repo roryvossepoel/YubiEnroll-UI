@@ -8,10 +8,15 @@ namespace YubiEnroll.UI;
 
 public partial class SettingsWindow : Window
 {
+    public event Action? PrerequisitesOpened;
+    private void SettingsTab_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.Source == SettingsTabs && Feedback != null) Feedback.Text = "";
+        if (e.Source == SettingsTabs && SettingsTabs.SelectedIndex == 2) PrerequisitesOpened?.Invoke();
+    }
     private readonly string _path;
     private ConfigSnapshot? _importSnapshot;
     private string? _importText;
-    public event Action? Finished;
     private void TenantFilter_Changed(object sender, TextChangedEventArgs e)
     {
         if (TenantList?.ItemsSource == null) return;
@@ -19,25 +24,34 @@ public partial class SettingsWindow : Window
     }
     private Window DialogOwner => Owner ?? this;
     public bool EmbeddedTerminal { get => EmbeddedChoice.IsChecked == true; set => EmbeddedChoice.IsChecked = value; }
-    private sealed record ProfileRow(string Name, string[] Tenants)
-    {
-        public string Usage => Tenants.Length == 0 ? "Not assigned to a tenant" : $"Used by {Tenants.Length} tenant(s)";
-    }
+    private sealed record ProfileRow(string Name, string Usage);
     public bool Changed { get; private set; }
-    public bool RecheckRequested { get; private set; }
-    public bool ElevationRequested { get; private set; }
 
-    public SettingsWindow(string path, string executable, string version)
+    public SettingsWindow(string path, string executable, string version, RegistrationJournal? registrationJournal = null)
     {
         _path = path;
         InitializeComponent();
+        RegistrationHost.Content = new RegistrationLogView(registrationJournal ?? new RegistrationJournal(RegistrationJournal.DefaultSettingsPath));
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
-        ExecutableInfo.Text = executable;
-        ConfigurationInfo.Text = path;
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
-        AccessInfo.Text = "Running with administrative permissions: " + (new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator) ? "Yes" : "No");
-        ManagerInfo.Text = KeyResetService.FindExecutable().Length == 0 ? "YubiKey Manager CLI: missing (required for target verification)" : "YubiKey Manager CLI: installed; version and device access checked on Overview.";
+        RuntimeVersion.Text = "Version " + Environment.Version;
         Attempt(RefreshLists);
+    }
+
+    internal void SetRequirements(RequirementReport report)
+    {
+        Set(EnrollmentStatusPill, EnrollmentStatus, VersionInfo, report.Enrollment);
+        Set(ManagerStatusPill, ManagerStatus, ManagerInfo, report.Manager);
+        static void Set(Border pill, TextBlock status, TextBlock version, RequirementCheck check)
+        {
+            status.Text = check.Ready ? "Installed" : check.Detail == "Not installed" ? "Not installed" : "Check required";
+            var match = System.Text.RegularExpressions.Regex.Match(check.Detail, @"version (\d+\.\d+\.\d+)");
+            version.Text = match.Success ? "Version " + match.Groups[1].Value : "—";
+            ((Border)version.Parent).SetValue(VisibilityProperty, match.Success ? Visibility.Visible : Visibility.Collapsed);
+            pill.ToolTip = check.Detail;
+            if (!check.Ready) { pill.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 242, 225)); status.Foreground = System.Windows.Media.Brushes.SaddleBrown; }
+            else { pill.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#EAF4D6")!; status.Foreground = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#305A14")!; }
+        }
     }
 
     private void Attempt(Action action)
@@ -54,8 +68,19 @@ public partial class SettingsWindow : Window
         var config = ConfigReader.Parse(ConfigSnapshot.Read(_path).Text ?? "");
         TenantList.ItemsSource = config.Providers.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         TenantFilter_Changed(this, null!);
-        ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, config.Providers.Where(t => t.Profile == p.Name).Select(t => t.Name).ToArray()));
+        ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, ProfileDescription(ProfileConfigWriter.Read(ConfigSnapshot.Read(_path).Text ?? "", p.Name))));
         Feedback.Text = "";
+    }
+
+    private static string ProfileDescription(ProfileSetup p)
+    {
+        var lines = new List<string> { p.Reset == true ? "Reset FIDO before setup" : p.Reset == false ? "Keep existing FIDO credentials" : "Reset: not specified" };
+        lines.Add(p.RandomPin == true ? $"Generate PIN{(p.RandomPinLength is { } length ? $" · {length} characters" : "")}" : "Use an existing or manually entered PIN");
+        if (p.ForcePinChange == true) lines.Add("Change PIN on first use");
+        if (p.MinPinLength is { } minimum) lines.Add($"Minimum PIN length: {minimum}");
+        if (p.RequireAlwaysUv == true) lines.Add("Always require user verification");
+        if (p.RequireEa == true) lines.Add("Enterprise attestation");
+        return string.Join("\n", lines);
     }
 
     private void Selection_Changed(object sender, SelectionChangedEventArgs e)
@@ -84,8 +109,6 @@ public partial class SettingsWindow : Window
         Changed = true;
         RefreshLists();
     });
-    private void Recheck_Click(object sender, RoutedEventArgs e) { RecheckRequested = true; Finish(); }
-    private void Elevate_Click(object sender, RoutedEventArgs e) { ElevationRequested = true; Finish(); }
 
     private void Export_Click(object sender, RoutedEventArgs e) => Attempt(() =>
     {
@@ -146,7 +169,6 @@ public partial class SettingsWindow : Window
         Feedback.Text = "Configuration imported. Reconnect to a tenant. " + (backup == null ? "No previous file needed backup." : "Backup: " + backup);
     }
 
-    private void Finish() { if (IsVisible) Close(); else Finished?.Invoke(); }
     private void CancelImport_Click(object sender, RoutedEventArgs e)
     {
         _importText = null; _importSnapshot = null; ImportReview.Visibility = Visibility.Collapsed; ImportButton.IsEnabled = false;
@@ -170,7 +192,7 @@ public partial class SettingsWindow : Window
     {
         if (ProfileList.SelectedItem is not ProfileRow profile) return;
         var snapshot = ConfigSnapshot.Read(_path);
-        var result = ProfileConfigWriter.Remove(snapshot.Text ?? "", profile.Name); // Refuses linked profiles before confirmation.
+        var result = ProfileConfigWriter.Remove(snapshot.Text ?? "", profile.Name);
         if (MessageBox.Show(DialogOwner, $"Remove '{profile.Name}' from local configuration?\n\nPreviously prepared keys and registered credentials are not changed.", "Remove profile", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         ConfigFileWriter.Save(snapshot, result);
         Changed = true; RefreshLists();

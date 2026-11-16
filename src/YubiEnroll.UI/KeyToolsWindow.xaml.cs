@@ -209,9 +209,9 @@ public partial class KeyToolsWindow : Window
     {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://developers.yubico.com/yubikey-manager/") { UseShellExecute = true });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://developers.yubico.com/yubikey-manager/Releases/") { UseShellExecute = true });
         }
-        catch { StatusText.Text = "Open https://developers.yubico.com/yubikey-manager/ in your browser to get the official Windows installer."; }
+        catch { StatusText.Text = "Open https://developers.yubico.com/yubikey-manager/Releases/ in your browser to get the official Windows installer."; }
     }
 
     private void Finish() { if (IsVisible) Close(); else Finished?.Invoke(); }

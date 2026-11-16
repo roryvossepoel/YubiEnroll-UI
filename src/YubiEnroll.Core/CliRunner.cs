@@ -20,7 +20,11 @@ public sealed class CliRunner(string executable)
     }
 
     // Only used for version, activation and read-only queries. Interactive enrollment/reset is never timed out or auto-retried.
-    public async Task<CliResult> CaptureAsync(params string[] arguments)
+    public Task<CliResult> CaptureAsync(params string[] arguments) => CaptureWithTimeoutAsync(TimeSpan.FromMinutes(2), arguments);
+
+    public Task<CliResult> CaptureWithTimeoutAsync(TimeSpan maximumWait, params string[] arguments) => CaptureWithInputAsync(maximumWait, null, arguments);
+
+    public async Task<CliResult> CaptureWithInputAsync(TimeSpan maximumWait, string? input, params string[] arguments)
     {
         var info = StartInfo(Executable, arguments);
         info.CreateNoWindow = true;
@@ -28,17 +32,21 @@ public sealed class CliRunner(string executable)
         info.RedirectStandardError = true;
         info.RedirectStandardInput = true;
         using var process = Process.Start(info) ?? throw new IOException("Cannot start the Yubico command-line tool.");
-        process.StandardInput.Close();
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-        try { await process.WaitForExitAsync(timeout.Token); }
+        using var timeout = new CancellationTokenSource(maximumWait);
+        try
+        {
+            if (input != null) await process.StandardInput.WriteAsync(input.AsMemory(), timeout.Token);
+            process.StandardInput.Close();
+            await process.WaitForExitAsync(timeout.Token);
+        }
         catch (OperationCanceledException)
         {
             try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             await process.WaitForExitAsync();
             await Task.WhenAll(stdout, stderr);
-            throw new TimeoutException("The Yubico command-line tool did not respond within two minutes.");
+            throw new TimeoutException($"The Yubico command-line tool did not respond within {maximumWait.TotalSeconds:0} seconds.");
         }
         return new(process.ExitCode, await stdout, await stderr);
     }

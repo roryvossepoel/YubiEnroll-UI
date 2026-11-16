@@ -4,7 +4,7 @@ namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
-    private async Task CheckEnrollmentTargetAsync(ResetKey target)
+    private async Task CheckEnrollmentTargetAsync(ResetKey target, ProfileSetup profile)
     {
         if (_choosingTarget || _selectedKey?.Key != target)
             throw new InvalidOperationException("Confirm the target key before starting enrollment.");
@@ -14,12 +14,20 @@ public partial class MainWindow
         var runner = new CliRunner(executable);
         var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
         InvalidateDeviceInventory();
+        var generation = _deviceGeneration;
         try
         {
             await service.CheckVersionAsync();
             var inventory = await service.DiscoverAsync();
-            ApplyInventory(inventory.Keys.Select(k => new KeyStatus(k, _knownKeys.FirstOrDefault(x => x.Key == k)?.Pin ?? FidoPinState.Unknown)).ToArray(), inventory.Unavailable);
             EnrollmentTargetGuard.Require(target, inventory);
+            var pin = await service.ReadPinStateAsync(target);
+            var capabilities = await FidoCapabilityProbe.ReadAsync(runner, target);
+            if (!TryApplyInventory(inventory.Keys.Select(k => k == target ? new KeyStatus(k, pin, capabilities) : new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation))
+                throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
+            var compatibility = _addPasskey ? PasskeyAddition.Evaluate(capabilities, pin) : ProfileCompatibility.Evaluate(profile, capabilities, pin);
+            if (_addPasskey && profile != PasskeyAddition.Settings(capabilities))
+                throw new InvalidOperationException("The key settings changed. Review the key again before adding a passkey.");
+            if (!compatibility.Compatible) throw new InvalidOperationException(compatibility.Message);
         }
         catch
         {

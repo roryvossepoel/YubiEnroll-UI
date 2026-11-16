@@ -1,6 +1,53 @@
-# Manual acceptance checks for preview 0.4.3
+# Manual acceptance checks for preview 0.5.4
 
-## Preview 0.4.3: current acceptance workflow
+## Preview 0.5.4: registration records
+
+- Start with logging off: perform enrollment, login and standalone reset. No registration files should be created. Existing records remain readable when disabled.
+- Enable logging under Settings → Registration log and select a writable folder. Restart with the same Windows account and confirm the saved preference. Elevation into a different account must not reuse the original account's history silently.
+- Enroll two disposable keys for different test users and tenants. Compare each record with its original review, especially serial, UPN versus email, profile, reset and first-use PIN flags. Check the actual CLI table format; missing identity fields must never be guessed.
+- Cancel or interrupt enrollment. Confirm it is not labelled successful; check Entra before retrying because a partial registration may exist. Simulate app termination after native launch: the saved attempt must remain unknown.
+- Deny folder write access before enrollment: the command must not start. Deny access after it starts: a successful native result must remain successful while the app clearly reports the unsaved log and offers save-only retry. Restore access, retry and verify one row with the same attempt ID. Navigate to another key while a result is pending; closing must warn about losing its final result. Do not use production keys for this test.
+- Export all rows and then filter by tenant, date and success. Compare CSV row counts and details in Excel, including names with accents/commas and serial numbers with leading zeroes. With PIN storage off, confirm no PIN is present. Enable generated-PIN storage, enroll a disposable key and confirm its generated PIN appears in the same JSON record and CSV. Existing PINs, tokens and console transcripts must never appear.
+- Inspect the Registration log tab at small window sizes and 100/150/200% scale; fields/actions must remain reachable. Confirm existing tenant/profile tabs are unchanged.
+
+## Preview 0.5.3: profile compatibility
+
+- Create Basic FIDO2 and Managed PIN profiles. Basic must omit `min_pin_length`, keep `force_pin_change = false`, and independently permit explicit reset. Verify live requirements update while editing; existing profiles and tenant assignments must not change without Save.
+- On a 5.1.2/5.4.x standard key, basic profile must pass if PIN/reset state permits; a managed profile must identify unsupported minimum policy / forced change and disable enrollment.
+- On a supporting 5.7 key, managed profile must pass; requiring enterprise attestation must fail unless provisioned, regardless of firmware.
+- Test the key's reported minimum and (Bio multi-protocol) maximum PIN lengths; do not assume every FIDO key has a 4-character floor or a 63-character maximum. Never test reset on a production Bio/PIV key.
+- Unplug/replug, deny device access or close ykman during inspection: no stale compatible result may enable enrollment. Profile change must immediately re-evaluate. No PIN prompt/touch request or mutation is permitted during inspection.
+- Check a profile with unspecified checkboxes: save remains possible without changing the shared TOML; enrollment explains that explicit values are needed.
+- Before real enrollment, verify two-key admin authentication then target-only preflight. No PIN or credential payload may appear in the activity log.
+
+## Preview 0.5.2: USB refresh and UI acceptance
+
+- With a reviewed target on Reset FIDO, unplug it: automatic discovery must empty/update the key list, return to Key and remove the destructive action. The old checkbox approval must be cleared.
+- Reconnect the same key, or connect another key while the target is missing: a fresh choice/review is required. Never substitute the administrator key. Repeat during enrollment review; tenant login may remain but the target must be confirmed again.
+- Quickly plug/unplug during a refresh: stale discovery output must not re-enable actions. Check the manual Refresh button still works.
+- During an actual native reset/enrollment, follow its unplug/reinsert prompts: automatic discovery must wait until the running operation releases the key. Verify the result remains visible afterward.
+- Inspect Connect beside the tenant selector, no-tenants guidance, progress connectors, the enrollment/gear icons, and extra scrollbar spacing in tenant/profile editors.
+- Activity entries without details have no disclosure arrow; real diagnostic entries can still expand. Confirm Copy/Export still includes details.
+
+## Preview 0.5.1: startup and visual acceptance
+
+- Launch as a standard user: the startup requirements screen explains administrator access and offers restart. Cancel UAC and verify that the same app remains open with a readable cancellation message. Retry, including a different administrator account, and verify that only the new account’s configuration is loaded.
+- Launch elevated with both supported tools: go directly to Home, without key discovery. Missing or unsupported tools must route task navigation to requirements while Settings stays accessible.
+- Install a missing tool in its standard location, then return to the app: the card updates automatically. No Recheck button is required. Open Home to continue when all checks pass.
+- Confirm that returning from documentation does not discard tenant login, user selection or target identity. No enrollment or reset may start from a software check.
+- Check Home, navigation, logo, titlebar and taskbar at 100%, 125%, 150% and 200% Windows scale. The app mark must be the same shape everywhere, with crisp contours. Cards have matching neutral borders at rest and visible hover/keyboard focus.
+- Prerequisites has two tool cards with status/download/docs; no administrator status or restart controls. Terminal preferences remains expandable; Technical details is removed. Profiles explains the key PIN/reset scope.
+
+## Preview 0.5.0: current acceptance workflow
+
+- Home shows only two task choices. Enroll key and Reset FIDO each show one step at a time. Settings stays reachable before operations.
+- Continue is disabled before explicit key selection. Tenant/user gates cannot be skipped by keyboard or event invocation. Back and navigation preserve the confirmed target without rediscovery.
+- Review shows the selected target, tenant, recipient, profile/name and current reset warning. The final action is disabled for multiple/unidentified devices, a disconnected target or changed configuration.
+- Reset review captures the selected serial. It requires acknowledgment and administrator rights; a device change revokes acknowledgment. No reset occurs merely by entering Confirm or going Back.
+- Verify result messages for success, failure, cancellation and unknown PIN read-back. Another key begins with no selection and clears the previous recipient. Native operations are never retried automatically.
+- Compare Home, both key selectors, every intermediate step and both results at small and large window sizes and Windows 100/150/200% scaling. Use the same icon at sidebar, title bar, taskbar and executable.
+
+## Preview 0.4.3: earlier acceptance workflow
 
 Earlier version sections below are historical checks; use this workflow for the current navigation.
 
@@ -22,7 +69,7 @@ Use a test tenant/user and a spare key. Record the Windows architecture, YubiEnr
 | Check | Expected result |
 |---|---|
 | Missing .NET Desktop Runtime 10 x64 | On a clean test machine, the native launcher reports the missing runtime and offers a download before the GUI opens. Install the runtime, then restart. |
-| Missing YubiEnroll | Prerequisite status says it is not located; install it in the standard folder, then use Settings → Prerequisites → Recheck. |
+| Missing YubiEnroll | Prerequisite status says it is not located; install it in the standard folder, then return to Settings → Prerequisites for automatic detection. |
 | Missing config | Window points to Settings → Tenants → Add tenant without an exception; cancellation leaves the configuration absent. |
 | Add tenant | Invalid IDs/redirect/PIN length stay in the form; valid values save and load the tenant and selected profile. |
 | Existing configuration | Add a second tenant; existing text and active provider remain intact; a backup contains the original. |
@@ -129,3 +176,24 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Verify real Connect output remains visible before browser authentication completes. The app must provide a waiting message even when the CLI has not emitted output. Test real enrollment prompts, hidden PIN input and generated PIN visibility using a disposable key. External console remains an explicit fallback; never auto-retry a started operation.
 
 Automated regressions include live terminal text before input/process exit, actual native YubiEnroll `--help` through the published renderer (no authentication), both native window icon sizes, hosted fonts, direct Activity navigation and editable name suggestions. Physical browser sign-in and taskbar shell caching remain manual checks.
+
+
+## Preview 0.5.5 hardware acceptance
+
+1. Create a tenant without profiles, then independently create Basic and Managed profiles. Change tenants and verify profile choice is not replaced by a tenant default.
+2. Use older and newer firmware: incompatible profiles remain visible with reasons; no transition to Review is allowed. Review has no editable profile/name fields.
+3. Enroll through a supported profile and check the existing native reset confirmation, result and optional registration journal.
+4. On a test key with existing credentials and a known PIN, use Add a passkey for another account/tenant. Set a destructive native default profile on that tenant first. Confirm the temporary explicit profile has reset/random PIN/forced PIN change disabled and the detected minimum PIN length preserved. Verify the existing PIN and original credentials still work and Always UV remains unchanged. Repeat with Always UV enabled, including a supporting locked-UV key. Check registration log flags are false/false.
+5. A missing/blocked PIN or existing force-PIN-change state must block Add a passkey. Device removal and additional connected keys must block both tasks without silently selecting another key.
+6. Check all three task cards, five-step setup and four-step addition at 100%, 150%, 200% scale and narrow window sizes. Confirm the reset label is white when enabled and readable gray when disabled.
+7. Verify failure/cancellation never repeats the native operation. Temporary-profile cleanup must not overwrite concurrent configuration edits; native outcomes and log retry must remain available.
+
+
+## Preview 0.5.6 acceptance
+
+- Setup order is Key → Profile → Tenant → User → Review; profiles are selectable before login. Add a passkey has no profile step and preserves the existing key settings.
+- Connect to a test tenant: there is no manual `y` prompt. Close the browser, reopen it using the button, then cancel. Connect again successfully. Also close the app during sign-in and test the five-minute timeout. Enrollment and reset remain protected against accidental cancellation.
+- The dedicated sign-in screen currently verifies the standard Microsoft public-cloud endpoints; a custom endpoint produces a configuration message instead of being silently approved.
+- Enable registration logging and generated-PIN storage, use a disposable setup key and confirm the PIN appears in its JSON record, detail view and CSV. Repeat with PIN storage off and with Add a passkey: no existing PIN must be captured. Confirm leading zeroes survive CSV import. PIN logging selects the in-app terminal even if the external-console preference is set.
+- Inspect each Settings tab at normal and compact widths: matching title/description spacing, readable profile names and tenant IDs, pill status/version labels and aligned log filters. Verify both CLI links and the .NET links open the documented destinations without tracking parameters.
+- In Help & About, check updates while online and offline. Until releases are published, expect “No releases published yet.” Verify a newer published preview appears when available; checking never downloads or installs an update.

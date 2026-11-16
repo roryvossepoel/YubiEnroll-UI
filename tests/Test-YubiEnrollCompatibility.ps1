@@ -13,12 +13,18 @@ $exe = (Get-ChildItem $destination -Filter yubienroll.exe -Recurse -File | Selec
 if (-not $exe) { throw 'YubiEnroll executable not found in extracted package' }
 & $exe --version
 if ($LASTEXITCODE -ne 0) { throw 'YubiEnroll version check failed' }
+# Login has no force option; our dedicated screen uses the documented browser suppression flag.
+$loginHelp = & $exe login --help 2>&1
+if ($LASTEXITCODE -ne 0 -or ($loginHelp -join "`n") -notmatch '--no-launch-browser') { throw 'Missing native login browser option' }
 # Confirm the documented enrollment contract against the exact supported executable.
 $enrollmentHelp = & $exe credentials add --help 2>&1
 $enrollmentHelpCode = $LASTEXITCODE
 $enrollmentHelp | Write-Output
 if ($enrollmentHelpCode -ne 0 -or ($enrollmentHelp -join "`n") -notmatch '--profile' -or ($enrollmentHelp -join "`n") -notmatch '--reader') {
     throw 'Unexpected native enrollment command interface; review target-selection compatibility'
+}
+foreach ($option in @('--no-reset', '--no-random-pin', '--no-force-pin-change', '--no-require-always-uv', '--no-require-ea')) {
+    if (($enrollmentHelp -join "`n") -notmatch [regex]::Escape($option)) { throw "Missing add-passkey option $option" }
 }
 # Exercise the real native program through the published terminal renderer, without sign-in.
 $terminalArgs = '--terminal-check "' + $exe + '"'
@@ -51,6 +57,9 @@ try {
     if ($profilesText -notmatch 'UI-test-profile\s+6\s+False\s+False\s+True\s+True\s+True\s+6' -or
         $profilesText -notmatch 'Second profile\s+8\s+False\s+False\s+False\s+False\s+True\s+10') {
         throw 'CLI did not read all seven edited profile settings and the independent second profile'
+    }
+    if ($profilesText -notmatch 'Preserve existing key\s+4\s+False\s+False\s+False\s+False\s+False\s+4') {
+        throw 'Native preservation profile did not retain the detected PIN floor with reset, random PIN, forced change and UV changes disabled'
     }
     & ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe --rename-fixture-config $legacy
     if ($LASTEXITCODE -ne 0) { throw 'Rename fixture failed' }

@@ -1,40 +1,48 @@
-<Window x:Class="YubiEnroll.UI.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Settings — YubiEnroll" Width="820" Height="650" MinWidth="680" MinHeight="520" WindowStartupLocation="CenterOwner" Background="#F5F7FA" Foreground="#172B41" FontFamily="Segoe UI" FontSize="14">
+<Window UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" Icon="pack://application:,,,/Assets/App.ico" x:Class="YubiEnroll.UI.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Settings — YubiEnroll" Width="1000" Height="760" MinWidth="680" MinHeight="520" WindowStartupLocation="CenterOwner" Background="#F5F7FA" Foreground="#172B41" FontFamily="Segoe UI" FontSize="14">
  <DockPanel TextElement.FontFamily="Segoe UI" TextElement.FontSize="14" TextElement.Foreground="#263238" Margin="28">
-  <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20"><TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Manage tenants, configuration profiles and application preferences." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,0"/></StackPanel>
+  <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20"><TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/><TextBlock Text="Manage tenants, configuration profiles and application preferences." TextWrapping="Wrap" Foreground="#617084" Margin="0,6,0,0"/></StackPanel>
   <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0"><TextBlock x:Name="Feedback" TextWrapping="Wrap" Foreground="#526277" VerticalAlignment="Center"/></DockPanel>
-  <TabControl x:Name="SettingsTabs">
+  <TabControl x:Name="SettingsTabs" SelectionChanged="SettingsTab_Changed">
    <TabItem Header="Tenants"><DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Configure tenants here. Connect to a tenant on the Enroll key page." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock DockPanel.Dock="Top" Text="Tenants" Style="{StaticResource SettingsTitle}"/><TextBlock DockPanel.Dock="Top" Text="Manage the Microsoft Entra tenants available for registration." Style="{StaticResource SettingsDescription}"/>
     <WrapPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="Add tenant" Click="AddTenant_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="EditTenantButton" Content="Edit tenant" Click="EditTenant_Click" IsEnabled="False"/><Button x:Name="RemoveTenantButton" Content="Remove" Click="RemoveTenant_Click" IsEnabled="False"/></WrapPanel>
-    <TextBox x:Name="TenantFilter" DockPanel.Dock="Top" TextChanged="TenantFilter_Changed" ToolTip="Search tenants by name" AutomationProperties.Name="Search tenants" Margin="0,0,0,12"/>
+    <Grid DockPanel.Dock="Top" Margin="0,0,0,16"><TextBox x:Name="TenantFilter" TextChanged="TenantFilter_Changed" ToolTip="Search tenants by name" AutomationProperties.Name="Search tenants"/><TextBlock Text="Search tenants…" Foreground="{StaticResource Muted}" Margin="10,0" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=TenantFilter}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
     <ListBox x:Name="TenantList" SelectionChanged="Selection_Changed" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-     <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="10"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Profile, StringFormat=Profile: {0}}" Foreground="#617084" Margin="0,4,0,0"/><TextBlock Text="{Binding TenantId}" Foreground="#7A8796" FontSize="11" Margin="0,4,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+     <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="10"><TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="{Binding TenantId}" Foreground="{StaticResource Muted}" FontSize="13" Margin="0,4,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
     </ListBox>
    </DockPanel></TabItem>
-   <TabItem Header="Profiles"><DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Profiles can be shared by multiple tenants." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+   <TabItem Header="Profiles"><DockPanel Margin="18"><TextBlock DockPanel.Dock="Top" Text="Configuration profiles" Style="{StaticResource SettingsTitle}"/>
+    <TextBlock DockPanel.Dock="Top" Text="Create reusable key settings. Choose a compatible profile when setting up each key." Style="{StaticResource SettingsDescription}"/>
     <WrapPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="New profile" Click="NewProfile_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="EditProfileButton" Content="Edit profile" Click="EditProfile_Click" IsEnabled="False"/><Button x:Name="RemoveProfileButton" Content="Remove" Click="RemoveProfile_Click" IsEnabled="False"/></WrapPanel>
-    <ListBox x:Name="ProfileList" SelectionChanged="Selection_Changed" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Usage}" Foreground="#617084" FontSize="12" Margin="0,5,0,8"/><ItemsControl ItemsSource="{Binding Tenants}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Background="#E7F1F2" CornerRadius="12" Padding="9,4" Margin="0,0,6,6"><TextBlock Text="{Binding}" MaxWidth="300" TextWrapping="Wrap" Foreground="#175C61" FontSize="12"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></DataTemplate></ListBox.ItemTemplate><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="12"/></Style></ListBox.ItemContainerStyle></ListBox>
+    <ListBox x:Name="ProfileList" SelectionChanged="Selection_Changed" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="{Binding Usage}" TextWrapping="Wrap" Foreground="#617084" FontSize="13" Margin="0,8,0,4"/></StackPanel></DataTemplate></ListBox.ItemTemplate><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="12"/></Style></ListBox.ItemContainerStyle></ListBox>
    </DockPanel></TabItem>
    <TabItem Header="Prerequisites"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
-    <TextBlock Text="Installed components &amp; access" Style="{StaticResource SectionTitle}"/>
-    <TextBlock x:Name="VersionInfo" Margin="0,12,0,12" TextWrapping="Wrap"/>
-    <TextBlock x:Name="ManagerInfo" TextWrapping="Wrap" Margin="0,0,0,12"/>
-    <TextBlock x:Name="AccessInfo" TextWrapping="Wrap" Margin="0,0,0,16"/>
-    <TextBlock Text="YubiEnroll is required for enrollment. YubiKey Manager CLI 5.9.2+ (5.x) is required for target verification, key inspection and FIDO reset." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
-    <WrapPanel Margin="0,0,0,12"><Button Content="Get YubiEnroll" Tag="https://www.yubico.com/products/yubienroll/" Click="Link_Click"/><Button Content="Get YubiKey Manager CLI" Tag="https://developers.yubico.com/yubikey-manager/" Click="Link_Click"/></WrapPanel>
-    <WrapPanel><Button Content="Recheck" Click="Recheck_Click"/><Button Content="Restart as administrator" Click="Elevate_Click"/></WrapPanel>
-    <TextBlock Text="Interactive console" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
+    <TextBlock Text="Required software" Style="{StaticResource SettingsTitle}"/>
+    <TextBlock Text="Install the tools and desktop runtime below. Tool detection refreshes when you return to the app." Style="{StaticResource SettingsDescription}"/>
+    <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,0,0,12"><StackPanel>
+     <DockPanel><WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0"><Border x:Name="EnrollmentStatusPill" Style="{StaticResource StatusPill}"><TextBlock x:Name="EnrollmentStatus" Text="Checking…" FontSize="12"/></Border><Border Style="{StaticResource VersionPill}"><TextBlock x:Name="VersionInfo" Text="—" Foreground="{StaticResource Heading}" FontSize="12"/></Border></WrapPanel><TextBlock Text="YubiEnroll CLI" Style="{StaticResource SectionTitle}" TextWrapping="Wrap"/></DockPanel>
+     <TextBlock Text="Registers the key in Entra and applies your PIN and configuration profile settings." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,12"/>
+     <WrapPanel><Button Content="Download YubiEnroll CLI" Tag="https://www.yubico.com/support/download/#h-yubienroll" Click="Link_Click"/><Button Content="Documentation" Style="{StaticResource QuietButton}" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/index.html" Click="Link_Click"/></WrapPanel>
+    </StackPanel></Border>
+    <Border Style="{StaticResource Card}" Padding="20,16"><StackPanel>
+     <DockPanel><WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0"><Border x:Name="ManagerStatusPill" Style="{StaticResource StatusPill}"><TextBlock x:Name="ManagerStatus" Text="Checking…" FontSize="12"/></Border><Border Style="{StaticResource VersionPill}"><TextBlock x:Name="ManagerInfo" Text="—" Foreground="{StaticResource Heading}" FontSize="12"/></Border></WrapPanel><TextBlock Text="YubiKey Manager CLI (ykman)" Style="{StaticResource SectionTitle}" TextWrapping="Wrap"/></DockPanel>
+     <TextBlock Text="Identifies connected keys, reads their PIN status and resets FIDO. Requires version 5.9.2 or newer within 5.x." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,12"/>
+     <WrapPanel><Button Content="Download YubiKey Manager CLI" Tag="https://developers.yubico.com/yubikey-manager/Releases/" Click="Link_Click"/><Button Content="Documentation" Style="{StaticResource QuietButton}" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/Using_the_ykman_CLI.html" Click="Link_Click"/></WrapPanel>
+    </StackPanel></Border>
+    <Border Style="{StaticResource Card}" Padding="20,16" Margin="0,12,0,0"><StackPanel>
+     <DockPanel><WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0"><Border Style="{StaticResource StatusPill}"><TextBlock Text="Installed" FontSize="12"/></Border><Border Style="{StaticResource VersionPill}"><TextBlock x:Name="RuntimeVersion" Foreground="{StaticResource Heading}" FontSize="12"/></Border></WrapPanel><TextBlock Text=".NET Desktop Runtime 10 · x64" Style="{StaticResource SectionTitle}" TextWrapping="Wrap"/></DockPanel>
+     <TextBlock Text="Runs this Windows desktop app. The version shown is the runtime used by this session." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,12"/>
+     <WrapPanel><Button Content="Download .NET Desktop Runtime" Tag="https://dotnet.microsoft.com/en-us/download/dotnet/10.0" Click="Link_Click"/><Button Content="Documentation" Style="{StaticResource QuietButton}" Tag="https://learn.microsoft.com/en-us/dotnet/core/install/windows" Click="Link_Click"/></WrapPanel>
+    </StackPanel></Border>
+    <Expander Header="Terminal preferences" Margin="0,22,0,16"><StackPanel Margin="0,12,0,0">
     <CheckBox x:Name="EmbeddedChoice" Content="Use embedded terminal (preview, this session)"/>
     <TextBlock Text="Try the Yubico prompts inside the app. Leave unchecked to use the external console. Select before starting; running commands are never restarted automatically." TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,16"/>
-    <Expander Header="Technical details"><StackPanel Margin="0,12,0,0">
-     <TextBlock Text="YubiEnroll executable"/><TextBox x:Name="ExecutableInfo" IsReadOnly="True" Margin="0,6,0,16" TextWrapping="Wrap"/>
-     <TextBlock Text="Configuration file"/><TextBox x:Name="ConfigurationInfo" IsReadOnly="True" Margin="0,6,0,16" TextWrapping="Wrap"/>
-     <TextBlock Text=".NET 10 Desktop Runtime x64 must be installed before this application can start. Configuration and sign-in belong to the current Windows account." TextWrapping="Wrap" Foreground="#617084"/>
     </StackPanel></Expander>
+
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Import / export"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
+    <TextBlock Text="Import / export" Style="{StaticResource SettingsTitle}"/><TextBlock Text="Transfer tenant and profile settings using a YubiEnroll CLI TOML configuration file." Style="{StaticResource SettingsDescription}"/>
     <Border Style="{StaticResource Card}" Margin="0,0,0,16"><StackPanel>
      <TextBlock Text="Export configuration" Style="{StaticResource SectionTitle}"/>
      <TextBlock Text="Save your supported tenant and profile settings to a file." TextWrapping="Wrap" Foreground="#617084" Margin="0,8,0,8"/>
@@ -54,18 +62,27 @@
     <Expander Header="What is included?" Margin="0,16,0,0"><TextBlock Text="A TOML file containing supported Entra tenant fields and all seven profile settings. Authentication tokens, caches, generated PINs and key credentials are excluded. Other custom fields are not exported; this is not a complete backup of arbitrary custom configuration." TextWrapping="Wrap" Foreground="#617084" Margin="0,10,0,0"/></Expander>
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Help &amp; About"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
-    <StackPanel Orientation="Horizontal"><Image Source="pack://application:,,,/Assets/App.ico" Width="32" Height="32" Margin="0,0,12,0"/><TextBlock Text="YubiEnroll UI" FontSize="28" FontWeight="SemiBold"/></StackPanel>
-    <TextBlock Text="Community preview 0.4.3 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
+    <TextBlock Text="Help &amp; About" Style="{StaticResource SettingsTitle}"/>
+    <TextBlock Text="Find documentation, application information and updates." Style="{StaticResource SettingsDescription}"/>
+    <Border Style="{StaticResource Card}" Margin="0,0,0,20"><StackPanel>
+    <StackPanel Orientation="Horizontal"><Image Source="{StaticResource BrandMark}" Width="32" Height="32" Margin="0,0,12,0"/><TextBlock Text="YubiEnroll UI" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/></StackPanel>
+    <TextBlock Text="Community preview 0.5.6 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
+    <TextBlock x:Name="UpdateStatus" Text="Check for published releases, including previews." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+    <WrapPanel><Button x:Name="CheckUpdatesButton" Content="Check for updates" Click="CheckUpdates_Click"/><Button x:Name="ReleaseButton" Content="View release" Click="Link_Click" Visibility="Collapsed"/></WrapPanel>
+    </StackPanel></Border>
     <TextBlock Text="An independent open-source community project. Not affiliated with, sponsored by, or endorsed by Yubico. Yubico and YubiKey are trademarks of Yubico." TextWrapping="Wrap" Margin="0,0,0,18"/>
     <TextBlock Text="Our project" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
-    <WrapPanel><Button Content="GitHub" Tag="https://github.com/roryvossepoel/YubiEnroll-UI" Click="Link_Click"/><Button Content="Report an issue" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/issues" Click="Link_Click"/><Button Content="Prerequisites" Click="Prerequisites_Click"/><Button Content="Testing guide" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/blob/feature/initial-wpf-app/docs/TESTING.md" Click="Link_Click"/></WrapPanel>
+    <WrapPanel><Button Content="GitHub" Tag="https://github.com/roryvossepoel/YubiEnroll-UI" Click="Link_Click"/><Button Content="Report an issue" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/issues" Click="Link_Click"/></WrapPanel>
     <TextBlock Text="Yubico documentation" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
-    <WrapPanel><Button Content="YubiEnroll docs" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/use-cli.html" Click="Link_Click"/></WrapPanel>
-    <WrapPanel Margin="0,8,0,0"><Button Content="ykman docs" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/" Click="Link_Click"/><Button Content="Authenticator docs" Tag="https://docs.yubico.com/software/yubikey/tools/authenticator/auth-guide/index.html" Click="Link_Click"/></WrapPanel>
+    <WrapPanel>
+     <Button Content="YubiEnroll CLI docs" Tag="https://docs.yubico.com/software/yubikey/tools/yubienroll/index.html" Click="Link_Click" Margin="0,0,8,8"/>
+     <Button Content="YubiKey Manager CLI (ykman) docs" Tag="https://docs.yubico.com/software/yubikey/tools/ykman/Using_the_ykman_CLI.html" Click="Link_Click" Margin="0,0,8,8"/>
+    </WrapPanel>
     <TextBlock Text="License &amp; diagnostics" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
     <TextBlock Text="MIT licensed. LICENSE and THIRD-PARTY-NOTICES.md are included with the download. Yubico tools are installed separately. Activity and error details are available in Settings → Activity log; interactive console output and PINs are not saved to that log. External tools manage their own authentication and caches." TextWrapping="Wrap" Foreground="#617084"/>
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Activity log"><ContentControl x:Name="ActivityHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
+   <TabItem Header="Registration log"><ContentControl x:Name="RegistrationHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
   </TabControl>
  </DockPanel>
 </Window>

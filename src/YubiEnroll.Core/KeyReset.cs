@@ -11,7 +11,7 @@ public sealed record ResetKey(string Serial, string Model)
 
 public enum FidoPinState { Unknown, NotSet, Set, Blocked, Disabled, Unsupported }
 
-public sealed record KeyStatus(ResetKey Key, FidoPinState Pin)
+public sealed record KeyStatus(ResetKey Key, FidoPinState Pin, FidoCapabilities? Capabilities = null)
 {
     public string Label => Key.Label;
     public string PinLabel => "FIDO PIN: " + (Pin switch
