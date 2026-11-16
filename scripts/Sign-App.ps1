@@ -9,7 +9,9 @@ if ($env:OS -ne 'Windows_NT') { throw 'Authenticode signing requires Windows.' }
 $certificate = Get-Item "Cert:\CurrentUser\My\$CertificateThumbprint" -ErrorAction Stop
 if (-not $certificate.HasPrivateKey) { throw 'The selected certificate has no private key in this Windows account.' }
 if ($certificate.NotBefore -gt (Get-Date) -or $certificate.NotAfter -le (Get-Date)) { throw 'The signing certificate is not currently valid.' }
-if ('1.3.6.1.5.5.7.3.3' -notin @($certificate.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId.Value })) {
+$usages = @($certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.37' } |
+    ForEach-Object { $_.EnhancedKeyUsages } | ForEach-Object { $_.Value })
+if ('1.3.6.1.5.5.7.3.3' -notin $usages) {
     throw 'The certificate must have the Code Signing enhanced key usage.'
 }
 if ($certificate.Subject -ne 'CN=Rory Vossepoel') { throw 'Expected publisher CN=Rory Vossepoel.' }
