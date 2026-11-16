@@ -44,6 +44,7 @@ if (args.FirstOrDefault() == "--write-fixture-config")
         "http://localhost/yubienroll-redirect", "UI-test-profile", true));
     ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), new ProfileSetup("Second profile", MinPinLength: 8, RandomPinLength: 10));
     ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), new ProfileSetup("UI-test-profile", Reset: true, ForcePinChange: true), "UI-test-profile");
+    ProfileConfigWriter.Save(ConfigSnapshot.Read(args[1]), PasskeyAddition.Settings(new FidoCapabilities("12345678", "5.4.3", true, true, false, false, false, false, 4, 63, false, true, false)) with { Name = "Preserve existing key" });
     var fixture = ConfigSnapshot.Read(args[1]);
     ConfigFileWriter.Save(fixture, ConfigTransfer.ValidateImport(ConfigTransfer.Export(fixture.Text!)));
     Console.WriteLine("Synthetic provider and multiple profiles written, edited and transferred.");

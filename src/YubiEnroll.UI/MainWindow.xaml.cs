@@ -203,7 +203,7 @@ public partial class MainWindow : Window
     {
         var user = Users.SelectedItem as UserCandidate;
         SelectedUserText.Text = user == null ? "Search and select a user." : "User selected.";
-        if (user != null) StatusText.Text = "User selected. Review the configuration profile before enrolling the key.";
+        if (user != null) StatusText.Text = _addPasskey ? "User selected. Review the registration before adding the passkey." : "User selected. Choose a configuration profile for this key.";
         UpdateSummary();
     }
 

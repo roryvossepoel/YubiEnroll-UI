@@ -33,7 +33,27 @@ public partial class MainWindow
         SidebarColumn.Width = new GridLength(compact ? 160 : 230);
         BrandTitle.FontSize = compact ? 13 : 19;
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        HomeTasks.Columns = ActualWidth < 1100 ? 1 : 3;
+        var stackedCards = ActualWidth < 1100;
+        HomeTasks.Columns = stackedCards ? 1 : 3;
+        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeResetCard };
+        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeResetLayout };
+        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeResetIcon };
+        var labels = new[] { HomeSetupText, HomeAdditionText, HomeResetText };
+        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeResetArrow };
+        for (var i = 0; i < cards.Length; i++)
+        {
+            cards[i].Padding = new Thickness(stackedCards ? 16 : 24);
+            cards[i].Margin = stackedCards ? new Thickness(0, 0, 0, 12) : new Thickness(i == 0 ? 0 : 6, 0, i == 2 ? 0 : 6, 0);
+            layouts[i].ColumnDefinitions[0].Width = stackedCards ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
+            layouts[i].ColumnDefinitions[1].Width = stackedCards ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            layouts[i].ColumnDefinitions[2].Width = stackedCards ? GridLength.Auto : new GridLength(0);
+            icons[i].Margin = stackedCards ? new Thickness(0, 0, 20, 0) : new Thickness(0, 0, 0, 20);
+            Grid.SetColumn(labels[i], stackedCards ? 1 : 0);
+            Grid.SetRow(labels[i], stackedCards ? 0 : 1);
+            Grid.SetColumn(arrows[i], stackedCards ? 2 : 0);
+            Grid.SetRow(arrows[i], stackedCards ? 0 : 2);
+            arrows[i].Margin = stackedCards ? new Thickness(12, 0, 0, 0) : new Thickness(0);
+        }
         HomeBody.Margin = compact ? new Thickness(28) : new Thickness(44, 64, 44, 32);
     }
     private void LeaveHostedPage()

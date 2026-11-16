@@ -55,6 +55,9 @@ try {
         $profilesText -notmatch 'Second profile\s+8\s+False\s+False\s+False\s+False\s+True\s+10') {
         throw 'CLI did not read all seven edited profile settings and the independent second profile'
     }
+    if ($profilesText -notmatch 'Preserve existing key\s+None\s+False\s+False\s+False\s+False\s+False\s+(None|6)') {
+        throw 'Native preservation profile unexpectedly supplies a PIN policy, reset, random PIN, forced change or UV override'
+    }
     & ./tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe --rename-fixture-config $legacy
     if ($LASTEXITCODE -ne 0) { throw 'Rename fixture failed' }
     $renamed = & $exe providers show 'UI test renamed' 2>&1

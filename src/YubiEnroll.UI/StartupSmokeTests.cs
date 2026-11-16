@@ -165,6 +165,7 @@ public partial class MainWindow
             Assert(connectedBeforeProbe != null && ReferenceEquals(connectedBeforeProbe, _connectedProvider) &&
                 ReferenceEquals(targetBeforeProbe, _selectedKey) && ReferenceEquals(inventoryBeforeProbe, _knownKeys),
                 "Automatic software detection preserves the authenticated tenant and selected target");
+            Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
             var keysCapture = Dispatcher.InvokeAsync(() =>
             {
                 var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
