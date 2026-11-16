@@ -309,7 +309,7 @@ public partial class MainWindow
             var loginPanel = new LoginPanel(provider.Name);
             _activeLogin = loginPanel;
             TerminalOverlay.Content = loginPanel; TerminalOverlay.Visibility = Visibility.Visible;
-            try { var result = await loginPanel.RunAsync(executable, tenant); _lastInteractiveFailure = loginPanel.FailureDetail; return result; }
+            try { var result = await loginPanel.RunAsync(executable, tenant); _lastInteractiveFailure = result == 0 ? "" : loginPanel.FailureDetail; return result; }
             finally { _activeLogin = null; TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
         }
         if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);

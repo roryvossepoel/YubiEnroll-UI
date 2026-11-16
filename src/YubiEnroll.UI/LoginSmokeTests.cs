@@ -15,6 +15,8 @@ public partial class MainWindow
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (launched == 0 && !run.IsCompleted && DateTime.UtcNow < deadline) await Task.Delay(50);
         Assert(launched == 1 && !run.IsCompleted, "Login automatically confirms only the matching tenant and opens its browser URL");
+        panel.Launch();
+        Assert(launched == 2 && !run.IsCompleted, "Reopening the browser reuses the same sign-in session");
         CaptureWindow(this, "login-browser.png");
         panel.Cancel();
         Assert(await run.WaitAsync(TimeSpan.FromSeconds(8)) == 125 && !panel.IsRunning, "Cancelling login terminates the waiting process and unblocks the app");

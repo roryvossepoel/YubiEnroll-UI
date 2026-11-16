@@ -17,6 +17,14 @@ public sealed class LoginProtocol(TenantSetup tenant)
         Confirmed = true;
         return true;
     }
+    private static bool MatchesRedirect(string? actual, string expected)
+    {
+        if (!Uri.TryCreate(actual, UriKind.Absolute, out var uri) || !Uri.TryCreate(expected, UriKind.Absolute, out var configured)) return false;
+        // YubiEnroll binds a local callback server to an ephemeral port when none is configured.
+        return uri.Scheme == "http" && uri.Host == "localhost" && configured.Host == "localhost" &&
+            uri.UserInfo.Length == 0 && uri.Fragment.Length == 0 && uri.Query.Length == 0 && uri.Port > 0 &&
+            uri.AbsolutePath == configured.AbsolutePath && (configured.IsDefaultPort || uri.Port == configured.Port);
+    }
     public Uri? AuthorizationUrl(string completedLines)
     {
         if (!completedLines.Contains("Go to the following link in your broswer, and complete the sign-in prompts:", StringComparison.Ordinal)) return null;
@@ -33,7 +41,7 @@ public sealed class LoginProtocol(TenantSetup tenant)
             if (parts.Length != 2 || !query.TryAdd(Uri.UnescapeDataString(parts[0]), Uri.UnescapeDataString(parts[1].Replace('+', ' '))))
                 throw new InvalidOperationException("The sign-in address is invalid.");
         }
-        if (query.GetValueOrDefault("client_id") != tenant.ClientId || query.GetValueOrDefault("redirect_uri") != tenant.RedirectUri ||
+        if (query.GetValueOrDefault("client_id") != tenant.ClientId || !MatchesRedirect(query.GetValueOrDefault("redirect_uri"), tenant.RedirectUri) ||
             query.GetValueOrDefault("response_type") != "code" || string.IsNullOrWhiteSpace(query.GetValueOrDefault("state")))
             throw new InvalidOperationException("The sign-in address does not match the selected tenant.");
         return uri;

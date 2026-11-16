@@ -7,7 +7,7 @@
 - Enroll two disposable keys for different test users and tenants. Compare each record with its original review, especially serial, UPN versus email, profile, reset and first-use PIN flags. Check the actual CLI table format; missing identity fields must never be guessed.
 - Cancel or interrupt enrollment. Confirm it is not labelled successful; check Entra before retrying because a partial registration may exist. Simulate app termination after native launch: the saved attempt must remain unknown.
 - Deny folder write access before enrollment: the command must not start. Deny access after it starts: a successful native result must remain successful while the app clearly reports the unsaved log and offers save-only retry. Restore access, retry and verify one row with the same attempt ID. Navigate to another key while a result is pending; closing must warn about losing its final result. Do not use production keys for this test.
-- Export all rows and then filter by tenant, date and success. Compare CSV row counts and details in Excel, including names with accents/commas and serial numbers with leading zeroes. Confirm no PIN, token or console transcript is present.
+- Export all rows and then filter by tenant, date and success. Compare CSV row counts and details in Excel, including names with accents/commas and serial numbers with leading zeroes. With PIN storage off, confirm no PIN is present. Enable generated-PIN storage, enroll a disposable key and confirm its generated PIN appears in the same JSON record and CSV. Existing PINs, tokens and console transcripts must never appear.
 - Inspect the Registration log tab at small window sizes and 100/150/200% scale; fields/actions must remain reachable. Confirm existing tenant/profile tabs are unchanged.
 
 ## Preview 0.5.3: profile compatibility
@@ -187,3 +187,13 @@ Automated regressions include live terminal text before input/process exit, actu
 5. A missing/blocked PIN or existing force-PIN-change state must block Add a passkey. Device removal and additional connected keys must block both tasks without silently selecting another key.
 6. Check all three task cards, five-step setup and four-step addition at 100%, 150%, 200% scale and narrow window sizes. Confirm the reset label is white when enabled and readable gray when disabled.
 7. Verify failure/cancellation never repeats the native operation. Temporary-profile cleanup must not overwrite concurrent configuration edits; native outcomes and log retry must remain available.
+
+
+## Preview 0.5.6 acceptance
+
+- Setup order is Key → Profile → Tenant → User → Review; profiles are selectable before login. Add a passkey has no profile step and preserves the existing key settings.
+- Connect to a test tenant: there is no manual `y` prompt. Close the browser, reopen it using the button, then cancel. Connect again successfully. Also close the app during sign-in and test the five-minute timeout. Enrollment and reset remain protected against accidental cancellation.
+- The dedicated sign-in screen currently verifies the standard Microsoft public-cloud endpoints; a custom endpoint produces a configuration message instead of being silently approved.
+- Enable registration logging and generated-PIN storage, use a disposable setup key and confirm the PIN appears in its JSON record, detail view and CSV. Repeat with PIN storage off and with Add a passkey: no existing PIN must be captured. Confirm leading zeroes survive CSV import. PIN logging selects the in-app terminal even if the external-console preference is set.
+- Inspect each Settings tab at normal and compact widths: matching title/description spacing, readable profile names and tenant IDs, pill status/version labels and aligned log filters. Verify both CLI links and the .NET links open the documented destinations without tracking parameters.
+- In Help & About, check updates while online and offline. Until releases are published, expect “No releases published yet.” Verify a newer published preview appears when available; checking never downloads or installs an update.

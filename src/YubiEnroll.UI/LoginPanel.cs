@@ -36,7 +36,7 @@ internal sealed class LoginPanel : Border
         _open.Click += (_, _) => Launch();
         _cancel.Click += (_, _) => Cancel();
     }
-    private void Launch()
+    internal void Launch()
     {
         if (_url == null || _cancelled || !IsRunning) return;
         try { _launch(_url); _status.Text = "Complete sign-in in your browser. This page returns automatically when you are connected."; }

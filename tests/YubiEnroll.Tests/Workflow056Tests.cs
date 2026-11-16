@@ -12,13 +12,15 @@ internal static class Workflow056Tests
         bool Reject(Action run) { try { run(); return false; } catch (InvalidOperationException) { return true; } }
         check(Reject(() => new LoginProtocol(tenant).TryConfirm(prompt.Replace(tenant.ClientId, Guid.NewGuid().ToString()))), "Mismatched login client is not automatically approved");
         var url = $"https://login.microsoftonline.com/{tenant.TenantId}/oauth2/v2.0/authorize?client_id={tenant.ClientId}&redirect_uri={Uri.EscapeDataString(tenant.RedirectUri)}&response_type=code&state=synthetic";
+        url = url.Replace("http%3A%2F%2Flocalhost%2F", "http%3A%2F%2Flocalhost%3A54321%2F");
         var output = "Go to the following link in your broswer, and complete the sign-in prompts: \n\n" + url;
         check(protocol.AuthorizationUrl(output)?.AbsoluteUri == url, "Native login address validates tenant, client and redirect");
         check(Reject(() => protocol.AuthorizationUrl(output.Replace("login.microsoftonline.com", "example.test"))), "Unexpected browser destination is rejected");
         var screen = new TerminalScreen(32760, 28);
-        screen.Feed(output[..^5]);
+        var terminalOutput = output.Replace("\n", "\r\n");
+        screen.Feed(terminalOutput[..^5]);
         check(protocol.AuthorizationUrl(screen.CompletedText) == null, "Partial authorization URL is never launched");
-        screen.Feed(output[^5..] + "\r\n");
+        screen.Feed(terminalOutput[^5..] + "\r\n");
         check(protocol.AuthorizationUrl(screen.CompletedText)?.AbsoluteUri == url, "Chunked complete URL is reconstructed without truncation");
         const string summary = "Enter PIN: \nYubiKey configuration summary:\nSerial number: 00123456\nTemporary PIN: 001234\n";
         check(GeneratedPinSummary.Read(summary, "00123456") == "001234", "Generated initial PIN is read from final summary, including leading zeroes");

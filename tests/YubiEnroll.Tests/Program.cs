@@ -32,7 +32,7 @@ if (args.FirstOrDefault() == "--login-probe")
     Console.Write("Proceed? [y/N]: ");
     if (Console.ReadLine() != "y") return 7;
     Console.WriteLine("Go to the following link in your broswer, and complete the sign-in prompts: \n");
-    Console.WriteLine("https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/oauth2/v2.0/authorize?client_id=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee&redirect_uri=http%3A%2F%2Flocalhost%2Fyubienroll-redirect&response_type=code&state=synthetic");
+    Console.WriteLine("https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/oauth2/v2.0/authorize?client_id=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee&redirect_uri=http%3A%2F%2Flocalhost%3A54321%2Fyubienroll-redirect&response_type=code&state=synthetic");
     await Task.Delay(TimeSpan.FromMinutes(2));
     return 0;
 }
