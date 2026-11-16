@@ -34,17 +34,24 @@ public partial class SettingsWindow : Window
         RegistrationHost.Content = new RegistrationLogView(registrationJournal ?? new RegistrationJournal(RegistrationJournal.DefaultSettingsPath));
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
+        RuntimeVersion.Text = "Version " + Environment.Version;
         Attempt(RefreshLists);
     }
 
     internal void SetRequirements(RequirementReport report)
     {
-        VersionInfo.Text = report.Enrollment.Detail;
-        ManagerInfo.Text = report.Manager.Detail;
-        var neutral = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#263238")!;
-        var attention = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#854018")!;
-        VersionInfo.Foreground = report.Enrollment.Ready ? neutral : attention;
-        ManagerInfo.Foreground = report.Manager.Ready ? neutral : attention;
+        Set(EnrollmentStatusPill, EnrollmentStatus, VersionInfo, report.Enrollment);
+        Set(ManagerStatusPill, ManagerStatus, ManagerInfo, report.Manager);
+        static void Set(Border pill, TextBlock status, TextBlock version, RequirementCheck check)
+        {
+            status.Text = check.Ready ? "Installed" : check.Detail == "Not installed" ? "Not installed" : "Check required";
+            var match = System.Text.RegularExpressions.Regex.Match(check.Detail, @"version (\d+\.\d+\.\d+)");
+            version.Text = match.Success ? "Version " + match.Groups[1].Value : "—";
+            ((Border)version.Parent).SetValue(VisibilityProperty, match.Success ? Visibility.Visible : Visibility.Collapsed);
+            pill.ToolTip = check.Detail;
+            if (!check.Ready) { pill.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 242, 225)); status.Foreground = System.Windows.Media.Brushes.SaddleBrown; }
+            else { pill.Background = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#EAF4D6")!; status.Foreground = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString("#305A14")!; }
+        }
     }
 
     private void Attempt(Action action)
@@ -61,8 +68,19 @@ public partial class SettingsWindow : Window
         var config = ConfigReader.Parse(ConfigSnapshot.Read(_path).Text ?? "");
         TenantList.ItemsSource = config.Providers.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         TenantFilter_Changed(this, null!);
-        ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, ProfileCompatibility.Requirements(ProfileConfigWriter.Read(ConfigSnapshot.Read(_path).Text ?? "", p.Name))));
+        ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, ProfileDescription(ProfileConfigWriter.Read(ConfigSnapshot.Read(_path).Text ?? "", p.Name))));
         Feedback.Text = "";
+    }
+
+    private static string ProfileDescription(ProfileSetup p)
+    {
+        var lines = new List<string> { p.Reset == true ? "Reset FIDO before setup" : p.Reset == false ? "Keep existing FIDO credentials" : "Reset: not specified" };
+        lines.Add(p.RandomPin == true ? $"Generate PIN{(p.RandomPinLength is { } length ? $" · {length} characters" : "")}" : "Use an existing or manually entered PIN");
+        if (p.ForcePinChange == true) lines.Add("Change PIN on first use");
+        if (p.MinPinLength is { } minimum) lines.Add($"Minimum PIN length: {minimum}");
+        if (p.RequireAlwaysUv == true) lines.Add("Always require user verification");
+        if (p.RequireEa == true) lines.Add("Enterprise attestation");
+        return string.Join("\n", lines);
     }
 
     private void Selection_Changed(object sender, SelectionChangedEventArgs e)

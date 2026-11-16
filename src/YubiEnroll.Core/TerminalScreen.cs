@@ -13,6 +13,7 @@ public sealed class TerminalScreen(int columns = 100, int rows = 28)
     public int Columns => columns;
     public int Rows => rows;
     public event Action<string>? Reply;
+    public string CompletedText => string.Join("\n", _history.Concat(_cells.Take(_y).Select(row => new string(row).TrimEnd())));
     public string Text => string.Join("\n", _history.Concat(_cells.Select(row => new string(row).TrimEnd()))).TrimEnd();
     public void Clear()
     {

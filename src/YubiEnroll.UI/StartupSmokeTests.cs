@@ -19,6 +19,7 @@ public partial class MainWindow
             await TestKeyToolsAsync();
             await TestEmbeddedTerminalAsync(mockExecutable);
             await TestExternalOutcomeAsync(mockExecutable);
+            await TestLoginCancellationAsync(mockExecutable);
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -345,22 +346,22 @@ public partial class MainWindow
             "Both task lists share an unconfirmed candidate");
         CaptureWindow(this, "enroll-key.png");
         EnrollNext_Click(this, e);
-        Assert(_selectedKey == target && _enrollStep == 1 && TenantStep.IsVisible && !UserCard.IsVisible && !PreparationCard.IsVisible,
-            "Continue commits target and shows only tenant step");
-        Assert(ConnectButton.IsEnabled && !EnrollNext.IsEnabled, "Tenant step requires login while allowing two keys for authentication");
+        Assert(_selectedKey == target && _enrollStep == 1 && ProfileStep.IsVisible && PreparePanel.IsEnabled && !TenantStep.IsVisible,
+            "Key selection leads to an enabled profile step before authentication");
+        Assert(EnrollNext.IsEnabled && !IsConnected, "Compatible profile can be chosen without a connected tenant");
+        CaptureWindow(this, "enroll-profile.png");
         EnrollNext_Click(this, e);
-        Assert(_enrollStep == 1, "Cannot skip authentication through the event handler");
+        Assert(_enrollStep == 2 && TenantStep.IsVisible && ConnectButton.IsEnabled && !EnrollNext.IsEnabled, "Tenant follows profile and requires login");
+        EnrollNext_Click(this, e);
+        Assert(_enrollStep == 2, "Cannot skip authentication through the event handler");
         _connectedProvider = SelectedProvider; UpdateSummary();
         Assert(EnrollNext.IsEnabled && EnrollmentTargetNotice.Text.Contains(admin.Key.Serial), "Signed-in tenant identifies other keys to disconnect");
         CaptureWindow(this, "enroll-tenant.png");
         EnrollNext_Click(this, e);
-        Assert(_enrollStep == 2 && UserCard.IsVisible && !TenantStep.IsVisible && !EnrollNext.IsEnabled, "Recipient is a separate gated step");
+        Assert(_enrollStep == 3 && UserCard.IsVisible && !TenantStep.IsVisible && !EnrollNext.IsEnabled, "Recipient is a separate gated step");
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } };
         Users.SelectedIndex = 0;
         CaptureWindow(this, "enroll-user.png");
-        EnrollNext_Click(this, e);
-        Assert(_enrollStep == 3 && ProfileStep.IsVisible && !PreparationCard.IsVisible, "Profile has its own step after the user");
-        CaptureWindow(this, "enroll-profile.png");
         EnrollNext_Click(this, e);
         Assert(_enrollStep == 4 && PreparationCard.IsVisible && !Profiles.IsVisible && !KeyName.IsVisible && !EnrollButton.IsEnabled && ReviewTargetNotice.Text.Contains(admin.Key.Serial),
             "Review blocks enrollment while another key is attached");

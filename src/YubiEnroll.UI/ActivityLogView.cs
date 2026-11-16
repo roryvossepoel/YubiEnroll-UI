@@ -24,7 +24,9 @@ internal sealed class ActivityLogView : DockPanel
         Margin = new Thickness(18);
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
 
-        var help = new TextBlock { Text = "Actions and errors from this session. Events with additional details can be expanded. PINs and terminal transcripts are not recorded.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+        var title = new TextBlock { Text = "Activity log", Style = (Style)Application.Current.FindResource("SettingsTitle") };
+        SetDock(title, Dock.Top); Children.Add(title);
+        var help = new TextBlock { Text = "Review actions and errors from this session. Expand an event for technical details.", Style = (Style)Application.Current.FindResource("SettingsDescription") };
         SetDock(help, Dock.Top); Children.Add(help);
         var actions = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
         SetDock(actions, Dock.Top); Children.Add(actions);

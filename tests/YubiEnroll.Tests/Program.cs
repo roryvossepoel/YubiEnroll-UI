@@ -21,6 +21,22 @@ if (args.FirstOrDefault() == "--echo")
     return 0;
 }
 
+if (args.FirstOrDefault() == "--login-probe")
+{
+    Console.WriteLine("Authenticating to ENTRA using the following parameters:");
+    Console.WriteLine("client_id: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    Console.WriteLine("redirect_uri: http://localhost/yubienroll-redirect");
+    Console.WriteLine("tenant_id: 11111111-2222-3333-4444-555555555555");
+    Console.WriteLine("entra_base_url: https://login.microsoftonline.com");
+    Console.WriteLine("graph_base_url: https://graph.microsoft.com");
+    Console.Write("Proceed? [y/N]: ");
+    if (Console.ReadLine() != "y") return 7;
+    Console.WriteLine("Go to the following link in your broswer, and complete the sign-in prompts: \n");
+    Console.WriteLine("https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/oauth2/v2.0/authorize?client_id=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee&redirect_uri=http%3A%2F%2Flocalhost%2Fyubienroll-redirect&response_type=code&state=synthetic");
+    await Task.Delay(TimeSpan.FromMinutes(2));
+    return 0;
+}
+
 if (args.FirstOrDefault() == "--terminal-probe")
 {
     Console.WriteLine("TERMINAL_READY");
@@ -429,6 +445,7 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0,
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 RegistrationJournalTests.Run(Check);
 Workflow055Tests.Run(Check);
+Workflow056Tests.Run(Check);
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 

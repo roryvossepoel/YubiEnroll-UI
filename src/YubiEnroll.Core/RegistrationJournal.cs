@@ -7,13 +7,14 @@ namespace YubiEnroll.Core;
 
 public enum RegistrationOutcome { Unknown, Succeeded, FailedOrInterrupted }
 
-// An explicit allowlist: no PINs, tokens, terminal output or arbitrary diagnostic strings.
+// Explicit fields only. Generated initial PINs require the per-attempt opt-in; no tokens or transcripts.
 public sealed record RegistrationRecord(
     int SchemaVersion, Guid AttemptId, DateTimeOffset StartedAt, DateTimeOffset? CompletedAt,
     string TenantName, string TenantId, string UserId, string DisplayName, string UserPrincipalName,
     string Email, string KeyModel, string TargetSerial, string ProfileName, string RegistrationName,
     bool ResetBeforeEnrollment, bool ForcePinChangeOnFirstUse, RegistrationOutcome Outcome, int? NativeExitCode)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? GeneratedPin { get; init; }
     [JsonIgnore] public DateTimeOffset RecordedAt => CompletedAt ?? StartedAt;
     [JsonIgnore] public string TimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
     [JsonIgnore] public string UserLabel => string.IsNullOrEmpty(DisplayName) ? UserPrincipalName.Length > 0 ? UserPrincipalName : UserId : DisplayName;
@@ -36,8 +37,8 @@ public sealed record RegistrationRecord(
     };
 }
 
-public sealed record RegistrationLogPreferences(bool Enabled, string Directory);
-public sealed record RegistrationAttempt(string Directory, RegistrationRecord Record);
+public sealed record RegistrationLogPreferences(bool Enabled, string Directory, bool SaveGeneratedPin = false);
+public sealed record RegistrationAttempt(string Directory, RegistrationRecord Record, bool SaveGeneratedPin = false);
 
 public sealed class RegistrationJournal
 {
@@ -77,7 +78,7 @@ public sealed class RegistrationJournal
     {
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory)) throw new ArgumentException("Choose an absolute log folder path.");
     }
-    public void Configure(bool enabled, string directory)
+    public void Configure(bool enabled, string directory, bool saveGeneratedPin = false)
     {
         ValidateDirectory(directory);
         directory = Path.GetFullPath(directory);
@@ -89,7 +90,7 @@ public sealed class RegistrationJournal
             var probe = Path.Combine(directory, ".write-test-" + Guid.NewGuid().ToString("N"));
             using (var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) stream.Flush(true);
         }
-        var preferences = new RegistrationLogPreferences(enabled, directory);
+        var preferences = new RegistrationLogPreferences(enabled, directory, saveGeneratedPin);
         AtomicWrite(_settingsPath, JsonSerializer.Serialize(preferences, Json));
         Preferences = preferences;
         SettingsError = null;
@@ -101,17 +102,17 @@ public sealed class RegistrationJournal
     {
         if (SettingsError != null) throw new InvalidOperationException(SettingsError);
         if (!Preferences.Enabled) return null;
-        var attempt = new RegistrationAttempt(Preferences.Directory, record);
+        var attempt = new RegistrationAttempt(Preferences.Directory, record with { GeneratedPin = null }, Preferences.SaveGeneratedPin);
         SaveRecord(attempt);
         Changed?.Invoke();
         return attempt;
     }
 
     // This method never repeats enrollment, even when saving the native result fails.
-    public bool Complete(RegistrationAttempt? attempt, int? exitCode)
+    public bool Complete(RegistrationAttempt? attempt, int? exitCode, string? generatedPin = null)
     {
         if (attempt == null) return true;
-        var completed = attempt with { Record = attempt.Record.Complete(exitCode) };
+        var completed = attempt with { Record = attempt.Record.Complete(exitCode) with { GeneratedPin = attempt.SaveGeneratedPin && GeneratedPinSummary.IsValid(generatedPin) ? generatedPin : null } };
         _pending[completed.Record.AttemptId] = completed;
         try { SaveRecord(completed); _pending.Remove(completed.Record.AttemptId); }
         catch (Exception ex) when (IsStorageError(ex)) { }
@@ -153,7 +154,7 @@ public sealed class RegistrationJournal
     }
     private static void Validate(RegistrationRecord record)
     {
-        if (record.SchemaVersion != 1 || record.AttemptId == Guid.Empty || record.StartedAt == default ||
+        if (record.GeneratedPin != null && !GeneratedPinSummary.IsValid(record.GeneratedPin) || record.SchemaVersion != 1 || record.AttemptId == Guid.Empty || record.StartedAt == default ||
             !Guid.TryParse(record.TenantId, out var tenant) || tenant == Guid.Empty || !Guid.TryParse(record.UserId, out var user) || user == Guid.Empty ||
             string.IsNullOrWhiteSpace(record.TargetSerial) || !record.TargetSerial.All(char.IsAsciiDigit) ||
             new[] { record.TenantName, record.DisplayName, record.UserPrincipalName, record.Email, record.KeyModel, record.ProfileName, record.RegistrationName }.Any(s => s == null) ||
@@ -172,7 +173,7 @@ public sealed class RegistrationJournal
         {
             var existing = ReadRecord(path);
             if (existing == attempt.Record) return; // Retry is idempotent.
-            if (existing.CompletedAt != null || existing != (attempt.Record with { CompletedAt = null, NativeExitCode = null, Outcome = RegistrationOutcome.Unknown }))
+            if (existing.CompletedAt != null || existing != (attempt.Record with { CompletedAt = null, NativeExitCode = null, Outcome = RegistrationOutcome.Unknown, GeneratedPin = null }))
                 throw new InvalidOperationException("The registration record changed; it was not overwritten.");
         }
         AtomicWrite(path, JsonSerializer.Serialize(attempt.Record, Json));
@@ -211,12 +212,12 @@ public sealed class RegistrationJournal
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
         string Row(IEnumerable<string> cells) => string.Join(separator, cells.Select(c => Cell(c))) + "\r\n";
-        var csv = new StringBuilder(Row(["Attempt ID", "Started at", "Completed at", "Tenant", "Tenant ID", "Display name", "UPN", "Email", "User ID", "Key model", "Target serial", "Profile", "Registration name", "Reset before enrollment (configured)", "PIN change on first use (configured)", "Result", "Native exit code"]));
+        var csv = new StringBuilder(Row(["Attempt ID", "Started at", "Completed at", "Tenant", "Tenant ID", "Display name", "UPN", "Email", "User ID", "Key model", "Target serial", "Profile", "Registration name", "Reset before enrollment (configured)", "PIN change on first use (configured)", "Result", "Native exit code", "Generated initial PIN"]));
         foreach (var r in records.DistinctBy(r => r.AttemptId))
         {
             string[] cells = [r.AttemptId.ToString(), r.StartedAt.ToString("o"), r.CompletedAt?.ToString("o") ?? "", r.TenantName, r.TenantId, r.DisplayName, r.UserPrincipalName, r.Email, r.UserId,
-                r.KeyModel, r.TargetSerial, r.ProfileName, r.RegistrationName, r.ResetBeforeEnrollment ? "Yes" : "No", r.ForcePinChangeOnFirstUse ? "Yes" : "No", r.OutcomeLabel, r.NativeExitCode?.ToString(CultureInfo.InvariantCulture) ?? ""];
-            csv.Append(string.Join(separator, cells.Select((v, i) => Cell(v, i == 10)))).Append("\r\n");
+                r.KeyModel, r.TargetSerial, r.ProfileName, r.RegistrationName, r.ResetBeforeEnrollment ? "Yes" : "No", r.ForcePinChangeOnFirstUse ? "Yes" : "No", r.OutcomeLabel, r.NativeExitCode?.ToString(CultureInfo.InvariantCulture) ?? "", r.GeneratedPin ?? ""];
+            csv.Append(string.Join(separator, cells.Select((v, i) => Cell(v, i == 10 || i == 17 && v.Length > 0)))).Append("\r\n");
         }
         return csv.ToString();
     }

@@ -63,7 +63,7 @@
      <StackPanel x:Name="ProfileStep" Visibility="Collapsed"><StackPanel x:Name="PreparePanel" IsEnabled="False">
       <TextBlock Text="Configuration profile" Style="{StaticResource SectionTitle}" Margin="0,8,0,12"/>
       <ListBox x:Name="Profiles" SelectionChanged="Profile_Changed" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled" MaxHeight="300">
-       <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="12,10"><TextBlock Text="{Binding Profile.Name}" FontWeight="SemiBold" FontSize="16"/><TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+       <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="12,10"><TextBlock Text="{Binding Profile.Name}" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
        <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="IsEnabled" Value="{Binding Compatible}"/><Setter Property="Margin" Value="0,0,0,8"/></Style></ListBox.ItemContainerStyle>
       </ListBox>
       <TextBlock x:Name="ProfileCompatibilityText" TextWrapping="Wrap" Margin="0,12,0,0"/>

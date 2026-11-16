@@ -10,6 +10,8 @@ namespace YubiEnroll.UI;
 public partial class MainWindow
 {
     private bool _addPasskey;
+    private int TenantStepIndex => _addPasskey ? 1 : 2;
+    private int UserStepIndex => _addPasskey ? 2 : 3;
     private int ReviewStep => _addPasskey ? 3 : 4;
     private int EnrollmentResultStep => ReviewStep + 1;
     private sealed class ProfileChoice(EnrollmentProfile profile) : System.ComponentModel.INotifyPropertyChanged
@@ -72,21 +74,21 @@ public partial class MainWindow
         if (ResetHeading == null || EnrollHeading == null || ResetAcknowledged == null) return;
         RenderRegistrationLogStatus();
         ReadReviewWarning();
-        RenderProgress(EnrollProgress, _addPasskey ? ["Key", "Tenant", "User", "Review"] : ["Key", "Tenant", "User", "Profile", "Review"], Math.Min(_enrollStep, ReviewStep));
+        RenderProgress(EnrollProgress, _addPasskey ? ["Key", "Tenant", "User", "Review"] : ["Key", "Profile", "Tenant", "User", "Review"], Math.Min(_enrollStep, ReviewStep));
         RenderProgress(ResetProgress, ["Key", "Confirm", "Result"], _resetStep);
         EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A KEY";
         EnrollHeading.Text = _enrollStep == 0 ? (_addPasskey ? "Choose your existing key" : "Choose the key to set up") :
-            _enrollStep == 1 ? "Connect to a tenant" : _enrollStep == 2 ? "Choose the user" :
+            _enrollStep == TenantStepIndex ? "Connect to a tenant" : _enrollStep == UserStepIndex ? "Choose the user" :
             _enrollStep == ReviewStep ? (_addPasskey ? "Review and add passkey" : "Review and enroll") :
             _enrollStep == EnrollmentResultStep ? "Registration result" : "Choose a configuration profile";
         EnrollDescription.Text = _enrollStep == 0 ? (_addPasskey ? "Use a key with an existing FIDO PIN. Its passkeys and PIN will be kept." : "Select the physical key you want to give to the user.") :
-            _enrollStep == 1 ? "Sign in with your administrator account." : _enrollStep == 2 ? "Select the account to register on this key." :
+            _enrollStep == TenantStepIndex ? "Sign in with your administrator account." : _enrollStep == UserStepIndex ? "Select the account to register on this key." :
             _enrollStep == ReviewStep ? "Check these details before starting." : _enrollStep == EnrollmentResultStep ? "Check the outcome before continuing." :
             "Only profiles supported by the selected key can be chosen.";
         EnrollmentChooser.Visibility = Visible(_enrollStep == 0);
-        TenantStep.Visibility = Visible(_enrollStep == 1); UserCard.Visibility = Visible(_enrollStep == 2);
-        ProfileStep.Visibility = Visible(!_addPasskey && _enrollStep == 3);
-        NamePanel.Visibility = Visible(_addPasskey ? _enrollStep == 2 : _enrollStep == 3);
+        TenantStep.Visibility = Visible(_enrollStep == TenantStepIndex); UserCard.Visibility = Visible(_enrollStep == UserStepIndex);
+        ProfileStep.Visibility = Visible(!_addPasskey && _enrollStep == 1);
+        NamePanel.Visibility = Visible(_enrollStep == UserStepIndex);
         PreparationCard.Visibility = Visible(_enrollStep == ReviewStep); EnrollmentResult.Visibility = Visible(_enrollStep == EnrollmentResultStep);
         FooterTargetText.Visibility = Visible(_enrollStep > 0 && _enrollStep < ReviewStep);
         FooterTargetText.Text = _selectedKey != null ? "Target · " + _selectedKey.Key.Label : "Target unavailable";
@@ -95,11 +97,14 @@ public partial class MainWindow
         EnrollButton.Visibility = Visible(_enrollStep == ReviewStep);
         EnrollButton.IsEnabled = !_busy && _enrollStep == ReviewStep && EnrollmentReady && _reviewValid;
         EnrollNext.Visibility = Visible(_enrollStep != ReviewStep);
-        EnrollNext.Content = _enrollStep == 0 ? "Continue to tenant  →" : _enrollStep == 1 ? "Continue to user  →" :
-            _enrollStep == 2 && !_addPasskey ? "Continue to profile  →" : _enrollStep == EnrollmentResultStep ? (_addPasskey ? "Add another passkey" : "Set up another key") : "Review registration  →";
+        EnrollNext.Content = _enrollStep == 0 ? (_addPasskey ? "Continue to tenant  →" : "Continue to profile  →") :
+            !_addPasskey && _enrollStep == 1 ? "Continue to tenant  →" : _enrollStep == TenantStepIndex ? "Continue to user  →" :
+            _enrollStep == EnrollmentResultStep ? (_addPasskey ? "Add another passkey" : "Set up another key") : "Review registration  →";
         EnrollNext.IsEnabled = !_busy && (_enrollStep == 0 ? CandidateReady && (!_addPasskey || AdditionCandidateReady) :
-            _enrollStep == 1 ? TargetReady && IsConnected : _enrollStep == 2 ? TargetReady && IsConnected && Users.SelectedItem != null && (!_addPasskey || _reviewValid) :
-            _enrollStep == EnrollmentResultStep || (!_addPasskey && _enrollStep == 3 && TargetReady && IsConnected && Users.SelectedItem != null && _reviewValid));
+            !_addPasskey && _enrollStep == 1 ? TargetReady && _reviewValid :
+            _enrollStep == TenantStepIndex ? TargetReady && IsConnected :
+            _enrollStep == UserStepIndex ? TargetReady && IsConnected && Users.SelectedItem != null && _reviewValid :
+            _enrollStep == EnrollmentResultStep);
         EnrollBack.Content = _enrollStep == 0 || _enrollStep == EnrollmentResultStep ? "Back to Home" : "←  Back";
         FooterInstruction.Text = _enrollStep >= EnrollmentResultStep ? "" : _inventoryDirty ? "Checking connected keys…" :
             _enrollStep == 0 && _addPasskey && CandidateReady && !AdditionCandidateReady ? string.Join(" ", PasskeyAddition.Evaluate((EnrollmentKeys.SelectedItem as KeyStatus)?.Capabilities, (EnrollmentKeys.SelectedItem as KeyStatus)?.Pin ?? FidoPinState.Unknown).Issues) :
@@ -147,7 +152,8 @@ public partial class MainWindow
                 return;
             }
             var profile = SelectedProfile;
-            ConfigReader.EnsureUnchanged(current, SelectedProvider, profile);
+            if (!current.Profiles.Any(p => p.Name == profile.Name && p.Fingerprint == profile.Fingerprint))
+                throw new InvalidOperationException("Profile changed. Reopen Settings.");
             var setup = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name);
             var compatibility = ProfileCompatibility.Evaluate(setup, TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
             _reviewValid = compatibility.Compatible;
@@ -174,7 +180,7 @@ public partial class MainWindow
         Row("User", !string.IsNullOrWhiteSpace(user?.DisplayName) ? user.DisplayName : user?.Label ?? "—");
         if (!string.IsNullOrWhiteSpace(user?.UserPrincipalName)) Row("Sign-in name", user.UserPrincipalName);
         if (!string.IsNullOrWhiteSpace(user?.Email) && !string.Equals(user.Email, user.UserPrincipalName, StringComparison.OrdinalIgnoreCase)) Row("Email", user.Email);
-        Row(_addPasskey ? "Action" : "Profile", _addPasskey ? "Add passkey · keep existing passkeys and PIN" : (Profiles.SelectedItem as ProfileChoice)?.Profile.Name ?? "—");
+        Row(_addPasskey ? "Action" : "Profile", _addPasskey ? "Add passkey · keep existing passkeys, PIN and key settings" : (Profiles.SelectedItem as ProfileChoice)?.Profile.Name ?? "—");
         Row("Registration name", string.IsNullOrWhiteSpace(KeyName.Text) ? "Default (serial number)" : KeyName.Text.Trim());
         ReviewRecipient.Text = user?.DisplayName ?? user?.Label ?? "";
     }
@@ -182,9 +188,9 @@ public partial class MainWindow
     {
         if (_busy) return;
         if (_enrollStep == 0 && (!_addPasskey || AdditionCandidateReady) && CommitTarget()) _enrollStep = 1;
-        else if (_enrollStep == 1 && TargetReady && IsConnected) _enrollStep = 2;
-        else if (_enrollStep == 2 && TargetReady && IsConnected && Users.SelectedItem != null && (!_addPasskey || _reviewValid)) _enrollStep = 3;
-        else if (!_addPasskey && _enrollStep == 3 && TargetReady && IsConnected && Users.SelectedItem != null && _reviewValid) _enrollStep = 4;
+        else if (!_addPasskey && _enrollStep == 1 && TargetReady && _reviewValid) _enrollStep = TenantStepIndex;
+        else if (_enrollStep == TenantStepIndex && TargetReady && IsConnected) _enrollStep = UserStepIndex;
+        else if (_enrollStep == UserStepIndex && TargetReady && IsConnected && Users.SelectedItem != null && _reviewValid) _enrollStep = ReviewStep;
         else if (_enrollStep == EnrollmentResultStep) BeginNextKey();
         EnrollmentScroll.ScrollToTop(); UpdateSummary();
     }

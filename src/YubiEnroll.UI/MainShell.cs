@@ -295,15 +295,29 @@ public partial class MainWindow
         _deviceRefresh?.Stop();
         _deviceRefresh?.Start();
     }
+    private LoginPanel? _activeLogin;
+    private bool _closeAfterLogin;
+    private bool _captureGeneratedPin;
+    private string? _generatedPin;
     private async Task<int> RunInteractiveAsync(string executable, string[] args)
     {
         _lastInteractiveFailure = "";
-        if (!EmbeddedTerminal) return await new CliRunner(executable).InteractiveAsync(args);
+        if (args.SequenceEqual(new[] { "login" }))
+        {
+            var provider = SelectedProvider;
+            var tenant = TenantConfigWriter.Read(File.ReadAllText(_configPath), provider.Name);
+            var loginPanel = new LoginPanel(provider.Name);
+            _activeLogin = loginPanel;
+            TerminalOverlay.Content = loginPanel; TerminalOverlay.Visibility = Visibility.Visible;
+            try { var result = await loginPanel.RunAsync(executable, tenant); _lastInteractiveFailure = loginPanel.FailureDetail; return result; }
+            finally { _activeLogin = null; TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
+        }
+        if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? "Enroll key · serial " + _selectedKey?.Key.Serial : login ? "Connect to tenant" : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login);
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a key · serial ") + _selectedKey?.Key.Serial : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
-        try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; return code; }
+        try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
     }
 }

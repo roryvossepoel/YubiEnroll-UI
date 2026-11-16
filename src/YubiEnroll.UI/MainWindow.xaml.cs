@@ -97,7 +97,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.5" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.6" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -181,7 +181,7 @@ public partial class MainWindow : Window
         ConnectButton.IsEnabled = provider != null && _cliReady;
         SearchPanel.IsEnabled = IsConnected;
         if (!IsConnected) SelectedUserText.Text = "Connect to a tenant first.";
-        PreparePanel.IsEnabled = IsConnected && Users.SelectedItem != null;
+        PreparePanel.IsEnabled = TargetReady;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
         // Wizard rendering determines which action is available at the current step.
         CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
@@ -203,7 +203,7 @@ public partial class MainWindow : Window
     {
         var user = Users.SelectedItem as UserCandidate;
         SelectedUserText.Text = user == null ? "Search and select a user." : "User selected.";
-        if (user != null) StatusText.Text = _addPasskey ? "User selected. Review the registration before adding the passkey." : "User selected. Choose a configuration profile for this key.";
+        if (user != null) StatusText.Text = _addPasskey ? "User selected. Review the registration before adding the passkey." : "User selected. Review the registration before enrolling the key.";
         UpdateSummary();
     }
 
@@ -245,14 +245,14 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.5\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.6\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
                 MessageBox.Show(this, report.Summary, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
-        finally { WorkPanel.IsEnabled = true; Navigation.IsEnabled = true; SettingsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
+        finally { WorkPanel.IsEnabled = true; Navigation.IsEnabled = true; SettingsButton.IsEnabled = true; _busy = false; UpdateSummary(); if (_closeAfterLogin) { _closeAfterLogin = false; Close(); } }
     }
 
     private void Record(string text, string level = "Info", string detail = "")
@@ -303,7 +303,7 @@ public partial class MainWindow : Window
         _connectedProvider = null;
         ResetSelection();
         await ActivateAsync(provider);
-        StatusText.Text = $"Connecting to {provider.Name}… Complete the native confirmation and browser sign-in. Successful sign-in returns automatically.";
+        StatusText.Text = $"Connecting to {provider.Name}… Complete browser sign-in. Successful sign-in returns automatically.";
         var exit = await RunInteractiveAsync(_exePath, ["login"]);
         Record(exit == 0 ? $"Sign-in completed · {provider.Name}." : $"Sign-in did not complete · {provider.Name}.", exit == 0 ? "Info" : "Error", $"YubiEnroll exit code: {exit}. See the interactive output for the reported cause.\n{_lastInteractiveFailure}");
         if (exit == 0)
@@ -313,7 +313,7 @@ public partial class MainWindow : Window
             StatusText.Text = "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
             _deviceRefresh?.Start();
         }
-        else StatusText.Text = $"Could not connect to {provider.Name}. Select Connect to try again.";
+        else StatusText.Text = $"{_lastInteractiveFailure} Select Connect to try again.";
         UpdateSummary();
         if (IsConnected) _ = Dispatcher.BeginInvoke(() => Query.Focus());
     }, "Connect tenant");
@@ -376,6 +376,8 @@ public partial class MainWindow : Window
         await CheckEnrollmentTargetAsync(target, setup);
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, KeyName.Text);
+        _generatedPin = null;
+        _captureGeneratedPin = registration?.SaveGeneratedPin == true && !_addPasskey && setup.RandomPin == true;
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {setup.Name} · reset {reset}.");
         StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;
@@ -398,12 +400,14 @@ public partial class MainWindow : Window
         }
         finally
         {
+            _captureGeneratedPin = false;
             try { lease?.Dispose(); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
             { Record("Temporary enrollment profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
         }
         // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
-        CompleteRegistrationRecord(registration, code);
+        CompleteRegistrationRecord(registration, code, _generatedPin);
+        _generatedPin = null;
         _deviceRefresh?.Start(); // Refresh status after enrollment, once the operation has released the key.
         Record(code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.", code == 0 ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
         if (code != 0)
@@ -452,7 +456,13 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (_busy)
+        if (_busy && _activeLogin is { } login)
+        {
+            e.Cancel = true;
+            if (MessageBox.Show(this, "Cancel sign-in and close the application?", "Sign-in in progress", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            { _closeAfterLogin = true; login.Cancel(); }
+        }
+        else if (_busy)
         {
             e.Cancel = true;
             MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");

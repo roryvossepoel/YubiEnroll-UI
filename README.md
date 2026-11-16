@@ -1,6 +1,6 @@
 # YubiEnroll UI
 
-## Preview 0.5.5
+## Preview 0.5.6
 
 - Home offers **Set up a key**, **Add a passkey**, and **Reset FIDO**.
 - Setup separates key, tenant, user, configuration profile, and read-only review. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
@@ -86,7 +86,7 @@ Only standalone **FIDO reset** is currently available. Additional application-sp
 2. Under **Artifacts**, download `YubiEnroll-UI-win-x64` for an Intel/AMD Windows PC. GitHub may require you to sign in.
 3. Extract the downloaded artifact once. Keep `YubiEnroll.UI.exe` and `YubiEnroll.ConsoleHost.exe` together.
 4. Install the **[.NET 10 Desktop Runtime for Windows x64](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)**. Choose **Desktop Runtime**, not just the base .NET Runtime. Visual Studio and the SDK are not required.
-5. Install in the standard location and configure [Yubico YubiEnroll](https://www.yubico.com/products/yubienroll/) separately.
+5. Install in the standard location and configure [Yubico YubiEnroll](https://www.yubico.com/support/download/#h-yubienroll) separately.
 6. Install **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or a newer 5.x release** in its standard location. It is required for target verification, inspection and standalone reset.
 7. Start `YubiEnroll.UI.exe`. The app displays the prerequisites and checks for YubiEnroll at startup.
 

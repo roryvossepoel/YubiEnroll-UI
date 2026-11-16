@@ -22,11 +22,14 @@ internal sealed class TerminalPanel : Border
     private PseudoConsole? _session;
     internal string FailureDetail { get; private set; } = "";
     private bool _running;
+    internal string? GeneratedPin { get; private set; }
+    private readonly string? _captureSerial;
+    private readonly bool _enrollment, _addPasskey;
     internal int? CompletedExitCode { get; private set; }
     private readonly bool _autoCloseOnSuccess;
-    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false)
+    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null)
     {
-        _autoCloseOnSuccess = autoCloseOnSuccess;
+        _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
         Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
         var layout = new DockPanel(); Child = layout;
@@ -36,7 +39,7 @@ internal sealed class TerminalPanel : Border
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
         var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
         footer.Children.Add(_status);
-        if (enrollment) footer.Children.Add(new TextBlock { Text = "Record any generated PIN securely before returning. Terminal output is not saved to the activity log.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
+        if (enrollment && !addPasskey) footer.Children.Add(new TextBlock { Text = captureSerial != null ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved." : "Record any generated PIN before returning. Terminal output is not saved to the activity log.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
         footer.Children.Add(_done);
         var output = new Grid(); output.Children.Add(Screen);
         var waiting = new TextBlock { Text = autoCloseOnSuccess ? "Waiting for sign-in…\nIf your browser opened, complete authentication there." : "Starting the interactive operation…", Foreground = Brushes.WhiteSmoke, Margin = new Thickness(18), TextWrapping = TextWrapping.Wrap, IsHitTestVisible = false };
@@ -71,8 +74,9 @@ internal sealed class TerminalPanel : Border
             exit = await session.RunAsync(executable, args);
             // Process queued final output before enabling dismissal.
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+            if (_captureSerial != null) GeneratedPin = GeneratedPinSummary.Read(_screen.Text, _captureSerial);
             if (exit != 0) FailureDetail = InteractiveFailure.Describe(_screen.Text);
-            _status.Text = $"The Yubico tool finished with exit code {exit}." + (exit == 0 ? "" : " The operation may be incomplete. Inspect the result before retrying.");
+            _status.Text = exit == 0 ? (_enrollment ? (_addPasskey ? "Passkey successfully registered (reported by YubiEnroll CLI)." : "Key successfully enrolled (reported by YubiEnroll CLI).") : "FIDO reset completed (reported by YubiKey Manager CLI).") : $"The tool finished with exit code {exit}. The operation may be incomplete. Inspect the result before retrying.";
         }
         catch
         {
