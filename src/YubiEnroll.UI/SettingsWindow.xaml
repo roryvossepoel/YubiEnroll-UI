@@ -5,7 +5,7 @@
   <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0"><TextBlock x:Name="Feedback" TextWrapping="Wrap" Foreground="#526277" VerticalAlignment="Center"/></DockPanel>
   <TabControl x:Name="SettingsTabs">
    <TabItem Header="Tenants"><DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Configure tenants here. Connect to a tenant on the Prepare Key page." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock DockPanel.Dock="Top" Text="Configure tenants here. Connect to a tenant on the Enroll key page." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
     <WrapPanel DockPanel.Dock="Bottom" Margin="0,16,0,0"><Button Content="Add tenant" Click="AddTenant_Click" Style="{StaticResource PrimaryButton}"/><Button x:Name="EditTenantButton" Content="Edit tenant" Click="EditTenant_Click" IsEnabled="False"/><Button x:Name="RemoveTenantButton" Content="Remove" Click="RemoveTenant_Click" IsEnabled="False"/></WrapPanel>
     <TextBox x:Name="TenantFilter" DockPanel.Dock="Top" TextChanged="TenantFilter_Changed" ToolTip="Search tenants by name" AutomationProperties.Name="Search tenants" Margin="0,0,0,12"/>
     <ListBox x:Name="TenantList" SelectionChanged="Selection_Changed" BorderBrush="#DCE3EB" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -22,7 +22,7 @@
     <TextBlock x:Name="VersionInfo" Margin="0,12,0,12" TextWrapping="Wrap"/>
     <TextBlock x:Name="ManagerInfo" TextWrapping="Wrap" Margin="0,0,0,12"/>
     <TextBlock x:Name="AccessInfo" TextWrapping="Wrap" Margin="0,0,0,16"/>
-    <TextBlock Text="YubiEnroll is required for preparation. YubiKey Manager CLI 5.9.2+ (5.x) is required for key inspection and FIDO reset." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
+    <TextBlock Text="YubiEnroll is required for enrollment. YubiKey Manager CLI 5.9.2+ (5.x) is required for target verification, key inspection and FIDO reset." Foreground="#617084" TextWrapping="Wrap" Margin="0,0,0,16"/>
     <WrapPanel Margin="0,0,0,12"><Button Content="Get YubiEnroll" Tag="https://www.yubico.com/products/yubienroll/" Click="Link_Click"/><Button Content="Get YubiKey Manager CLI" Tag="https://developers.yubico.com/yubikey-manager/" Click="Link_Click"/></WrapPanel>
     <WrapPanel><Button Content="Recheck" Click="Recheck_Click"/><Button Content="Restart as administrator" Click="Elevate_Click"/></WrapPanel>
     <TextBlock Text="Interactive console" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
@@ -55,7 +55,7 @@
    </StackPanel></ScrollViewer></TabItem>
    <TabItem Header="Help &amp; About"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
     <StackPanel Orientation="Horizontal"><Image Source="pack://application:,,,/Assets/App.ico" Width="32" Height="32" Margin="0,0,12,0"/><TextBlock Text="YubiEnroll UI" FontSize="28" FontWeight="SemiBold"/></StackPanel>
-    <TextBlock Text="Community preview 0.4.2 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
+    <TextBlock Text="Community preview 0.4.3 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
     <TextBlock Text="An independent open-source community project. Not affiliated with, sponsored by, or endorsed by Yubico. Yubico and YubiKey are trademarks of Yubico." TextWrapping="Wrap" Margin="0,0,0,18"/>
     <TextBlock Text="Our project" Style="{StaticResource SectionTitle}" Margin="0,0,0,10"/>
     <WrapPanel><Button Content="GitHub" Tag="https://github.com/roryvossepoel/YubiEnroll-UI" Click="Link_Click"/><Button Content="Report an issue" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/issues" Click="Link_Click"/><Button Content="Prerequisites" Click="Prerequisites_Click"/><Button Content="Testing guide" Tag="https://github.com/roryvossepoel/YubiEnroll-UI/blob/feature/initial-wpf-app/docs/TESTING.md" Click="Link_Click"/></WrapPanel>

@@ -36,7 +36,7 @@ public partial class SettingsWindow : Window
         ConfigurationInfo.Text = path;
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
         AccessInfo.Text = "Running with administrative permissions: " + (new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator) ? "Yes" : "No");
-        ManagerInfo.Text = KeyResetService.FindExecutable().Length == 0 ? "YubiKey Manager CLI: missing (optional for enrollment)" : "YubiKey Manager CLI: installed; version and device access checked on Overview / Key Management.";
+        ManagerInfo.Text = KeyResetService.FindExecutable().Length == 0 ? "YubiKey Manager CLI: missing (required for target verification)" : "YubiKey Manager CLI: installed; version and device access checked on Overview.";
         Attempt(RefreshLists);
     }
 

@@ -13,6 +13,13 @@ $exe = (Get-ChildItem $destination -Filter yubienroll.exe -Recurse -File | Selec
 if (-not $exe) { throw 'YubiEnroll executable not found in extracted package' }
 & $exe --version
 if ($LASTEXITCODE -ne 0) { throw 'YubiEnroll version check failed' }
+# Confirm the documented enrollment contract against the exact supported executable.
+$enrollmentHelp = & $exe credentials add --help 2>&1
+$enrollmentHelpCode = $LASTEXITCODE
+$enrollmentHelp | Write-Output
+if ($enrollmentHelpCode -ne 0 -or ($enrollmentHelp -join "`n") -notmatch '--profile' -or ($enrollmentHelp -join "`n") -notmatch '--reader') {
+    throw 'Unexpected native enrollment command interface; review target-selection compatibility'
+}
 # Exercise the real native program through the published terminal renderer, without sign-in.
 $terminalArgs = '--terminal-check "' + $exe + '"'
 $terminalCheck = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList $terminalArgs -PassThru

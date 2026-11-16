@@ -93,7 +93,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · preview 0.4.2" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.4.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -177,10 +177,12 @@ public partial class MainWindow : Window
         if (!IsConnected) SelectedUserText.Text = "Connect to a tenant first.";
         PreparePanel.IsEnabled = IsConnected && Users.SelectedItem != null;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
-        EnrollButton.IsEnabled = IsConnected && Users.SelectedItem != null && profile != null;
+        EnrollButton.IsEnabled = IsConnected && Users.SelectedItem != null && profile != null && !_choosingTarget && !_inventoryDirty &&
+            EnrollmentTargetGuard.CanStart(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys);
         CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
         CredentialsButton.Visibility = Users.SelectedItem != null ? Visibility.Visible : Visibility.Collapsed;
         SelectedUserText.Visibility = Users.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
+        UpdateEnrollmentGuidance();
     }
 
     private void ResetSelection()
@@ -196,7 +198,7 @@ public partial class MainWindow : Window
     {
         var user = Users.SelectedItem as UserCandidate;
         SelectedUserText.Text = user == null ? "Search and select a user." : "User selected.";
-        if (user != null) StatusText.Text = "User selected. Review the configuration profile before preparing the key.";
+        if (user != null) StatusText.Text = "User selected. Review the configuration profile before enrolling the key.";
         UpdateSummary();
     }
 
@@ -233,20 +235,19 @@ public partial class MainWindow : Window
         WorkPanel.IsEnabled = false;
         Navigation.IsEnabled = false;
         SettingsButton.IsEnabled = false;
-        KeyToolsButton.IsEnabled = false;
         try { await action(); return true; }
         catch (Exception ex)
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.2\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.4.3\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
                 MessageBox.Show(this, report.Summary, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
-        finally { WorkPanel.IsEnabled = true; Navigation.IsEnabled = true; SettingsButton.IsEnabled = true; KeyToolsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
+        finally { WorkPanel.IsEnabled = true; Navigation.IsEnabled = true; SettingsButton.IsEnabled = true; _busy = false; UpdateSummary(); }
     }
 
     private void Record(string text, string level = "Info", string detail = "")
@@ -254,22 +255,35 @@ public partial class MainWindow : Window
         _activityView.Add(text, level, detail);
     }
 
-    private async void KeyTools_Click(object sender, RoutedEventArgs e)
+    private async void ResetTarget_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy) return;
-        var dialog = new KeyToolsWindow(IsAdministrator(), RunInteractiveAsync) { PreferredKey = _lastKnownKey };
-        dialog.SelectionUpdated += key => SetSelectedKey(key);
-        dialog.OperationRecorded += (message, level) => Record(message, level);
-        dialog.BusyChanged += active => { Navigation.IsEnabled = !active; SettingsButton.IsEnabled = !active; };
-        dialog.Finished += async () =>
+        if (_busy || _inventoryDirty || _choosingTarget || _selectedKey == null || !IsAdministrator()) return;
+        var target = _selectedKey.Key;
+        int? resetExit = null;
+        var resetCompleted = await RunWithResultAsync(async () =>
         {
-            var elevate = dialog.ElevationRequested;
-            ShowPage(OverviewPage);
-            await RefreshOverviewAsync();
-            if (elevate) Elevate_Click(sender, e);
-        };
-        Host(dialog);
-        await dialog.RefreshAsync();
+            var path = KeyResetService.FindExecutable();
+            if (path.Length == 0) throw new InvalidOperationException("Install YubiKey Manager CLI in Prerequisites.");
+            var runner = new CliRunner(path);
+            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a));
+            var exit = resetExit = await service.ResetAsync(target, key => MessageBox.Show(this,
+                $"Target: {key.Label}\n\nErase all FIDO2/U2F passkeys and the PIN on this key? This cannot be undone. Registrations in Entra and other services remain.\n\nOther connected keys are not targeted. Confirm, reinsert and touch this same key in the following prompts.",
+                "Reset target key", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes);
+            StatusText.Text = exit switch { null => "Reset cancelled.", 0 => "YubiKey Manager reported a successful FIDO reset. Reading target status…", _ => "Reset failed or was interrupted. Check the target key before retrying." };
+            Record(StatusText.Text + " · serial " + target.Serial, exit is null or 0 ? "Info" : "Error");
+        }, "Reset target key");
+        await RefreshOverviewAsync();
+        if (resetCompleted && resetExit == 0)
+        {
+            var readBack = _selectedKey?.Key == target ? _selectedKey.Pin : FidoPinState.Unknown;
+            StatusText.Text = readBack switch
+            {
+                FidoPinState.NotSet => "Reset reported successful. Read-back: target PIN is not set. Entra registrations remain.",
+                FidoPinState.Set or FidoPinState.Blocked => "Reset reported successful, but a PIN is still set. Inspect the target before continuing.",
+                _ => "Reset reported successful, but target PIN status could not be verified. Reconnect the target and refresh."
+            };
+            Record(StatusText.Text + " · serial " + target.Serial, readBack == FidoPinState.NotSet ? "Info" : "Warning");
+        }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
@@ -287,7 +301,8 @@ public partial class MainWindow : Window
         {
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, null);
             _connectedProvider = provider;
-            StatusText.Text = "Login completed. Search for the user who will receive this key.";
+            StatusText.Text = "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
+            _deviceRefresh?.Start();
         }
         else StatusText.Text = $"Could not connect to {provider.Name}. Select Connect to try again.";
         UpdateSummary();
@@ -349,8 +364,11 @@ public partial class MainWindow : Window
             false => "This profile does not reset existing FIDO credentials.",
             null => "Reset is not specified. YubiEnroll's default may erase existing FIDO credentials."
         };
+        var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
+        await CheckEnrollmentTargetAsync(target);
         if (!ConfirmEnrollment(provider, profile, user, warning)) return;
         await ActivateAsync(provider, profile);
+        await CheckEnrollmentTargetAsync(target);
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {profile.Name} · reset {reset}.");
         StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         var code = await RunInteractiveAsync(_exePath, arguments);
@@ -403,7 +421,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_busy && !(_hostedWindow is KeyToolsWindow tools && tools.IsOperationActive)) return;
+        if (!_busy) return;
         e.Cancel = true;
         MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
     }
