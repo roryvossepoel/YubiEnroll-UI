@@ -10,7 +10,8 @@ try {
         -KeyExportPolicy NonExportable -HashAlgorithm SHA256 -NotAfter (Get-Date).AddDays(1)
     $publicPath = Join-Path $temporary 'test.cer'
     Export-Certificate -Cert $certificate -FilePath $publicPath | Out-Null
-    Import-Certificate -FilePath $publicPath -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+    # The hosted runner is elevated; machine trust avoids the interactive user-root dialog.
+    Import-Certificate -FilePath $publicPath -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
     $names = @('YubiEnroll.UI.exe', 'YubiEnroll.ConsoleHost.exe')
     foreach ($name in $names) {
         Copy-Item -LiteralPath "$root/artifacts/win-x64/app/$name" -Destination $temporary
@@ -35,7 +36,7 @@ try {
     Write-Host 'Internal signing passed: publisher metadata, both signatures, ZIP round-trip and tamper detection.'
 } finally {
     if ($certificate) {
-        Remove-Item "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -ErrorAction SilentlyContinue
+        Remove-Item "Cert:\LocalMachine\Root\$($certificate.Thumbprint)" -ErrorAction SilentlyContinue
         Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -DeleteKey -ErrorAction SilentlyContinue
     }
     Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
