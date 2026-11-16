@@ -54,7 +54,7 @@ public static class ConfigTransfer
                     string Get(string k) => table.TryGetValue(k, out var value) && value is string s ? s : "";
                     if (Get("provider") != "ENTRA") throw new InvalidDataException("Only ENTRA tenants can be imported.");
                     new TenantSetup(entry.Key, Get("tenant_id"), Get("client_id"), Get("redirect_uri"), Get("profile"), false).Validate();
-                    if (!config.Profiles.Any(p => p.Name == Get("profile"))) throw new InvalidDataException("A tenant references a missing profile.");
+                    if (Get("profile").Length > 0 && !config.Profiles.Any(p => p.Name == Get("profile"))) throw new InvalidDataException("A tenant references a missing profile.");
                     foreach (var endpoint in new[] { "entra_base_url", "graph_base_url" })
                         if (table.ContainsKey(endpoint) && (!Uri.TryCreate(Get(endpoint), UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length > 0))
                             throw new InvalidDataException("Cloud endpoints must be absolute HTTPS URLs without credentials.");

@@ -50,8 +50,10 @@ public partial class MainWindow
             await saveOperation.Task;
             Assert(saved == true, "Tenant dialog closes after successful save");
             await InitializeAsync(root, mockExecutable);
-            Assert(_config?.Providers.Single().Name == "New tenant" && Profiles.Items.Count == 1,
-                "First tenant and profile load after setup");
+            Assert(_config?.Providers.Single().Name == "New tenant" && Profiles.Items.Count == 0 && _config.Providers.Single().Profile == "",
+                "Tenant setup creates no profile or default association");
+            ProfileConfigWriter.Save(ConfigSnapshot.Read(path), new ProfileSetup("standard"));
+            LoadConfiguration(path);
             var beforeCancel = File.ReadAllText(path);
             var cancelDialog = new AddTenantWindow(ConfigSnapshot.Read(path)) { Owner = this };
             var cancelOperation = cancelDialog.Dispatcher.InvokeAsync(() => cancelDialog.Close());
@@ -85,13 +87,13 @@ public partial class MainWindow
             await profileOperation.Task;
             await InitializeAsync(root, mockExecutable);
             Assert(Profiles.Items.Count == 2 && _config?.Providers.Count == 1, "Multiple profiles load alongside existing tenant");
-            var linkedProfile = _config!.Providers.Single().Profile;
+            var linkedProfile = "standard";
             var editDialog = new ProfileWindow(ConfigSnapshot.Read(path), linkedProfile) { Owner = this };
             var editOperation = editDialog.Dispatcher.InvokeAsync(() =>
             {
                 try
                 {
-                    Assert(editDialog.LinkedTenants.Items.Count == 1 && !editDialog.ProfileName.IsReadOnly, "Editor shows linked tenants and permits profile renaming");
+                    Assert(editDialog.UsageText.Text.Contains("any tenant") && !editDialog.ProfileName.IsReadOnly, "Editor describes independent profiles and permits renaming");
                     editDialog.ResetProfile.IsChecked = true;
                     editDialog.ForcePinChange.IsChecked = true;
                     Assert(editDialog.TrySave(), "Existing profile can be edited");
@@ -335,6 +337,7 @@ public partial class MainWindow
         CaptureWindow(this, "home-200-percent.png", 192);
         ShowPage(PreparePage);
         ApplyInventory(new[] { target, admin }, 0);
+        Profiles.SelectedIndex = 0;
         Assert(_selectedKey == null && !EnrollNext.IsEnabled, "Discovery never selects a target automatically");
         EnrollmentKeys.SelectedIndex = 0;
         Assert(_selectedKey == null && OverviewKeys.SelectedItem is KeyStatus candidate && candidate == target && EnrollNext.IsEnabled,
@@ -351,18 +354,21 @@ public partial class MainWindow
         CaptureWindow(this, "enroll-tenant.png");
         EnrollNext_Click(this, e);
         Assert(_enrollStep == 2 && UserCard.IsVisible && !TenantStep.IsVisible && !EnrollNext.IsEnabled, "Recipient is a separate gated step");
-        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") };
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } };
         Users.SelectedIndex = 0;
         CaptureWindow(this, "enroll-user.png");
         EnrollNext_Click(this, e);
-        Assert(_enrollStep == 3 && PreparationCard.IsVisible && !EnrollButton.IsEnabled && ReviewTargetNotice.Text.Contains(admin.Key.Serial),
+        Assert(_enrollStep == 3 && ProfileStep.IsVisible && !PreparationCard.IsVisible, "Profile has its own step after the user");
+        CaptureWindow(this, "enroll-profile.png");
+        EnrollNext_Click(this, e);
+        Assert(_enrollStep == 4 && PreparationCard.IsVisible && !Profiles.IsVisible && !KeyName.IsVisible && !EnrollButton.IsEnabled && ReviewTargetNotice.Text.Contains(admin.Key.Serial),
             "Review blocks enrollment while another key is attached");
         ApplyInventory(new[] { admin }, 0);
         Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Missing target is never replaced by the administrator key");
         ApplyInventory(new[] { target }, 0);
         Assert(_selectedKey == target && _enrollStep == 0 && !EnrollButton.IsEnabled, "Target reconnect requires choosing the key again before enrollment");
-        EnrollNext_Click(this, e); EnrollNext_Click(this, e); EnrollNext_Click(this, e);
-        Assert(_enrollStep == 3 && EnrollButton.IsEnabled, "Review is available again only after confirming the reconnected target");
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e); EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Assert(_enrollStep == 4 && EnrollButton.IsEnabled, "Review is available again only after confirming the reconnected target");
         InvalidateDeviceInventory(); UpdateSummary();
         Assert(!EnrollButton.IsEnabled && !ResetTargetButton.IsEnabled && !EnrollNext.IsEnabled, "USB change immediately invalidates action readiness");
         ApplyInventory(new[] { target }, 0);
@@ -387,7 +393,7 @@ public partial class MainWindow
         Assert(!_inventoryDirty && EnrollButton.IsEnabled, "The latest USB inventory restores readiness when the confirmed target remains present");
         var cached = _selectedKey;
         ShowPage(OverviewPage); ShowPage(PreparePage);
-        Assert(ReferenceEquals(cached, _selectedKey) && _enrollStep == 3 && !_busy, "Navigation preserves target and step without reading hardware");
+        Assert(ReferenceEquals(cached, _selectedKey) && _enrollStep == 4 && !_busy, "Navigation preserves target and step without reading hardware");
         Assert(TaskbarIdentity.HasWindowIcons(this), "Published app exposes the shared icon at both native sizes");
         // A reset is an independent task and cannot start from enrollment selection alone.
         ShowPage(ResetPage); CaptureWindow(this, "reset-key.png");
@@ -396,6 +402,10 @@ public partial class MainWindow
         Assert(_resetStep == 1 && _resetReviewTarget == target.Key && !ResetTargetButton.IsEnabled, "Reset review captures exact target and requires acknowledgment");
         ResetAcknowledged.IsChecked = true;
         Assert(ResetTargetButton.IsEnabled == IsAdministrator(), "Reset action also requires Windows administrator access");
+        ResetTargetButton.ApplyTemplate();
+        var resetSurface = (System.Windows.Controls.Border)ResetTargetButton.Template.FindName("DangerSurface", ResetTargetButton);
+        var resetLabel = (System.Windows.Controls.TextBlock)resetSurface.Child;
+        Assert(((System.Windows.Media.SolidColorBrush)resetLabel.Foreground).Color == (ResetTargetButton.IsEnabled ? System.Windows.Media.Colors.White : System.Windows.Media.Color.FromRgb(82, 96, 107)), "Erase label has explicit readable contrast");
         CaptureWindow(this, "reset-confirm.png");
         InvalidateDeviceInventory();
         Assert(ResetAcknowledged.IsChecked == false && !ResetTargetButton.IsEnabled, "Device change revokes destructive acknowledgment");
@@ -419,11 +429,30 @@ public partial class MainWindow
         Assert(_resetStep == 0 && _selectedKey == null && !ResetNext.IsEnabled, "Reset another key requires a fresh explicit selection");
         ShowPage(PreparePage);
         EnrollmentKeys.SelectedIndex = 0; EnrollNext_Click(this, e); EnrollNext_Click(this, e);
-        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
         EnrollNext_Click(this, e); ApplyInventory(new[] { target }, 0);
         ShowEnrollmentResult("Synthetic result: YubiEnroll reported success. Review registered keys and test sign-in.");
         CaptureWindow(this, "enroll-result.png");
-        Assert(_enrollStep == 4 && !EnrollButton.IsVisible && EnrollNext.IsEnabled, "Enrollment result offers another key without repeating enrollment");
+        Assert(_enrollStep == 5 && !EnrollButton.IsVisible && EnrollNext.IsEnabled, "Enrollment result offers another key without repeating enrollment");
+        AddPasskey_Click(this, e); UpdateLayout();
+        Assert(_addPasskey && _enrollStep == 0 && AddPasskeyButton.Tag as string == "active", "Add passkey is a separate task starting at key selection");
+        ApplyInventory(new[] { target }, 0); EnrollmentKeys.SelectedIndex = 0;
+        Assert(!EnrollNext.IsEnabled, "Add passkey rejects a blocked PIN without proposing an automatic reset");
+        var existing = target with { Pin = FidoPinState.Set };
+        ApplyInventory(new[] { existing }, 0); EnrollmentKeys.SelectedIndex = 0;
+        Assert(EnrollNext.IsEnabled, "Existing working PIN permits the addition flow");
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
+        Profiles.SelectedItem = null; EnrollNext_Click(this, e); UpdateLayout();
+        Assert(_enrollStep == 3 && PreparationCard.IsVisible && !ProfileStep.IsVisible && EnrollButton.IsEnabled && !ReviewWarningBox.IsVisible,
+            "Adding a passkey skips profile selection and reset warnings, and does not need any selected profile");
+        CaptureWindow(this, "add-passkey-review.png"); AssertActionFooterVisible();
+        ApplyInventory(new[] { existing with { Capabilities = existing.Capabilities! with { ForcePinChange = true } } }, 0);
+        Assert(!EnrollButton.IsEnabled, "An existing required PIN change blocks preservation mode");
+        ApplyInventory(new[] { existing }, 0);
+        Prepare_Click(this, e);
+        Assert(!_addPasskey && _enrollStep == 0 && !EnrollButton.IsVisible, "Switching tasks requires a fresh key choice");
+
     }
 
     private void AssertActionFooterVisible()

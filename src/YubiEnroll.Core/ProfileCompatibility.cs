@@ -5,7 +5,7 @@ namespace YubiEnroll.Core;
 
 public sealed record FidoCapabilities(string Serial, string Firmware, bool ClientPin, bool ResidentKey,
     bool PinPolicy, bool AlwaysUvSupported, bool AlwaysUvEnabled, bool EnterpriseAttestation,
-    int MinimumPinLength, int MaximumPinLength, bool ResetBlocked, bool ResetOverUsb, bool AlwaysUvLocked)
+    int MinimumPinLength, int MaximumPinLength, bool ResetBlocked, bool ResetOverUsb, bool AlwaysUvLocked, bool ForcePinChange = false)
 {
     public static FidoCapabilities Parse(string json, ResetKey target)
     {
@@ -38,7 +38,7 @@ public sealed record FidoCapabilities(string Serial, string Firmware, bool Clien
             return new(target.Serial, firmware, Present("clientPin"), Enabled("rk"),
                 Enabled("authnrCfg") && Enabled("setMinPINLength"), Present("alwaysUv"), Enabled("alwaysUv"),
                 Present("ep"), minimum, maximum, root.GetProperty("resetBlocked").GetBoolean(),
-                root.GetProperty("resetOverUsb").GetBoolean(), root.GetProperty("alwaysUvLocked").GetBoolean());
+                root.GetProperty("resetOverUsb").GetBoolean(), root.GetProperty("alwaysUvLocked").GetBoolean(), root.GetProperty("forcePinChange").GetBoolean());
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or InvalidDataException or FormatException or OverflowException)
         {

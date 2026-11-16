@@ -33,7 +33,7 @@ public partial class MainWindow
         SidebarColumn.Width = new GridLength(compact ? 160 : 230);
         BrandTitle.FontSize = compact ? 13 : 19;
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        HomeTasks.Columns = ActualWidth < 950 ? 1 : 2;
+        HomeTasks.Columns = ActualWidth < 1100 ? 1 : 3;
         HomeBody.Margin = compact ? new Thickness(28) : new Thickness(44, 64, 44, 32);
     }
     private void LeaveHostedPage()
@@ -55,9 +55,10 @@ public partial class MainWindow
         if (page != HostedPage) LeaveHostedPage();
         foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var button in new[] { OverviewButton, PrepareButton, ResetButton, SettingsButton })
+        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, SettingsButton })
         {
-            var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage ||
+            var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage && !_addPasskey ||
+                button == AddPasskeyButton && page == PreparePage && _addPasskey ||
                 button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
             button.Tag = active ? "active" : null;
         }
@@ -68,8 +69,17 @@ public partial class MainWindow
     private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);
     private async void Prepare_Click(object sender, RoutedEventArgs e)
     {
+        if (_busy) return;
+        if (_addPasskey) { _addPasskey = false; BeginNextKey(); }
         ShowPage(PreparePage);
         if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+    }
+    private async void AddPasskey_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        if (!_addPasskey) { _addPasskey = true; BeginNextKey(); }
+        ShowPage(PreparePage);
+        if (!RequirementsBlockTasks && !_inventoryLoaded) await RefreshOverviewAsync();
     }
     private async void ResetPage_Click(object sender, RoutedEventArgs e)
     {
@@ -169,7 +179,7 @@ public partial class MainWindow
             ResetAcknowledged.IsChecked = false;
             _resetReviewTarget = null;
             if (_resetStep == 1) _resetStep = 0;
-            if (_enrollStep is > 0 and < 4) _enrollStep = 0;
+            if (_enrollStep > 0 && _enrollStep < EnrollmentResultStep) _enrollStep = 0;
             StatusText.Text = "Target unavailable · serial " + previousTarget!.Serial + ". Select a connected key to continue.";
         }
         // Preserve an unconfirmed choice across a refresh, but never make the first choice for the operator.

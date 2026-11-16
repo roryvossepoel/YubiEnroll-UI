@@ -24,7 +24,9 @@ public partial class MainWindow
             var capabilities = await FidoCapabilityProbe.ReadAsync(runner, target);
             if (!TryApplyInventory(inventory.Keys.Select(k => k == target ? new KeyStatus(k, pin, capabilities) : new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation))
                 throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
-            var compatibility = ProfileCompatibility.Evaluate(profile, capabilities, pin);
+            var compatibility = _addPasskey ? PasskeyAddition.Evaluate(capabilities, pin) : ProfileCompatibility.Evaluate(profile, capabilities, pin);
+            if (_addPasskey && profile != PasskeyAddition.Settings(capabilities))
+                throw new InvalidOperationException("The key settings changed. Review the key again before adding a passkey.");
             if (!compatibility.Compatible) throw new InvalidOperationException(compatibility.Message);
         }
         catch

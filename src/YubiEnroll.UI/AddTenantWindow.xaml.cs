@@ -12,11 +12,6 @@ public partial class AddTenantWindow : Window
     public string? SavedTenantName { get; private set; }
     public string? BackupPath { get; private set; }
 
-    private sealed record ProfileOption(string Label, string? Name)
-    {
-        public override string ToString() => Label;
-    }
-
     public AddTenantWindow(ConfigSnapshot snapshot, string? editName = null)
     {
         _snapshot = snapshot;
@@ -24,10 +19,6 @@ public partial class AddTenantWindow : Window
         InitializeComponent();
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
 
-        var config = ConfigReader.Parse(snapshot.Text ?? "");
-        ProfileChoice.Items.Add(new ProfileOption("Create a new profile", null));
-        foreach (var profile in config.Profiles) ProfileChoice.Items.Add(new ProfileOption(profile.Name, profile.Name));
-        ProfileChoice.SelectedIndex = config.Profiles.Count > 0 ? 1 : 0;
         if (editName != null)
         {
             var tenant = TenantConfigWriter.Read(snapshot.Text ?? "", editName);
@@ -38,14 +29,7 @@ public partial class AddTenantWindow : Window
             TenantId.Text = tenant.TenantId;
             ClientId.Text = tenant.ClientId;
             RedirectUri.Text = tenant.RedirectUri;
-            ProfileChoice.SelectedItem = ProfileChoice.Items.Cast<ProfileOption>().FirstOrDefault(x => x.Name == tenant.ProfileName);
         }
-    }
-
-    private void ProfileChoice_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (NewProfilePanel != null)
-            NewProfilePanel.Visibility = (ProfileChoice.SelectedItem as ProfileOption)?.Name == null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void Save_Click(object sender, RoutedEventArgs e) => TrySave();
@@ -54,11 +38,7 @@ public partial class AddTenantWindow : Window
     {
         try
         {
-            var selected = ProfileChoice.SelectedItem as ProfileOption;
-            var create = selected?.Name == null;
-            if (create && !int.TryParse(PinLength.Text, out _)) throw new ArgumentException("Enter a numeric PIN length (4–63).");
-            var setup = new TenantSetup(TenantName.Text, TenantId.Text, ClientId.Text, RedirectUri.Text,
-                selected?.Name ?? ProfileName.Text, create, create ? int.Parse(PinLength.Text) : 6, ForcePinChange.IsChecked == true).Validate();
+            var setup = new TenantSetup(TenantName.Text, TenantId.Text, ClientId.Text, RedirectUri.Text, "", false).Validate();
             BackupPath = TenantConfigWriter.Save(_snapshot, setup, _editName);
             SavedTenantName = setup.Name;
             DialogResult = true;

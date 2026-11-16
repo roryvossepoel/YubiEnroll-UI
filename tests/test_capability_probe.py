@@ -17,7 +17,7 @@ class ProbeTests(unittest.TestCase):
         calls = []
         options = {"clientPin": client_pin, "rk": True, **(extra_options or {})}
         ctap_info = types.SimpleNamespace(options=options, min_pin_length=minimum,
-                                         max_pin_length=maximum, transports_for_reset=transports)
+                                         max_pin_length=maximum, transports_for_reset=transports, force_pin_change=False)
         class Connection:
             def __init__(self, serial): self.serial = serial
             def __enter__(self): calls.append(("open", self.serial)); return self

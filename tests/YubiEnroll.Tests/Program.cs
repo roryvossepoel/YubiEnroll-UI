@@ -104,7 +104,7 @@ void Reject(Action action, string name)
 
 // Capability-based compatibility: firmware is identity metadata, never a substitute for CTAP options.
 const string modernCapabilities = """
-{"schema":1,"serial":"12345678","firmware":"5.7.1","options":{"clientPin":false,"rk":true,"authnrCfg":true,"setMinPINLength":true,"alwaysUv":false},"minimumPinLength":4,"maximumPinLength":63,"resetBlocked":false,"resetOverUsb":true,"alwaysUvLocked":false}
+{"schema":1,"forcePinChange":false,"serial":"12345678","firmware":"5.7.1","options":{"clientPin":false,"rk":true,"authnrCfg":true,"setMinPINLength":true,"alwaysUv":false},"minimumPinLength":4,"maximumPinLength":63,"resetBlocked":false,"resetOverUsb":true,"alwaysUvLocked":false}
 """;
 var capTarget = new ResetKey("12345678", "YubiKey 5 NFC (5.7.1)");
 var modernCap = FidoCapabilities.Parse(modernCapabilities, capTarget);
@@ -252,7 +252,7 @@ var renamedProfile = ProfileConfigWriter.Build(multiple, policy with { Name = "R
 Check(ConfigReader.Parse(renamedProfile).Providers.Where(x => x.Profile == "Renamed profile").Count() == ConfigReader.Parse(multiple).Providers.Where(x => x.Profile == "Standard").Count(), "Profile rename updates every linked tenant atomically");
 Check(ProfileConfigWriter.Read(renamedProfile, "Renamed profile") == policy with { Name = "Renamed profile" }, "Renaming preserves profile values and accepts spaces");
 Reject(() => ProfileConfigWriter.Build(multiple, policy with { Name = separate.Name }, "Standard"), "Profile rename rejects duplicate names");
-Reject(() => ProfileConfigWriter.Remove(multiple, "Standard"), "Linked profile cannot be removed");
+Check(ConfigReader.Parse(ProfileConfigWriter.Remove(multiple, "Standard")).Providers.All(p => p.Profile != "Standard"), "Removing a profile clears legacy defaults without removing tenants");
 Check(!ConfigReader.Parse(ProfileConfigWriter.Remove(multiple, separate.Name)).Profiles.Any(x => x.Name == separate.Name), "Unused profile can be removed");
 Reject(() => ProfileConfigWriter.Build(multiple, separate with { RandomPinLength = 6 }), "Generated PIN cannot be shorter than minimum");
 Reject(() => ProfileConfigWriter.Build(multiple, separate with { MinPinLength = 64 }), "Profile PIN limit enforced");
@@ -427,6 +427,7 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0,
     EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 RegistrationJournalTests.Run(Check);
+Workflow055Tests.Run(Check);
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 

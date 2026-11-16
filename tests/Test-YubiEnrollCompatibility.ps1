@@ -20,6 +20,9 @@ $enrollmentHelp | Write-Output
 if ($enrollmentHelpCode -ne 0 -or ($enrollmentHelp -join "`n") -notmatch '--profile' -or ($enrollmentHelp -join "`n") -notmatch '--reader') {
     throw 'Unexpected native enrollment command interface; review target-selection compatibility'
 }
+foreach ($option in @('--no-reset', '--no-random-pin', '--no-force-pin-change', '--no-require-always-uv', '--no-require-ea')) {
+    if (($enrollmentHelp -join "`n") -notmatch [regex]::Escape($option)) { throw "Missing add-passkey option $option" }
+}
 # Exercise the real native program through the published terminal renderer, without sign-in.
 $terminalArgs = '--terminal-check "' + $exe + '"'
 $terminalCheck = Start-Process ./artifacts/win-x64/app/YubiEnroll.UI.exe -ArgumentList $terminalArgs -PassThru

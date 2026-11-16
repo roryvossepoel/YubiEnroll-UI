@@ -7,7 +7,7 @@ public sealed record UserCandidate(string Id, string Details)
     public string DisplayName { get; init; } = "";
     public string UserPrincipalName { get; init; } = "";
     public string Email { get; init; } = "";
-    public string Label => string.Join("  ·  ", Regex.Split(Details.Replace(Id, "", StringComparison.OrdinalIgnoreCase).Trim(' ', '|', '│'), @"\s{2,}|[|│]").Select(x => x.Trim()).Where(x => x.Length > 0 && x != "None"));
+    public string Label => string.Join("  ·  ", Regex.Split(Details.Replace(Id, "", StringComparison.OrdinalIgnoreCase).Trim(' ', '|', '│'), @"\s{2,}|[|│]").Select(x => x.Trim()).Where(x => x.Length > 0 && x != "None").Distinct(StringComparer.OrdinalIgnoreCase));
     public override string ToString() => Details;
 }
 

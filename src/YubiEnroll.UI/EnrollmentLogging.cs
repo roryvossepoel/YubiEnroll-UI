@@ -33,8 +33,8 @@ public partial class MainWindow
         RegistrationLogStatus.Text = _registrationResultMessage + (_registrationJournal.PendingCount > 0 ? $"\n{_registrationJournal.PendingCount} result(s) still need to be saved." : "");
         RetryRegistrationLog.Visibility = Visible(_registrationJournal.PendingCount > 0);
         RegistrationReviewNote.Text = _registrationJournal.SettingsError ?? (_registrationJournal.Preferences.Enabled
-            ? "Registration logging is on. This enrollment's recipient, target key and configured options will be recorded."
-            : "Registration logging is off. Enable it in Settings → Registration log to keep an issuance record.");
+            ? "Registration logging enabled."
+            : "Registration logging disabled.");
     }
 
     private void RetryRegistrationLog_Click(object sender, RoutedEventArgs e)

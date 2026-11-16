@@ -22,6 +22,7 @@ with device.open_connection(FidoConnection) as connection:
     # Only a small allowlist of non-secret capabilities leaves this process.
     data = {
         "schema": 1,
+        "forcePinChange": bool(info.force_pin_change),
         "serial": str(device_info.serial),
         "firmware": str(device_info.version),
         "options": {k: options[k] for k in (

@@ -23,10 +23,7 @@ public partial class ProfileWindow : Window
         ProfileName.Text = profile.Name;
         ProfileName.IsReadOnly = false;
         ApplySettings(profile);
-        var linked = ConfigReader.Parse(snapshot.Text ?? "").Providers.Where(x => x.Profile == editName).Select(x => x.Name).ToArray();
-        LinkedTenants.ItemsSource = linked;
-        UsageText.Text = linked.Length > 0 ? $"Used by {linked.Length} tenant(s). Changes apply to all of them." :
-            "Select this profile in the main window to use it for enrollment.";
+        UsageText.Text = "Choose this profile during key setup. It can be used with any tenant and a compatible key.";
         foreach (var box in new[] { ResetProfile, AlwaysUv, EnterpriseAttestation, ForcePinChange, RandomPin })
         {
             box.Checked += (_, _) => UpdateRequirements(); box.Unchecked += (_, _) => UpdateRequirements();

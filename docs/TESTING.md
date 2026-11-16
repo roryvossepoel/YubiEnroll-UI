@@ -176,3 +176,14 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Verify real Connect output remains visible before browser authentication completes. The app must provide a waiting message even when the CLI has not emitted output. Test real enrollment prompts, hidden PIN input and generated PIN visibility using a disposable key. External console remains an explicit fallback; never auto-retry a started operation.
 
 Automated regressions include live terminal text before input/process exit, actual native YubiEnroll `--help` through the published renderer (no authentication), both native window icon sizes, hosted fonts, direct Activity navigation and editable name suggestions. Physical browser sign-in and taskbar shell caching remain manual checks.
+
+
+## Preview 0.5.5 hardware acceptance
+
+1. Create a tenant without profiles, then independently create Basic and Managed profiles. Change tenants and verify profile choice is not replaced by a tenant default.
+2. Use older and newer firmware: incompatible profiles remain visible with reasons; no transition to Review is allowed. Review has no editable profile/name fields.
+3. Enroll through a supported profile and check the existing native reset confirmation, result and optional registration journal.
+4. On a test key with existing credentials and a known PIN, use Add a passkey for another account/tenant. Set a destructive native default profile on that tenant first. Confirm the temporary explicit profile has reset/random PIN/forced PIN change disabled and no minimum override. Verify the existing PIN and original credentials still work and Always UV remains unchanged. Repeat with Always UV enabled, including a supporting locked-UV key. Check registration log flags are false/false.
+5. A missing/blocked PIN or existing force-PIN-change state must block Add a passkey. Device removal and additional connected keys must block both tasks without silently selecting another key.
+6. Check all three task cards, five-step setup and four-step addition at 100%, 150%, 200% scale and narrow window sizes. Confirm the reset label is white when enabled and readable gray when disabled.
+7. Verify failure/cancellation never repeats the native operation. Temporary-profile cleanup must not overwrite concurrent configuration edits; native outcomes and log retry must remain available.

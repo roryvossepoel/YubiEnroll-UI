@@ -1,5 +1,18 @@
 # YubiEnroll UI
 
+## Preview 0.5.5
+
+- Home offers **Set up a key**, **Add a passkey**, and **Reset FIDO**.
+- Setup separates key, tenant, user, configuration profile, and read-only review. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
+- Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
+- Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, minimum PIN policy, or forced PIN change. It carries forward the detected Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
+- The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-add-passkey-*` profile; it can be removed in Settings. Configuration backups retain the previous TOML, as for other edits.
+- Both tasks keep the existing single-target USB preflight restriction. YubiEnroll has no USB serial selector; keep only the intended key connected throughout the native operation. NFC is not implemented in this preview.
+- Review deduplicates the user's sign-in/email information. Task icons share one background; the reset button has explicit readable active/hover/focus/disabled states.
+
+Real hardware testing remains required, especially adding a credential while checking that existing credentials, PIN, and key settings remain usable.
+
+
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
 **Version 0.5.4 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.

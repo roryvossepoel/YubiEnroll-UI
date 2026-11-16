@@ -27,7 +27,7 @@ public sealed record TenantSetup(string Name, string TenantId, string ClientId, 
         if (CreateProfile && PinLength is < 4 or > 63)
             throw new ArgumentException("PIN length must be between 4 and 63.");
         return this with { Name = NameValue(Name, "Tenant name"), TenantId = IdValue(TenantId, "Tenant ID"),
-            ClientId = IdValue(ClientId, "Client ID"), RedirectUri = redirect, ProfileName = NameValue(ProfileName, "Profile name") };
+            ClientId = IdValue(ClientId, "Client ID"), RedirectUri = redirect, ProfileName = string.IsNullOrWhiteSpace(ProfileName) && !CreateProfile ? "" : NameValue(ProfileName, "Profile name") };
     }
 }
 
@@ -61,7 +61,7 @@ public static class TenantConfigWriter
             throw new ArgumentException("A provider with this name already exists. Choose a different tenant name.");
         if (setup.CreateProfile && profiles.Keys.Any(x => x.Equals(setup.ProfileName, StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("A profile with this name already exists. Select that profile or choose another name.");
-        if (!setup.CreateProfile && !parsed.Profiles.Any(x => x.Name == setup.ProfileName))
+        if (!setup.CreateProfile && setup.ProfileName.Length > 0 && !parsed.Profiles.Any(x => x.Name == setup.ProfileName))
             throw new ArgumentException("The selected profile no longer exists. Reopen Add tenant and select a profile.");
         var addition = new TomlTable();
         var provider = new TomlTable
@@ -69,6 +69,7 @@ public static class TenantConfigWriter
             ["provider"] = "ENTRA", ["tenant_id"] = setup.TenantId, ["client_id"] = setup.ClientId,
             ["redirect_uri"] = setup.RedirectUri, ["profile"] = setup.ProfileName
         };
+        if (setup.ProfileName.Length == 0) provider.Remove("profile");
         addition["providers"] = new TomlTable { [setup.Name] = provider };
         if (setup.CreateProfile)
             addition["profiles"] = new TomlTable { [setup.ProfileName] = new TomlTable
@@ -120,12 +121,13 @@ public static class TenantConfigWriter
             profiles[setup.ProfileName] = ((TomlTable)addition["profiles"])[setup.ProfileName];
             model["profiles"] = profiles;
         }
-        else if (!profiles.ContainsKey(setup.ProfileName)) throw new ArgumentException("Choose an existing profile.");
+        else if (setup.ProfileName.Length > 0 && !profiles.ContainsKey(setup.ProfileName)) throw new ArgumentException("Choose an existing profile.");
         var tenant = (TomlTable)((TomlTable)model["providers"])[name];
         tenant["tenant_id"] = setup.TenantId;
         tenant["client_id"] = setup.ClientId;
         tenant["redirect_uri"] = setup.RedirectUri;
-        tenant["profile"] = setup.ProfileName;
+        if (setup.ProfileName.Length == 0) tenant.Remove("profile");
+        else tenant["profile"] = setup.ProfileName;
         if (setup.Name != name)
         {
             providers.Remove(name);

@@ -24,10 +24,7 @@ public partial class SettingsWindow : Window
     }
     private Window DialogOwner => Owner ?? this;
     public bool EmbeddedTerminal { get => EmbeddedChoice.IsChecked == true; set => EmbeddedChoice.IsChecked = value; }
-    private sealed record ProfileRow(string Name, string[] Tenants)
-    {
-        public string Usage => Tenants.Length == 0 ? "Not assigned to a tenant" : $"Used by {Tenants.Length} tenant(s)";
-    }
+    private sealed record ProfileRow(string Name, string Usage);
     public bool Changed { get; private set; }
 
     public SettingsWindow(string path, string executable, string version, RegistrationJournal? registrationJournal = null)
@@ -64,7 +61,7 @@ public partial class SettingsWindow : Window
         var config = ConfigReader.Parse(ConfigSnapshot.Read(_path).Text ?? "");
         TenantList.ItemsSource = config.Providers.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         TenantFilter_Changed(this, null!);
-        ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, config.Providers.Where(t => t.Profile == p.Name).Select(t => t.Name).ToArray()));
+        ProfileList.ItemsSource = config.Profiles.Select(p => new ProfileRow(p.Name, ProfileCompatibility.Requirements(ProfileConfigWriter.Read(ConfigSnapshot.Read(_path).Text ?? "", p.Name))));
         Feedback.Text = "";
     }
 
@@ -177,7 +174,7 @@ public partial class SettingsWindow : Window
     {
         if (ProfileList.SelectedItem is not ProfileRow profile) return;
         var snapshot = ConfigSnapshot.Read(_path);
-        var result = ProfileConfigWriter.Remove(snapshot.Text ?? "", profile.Name); // Refuses linked profiles before confirmation.
+        var result = ProfileConfigWriter.Remove(snapshot.Text ?? "", profile.Name);
         if (MessageBox.Show(DialogOwner, $"Remove '{profile.Name}' from local configuration?\n\nPreviously prepared keys and registered credentials are not changed.", "Remove profile", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         ConfigFileWriter.Save(snapshot, result);
         Changed = true; RefreshLists();

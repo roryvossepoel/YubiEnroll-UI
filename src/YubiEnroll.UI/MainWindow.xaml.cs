@@ -30,7 +30,7 @@ public partial class MainWindow : Window
     private readonly bool _smokeTest;
     private Provider SelectedProvider => Tenants.SelectedItem as Provider
         ?? throw new InvalidOperationException("Select an Entra tenant first.");
-    private EnrollmentProfile SelectedProfile => Profiles.SelectedItem as EnrollmentProfile
+    private EnrollmentProfile SelectedProfile => (Profiles.SelectedItem as ProfileChoice)?.Profile
         ?? throw new InvalidOperationException("Select a configuration profile first.");
     private UserCandidate SelectedUser => Users.SelectedItem as UserCandidate
         ?? throw new InvalidOperationException("Search and select a user first.");
@@ -97,13 +97,13 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.4" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.5" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
         _connectedProvider = null;
         var oldTenant = (Tenants.SelectedItem as Provider)?.Name;
-        var oldProfile = (Profiles.SelectedItem as EnrollmentProfile)?.Name;
+        var oldProfile = (Profiles.SelectedItem as ProfileChoice)?.Profile.Name;
         // The CLI uses this Windows user's configuration. Never silently open another tenant config.
         _configPath = configPath ?? ConfigReader.FindPath();
         // Invalidate stale selections even if the new config is missing or malformed.
@@ -126,13 +126,12 @@ public partial class MainWindow : Window
         {
             _config = config;
             Tenants.ItemsSource = config.Providers;
-            Profiles.ItemsSource = config.Profiles;
+            Profiles.ItemsSource = config.Profiles.Select(p => new ProfileChoice(p)).ToArray();
             Tenants.SelectedItem = config.Providers.FirstOrDefault(x => x.Name == oldTenant)
                 ?? config.Providers.FirstOrDefault(x => x.Name == config.ActiveProvider)
                 ?? config.Providers.FirstOrDefault();
             var tenant = Tenants.SelectedItem as Provider;
-            Profiles.SelectedItem = config.Profiles.FirstOrDefault(x => x.Name == oldProfile && tenant?.Name == oldTenant)
-                ?? config.Profiles.FirstOrDefault(x => x.Name == tenant?.Profile);
+            Profiles.SelectedItem = Profiles.Items.Cast<ProfileChoice>().FirstOrDefault(x => x.Profile.Name == oldProfile);
             ResetSelection();
         }
         finally { _loading = false; }
@@ -160,7 +159,6 @@ public partial class MainWindow : Window
         SuggestRegistrationName();
         Details.Clear();
         var provider = Tenants.SelectedItem as Provider;
-        Profiles.SelectedItem = _config?.Profiles.FirstOrDefault(x => x.Name == provider?.Profile);
         UpdateSummary();
     }
 
@@ -247,7 +245,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.4\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.5\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -361,16 +359,16 @@ public partial class MainWindow : Window
 
     private async void Enroll_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
-        if (_enrollStep != 3 || !EnrollmentReady || !_reviewValid) throw new InvalidOperationException("Review the target, tenant, user and profile first.");
+        if (_enrollStep != ReviewStep || !EnrollmentReady || !_reviewValid) throw new InvalidOperationException("Review the target, tenant, user and profile first.");
         var provider = SelectedProvider;
-        var profile = SelectedProfile;
+        EnrollmentProfile? profile = _addPasskey ? null : SelectedProfile;
         var user = SelectedUser;
         RequireConnection();
         var current = ConfigReader.Read(_configPath);
         ConfigReader.EnsureUnchanged(current, provider, profile);
-        var setup = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name);
+        var setup = _addPasskey ? PasskeyAddition.Settings(_selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")) :
+            ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile!.Name);
         var reset = setup.Reset;
-        var arguments = EnrollmentCommand.Build(user.Id, profile.Name, KeyName.Text, reset);
         var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
         await CheckEnrollmentTargetAsync(target, setup);
         // The Review step is the confirmation; never silently skip its fresh target checks.
@@ -378,15 +376,29 @@ public partial class MainWindow : Window
         await CheckEnrollmentTargetAsync(target, setup);
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, KeyName.Text);
-        Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {profile.Name} · reset {reset}.");
-        StatusText.Text = EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
+        Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {setup.Name} · reset {reset}.");
+        StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;
-        try { code = await RunInteractiveAsync(_exePath, arguments); }
+        PasskeyProfileLease? lease = null;
+        try
+        {
+            if (_addPasskey) lease = PasskeyProfileLease.Create(_configPath, setup);
+            var operationProfile = lease?.Profile ?? profile!;
+            ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, operationProfile);
+            var arguments = EnrollmentCommand.Build(user.Id, operationProfile.Name, KeyName.Text, reset);
+            code = await RunInteractiveAsync(_exePath, arguments);
+        }
         catch
         {
             CompleteRegistrationRecord(registration, null);
             ShowEnrollmentResult("The enrollment outcome is unknown. Check Registered keys and Entra before retrying.");
             throw;
+        }
+        finally
+        {
+            try { lease?.Dispose(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            { Record("Temporary add-passkey profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
         }
         // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
         CompleteRegistrationRecord(registration, code);
