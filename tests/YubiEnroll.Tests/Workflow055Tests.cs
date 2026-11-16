@@ -16,13 +16,18 @@ static class Workflow055Tests
         check(!PasskeyAddition.Evaluate(key, FidoPinState.NotSet).Compatible && !PasskeyAddition.Evaluate(key, FidoPinState.Blocked).Compatible && !PasskeyAddition.Evaluate(null, FidoPinState.Set).Compatible, "Add passkey blocks new, blocked or unreadable keys");
         check(!PasskeyAddition.Evaluate(key with { ForcePinChange = true }, FidoPinState.Set).Compatible, "Add passkey never clears a pending forced PIN change");
         var settings = PasskeyAddition.Settings(key);
-        check(settings.Reset == false && settings.RandomPin == false && settings.ForcePinChange == false && settings.MinPinLength == null && settings.RandomPinLength == null && settings.RequireAlwaysUv == true, "Preservation mode keeps Always UV and requests no reset, replacement PIN or minimum override");
+        check(settings.Reset == false && settings.RandomPin == false && settings.ForcePinChange == false && settings.MinPinLength == 4 && settings.RandomPinLength == 4 && settings.RequireAlwaysUv == true, "Preservation mode keeps Always UV and requests no reset, replacement PIN or minimum policy change");
+        var stricter = key with { MinimumPinLength = 8 };
+        check(PasskeyAddition.Settings(stricter).MinPinLength == 8, "Addition carries the detected PIN floor instead of a fixed default");
+        var basic = ProfileCompatibility.Basic("Basic");
+        check(EnrollmentProfileLease.Resolve(basic, stricter).MinPinLength == 8 && basic.MinPinLength == null,
+            "Native basic profile resolves an omitted floor without rewriting the reusable profile");
         var dir = Path.Combine(Path.GetTempPath(), "YubiEnroll-055-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "yubienroll.toml"); File.WriteAllText(path, legacy);
         try
         {
             string operationName;
-            using (var lease = PasskeyProfileLease.Create(path, settings))
+            using (var lease = EnrollmentProfileLease.Create(path, settings))
             {
                 operationName = lease.Profile.Name;
                 var operation = ProfileConfigWriter.Read(File.ReadAllText(path), operationName);

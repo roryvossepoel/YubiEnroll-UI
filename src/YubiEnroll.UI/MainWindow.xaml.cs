@@ -379,10 +379,12 @@ public partial class MainWindow : Window
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {setup.Name} · reset {reset}.");
         StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;
-        PasskeyProfileLease? lease = null;
+        EnrollmentProfileLease? lease = null;
         try
         {
-            if (_addPasskey) lease = PasskeyProfileLease.Create(_configPath, setup);
+            if (_addPasskey || setup.MinPinLength == null || setup.RandomPinLength == null)
+                lease = EnrollmentProfileLease.Create(_configPath, EnrollmentProfileLease.Resolve(setup,
+                    _selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")));
             var operationProfile = lease?.Profile ?? profile!;
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, operationProfile);
             var arguments = EnrollmentCommand.Build(user.Id, operationProfile.Name, KeyName.Text, reset);
@@ -398,7 +400,7 @@ public partial class MainWindow : Window
         {
             try { lease?.Dispose(); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-            { Record("Temporary add-passkey profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
+            { Record("Temporary enrollment profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
         }
         // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
         CompleteRegistrationRecord(registration, code);

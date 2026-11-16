@@ -17,19 +17,26 @@ public static class PasskeyAddition
         return new(issues);
     }
     public static ProfileSetup Settings(FidoCapabilities key) => new("Add a passkey", Reset: false,
-        MinPinLength: null, RequireAlwaysUv: key.AlwaysUvEnabled, RequireEa: false,
-        ForcePinChange: false, RandomPin: false, RandomPinLength: null);
+        MinPinLength: key.MinimumPinLength, RequireAlwaysUv: key.AlwaysUvEnabled, RequireEa: false,
+        ForcePinChange: false, RandomPin: false, RandomPinLength: key.MinimumPinLength);
 }
 
-public sealed class PasskeyProfileLease : IDisposable
+public sealed class EnrollmentProfileLease : IDisposable
 {
     private readonly string _path;
     public EnrollmentProfile Profile { get; }
-    private PasskeyProfileLease(string path, EnrollmentProfile profile) { _path = path; Profile = profile; }
-    public static PasskeyProfileLease Create(string path, ProfileSetup setup)
+    private EnrollmentProfileLease(string path, EnrollmentProfile profile) { _path = path; Profile = profile; }
+    // YubiEnroll 1.2.0 indexes min_pin_length directly. Supply the freshly read
+    // floor when a basic profile leaves it unset; never substitute a policy default.
+    public static ProfileSetup Resolve(ProfileSetup setup, FidoCapabilities key) => setup with
+    {
+        MinPinLength = setup.MinPinLength ?? key.MinimumPinLength,
+        RandomPinLength = setup.RandomPinLength ?? setup.MinPinLength ?? key.MinimumPinLength
+    };
+    public static EnrollmentProfileLease Create(string path, ProfileSetup setup)
     {
         var snapshot = ConfigSnapshot.Read(path);
-        var name = "UI-add-passkey-" + Guid.NewGuid().ToString("N");
+        var name = "UI-enrollment-" + Guid.NewGuid().ToString("N");
         var content = ProfileConfigWriter.Build(snapshot.Text, setup with { Name = name });
         ConfigFileWriter.Save(snapshot, content);
         return new(path, ConfigReader.Parse(content).Profiles.Single(p => p.Name == name));
