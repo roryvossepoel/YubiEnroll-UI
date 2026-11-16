@@ -24,6 +24,7 @@ public static class UserSearch
     {
         var result = new List<UserCandidate>();
         string[] columns = [];
+        int[] columnStarts = [];
         foreach (var raw in Ansi.Replace(output, "").Split('\n'))
         {
             var line = raw.Trim();
@@ -32,12 +33,17 @@ public static class UserSearch
                 cells.Skip(1).All(c => c.ToLowerInvariant() is "display name" or "username" or "email"))
             {
                 columns = cells;
+                columnStarts = !line.Contains('|') && !line.Contains('│')
+                    ? Regex.Matches(line, @"\b(?:ID|Display Name|Username|Email)\b", RegexOptions.IgnoreCase).Select(m => m.Index).ToArray() : [];
+                if (columnStarts.Length != columns.Length || columnStarts[1] < 36) columnStarts = [];
                 continue;
             }
             var match = IdRow.Match(line);
             if (match.Success && Guid.TryParse(match.Groups["id"].Value, out var id) && id != Guid.Empty)
             {
                 var candidate = new UserCandidate(id.ToString(), line);
+                if (columnStarts.Length > 0)
+                    cells = columnStarts.Select((start, i) => start >= line.Length ? "" : line[start..(i + 1 < columnStarts.Length ? Math.Min(columnStarts[i + 1], line.Length) : line.Length)].Trim()).ToArray();
                 // Only use explicitly labelled columns. Never infer an email/UPN from its position in free text.
                 if (columns.Length == cells.Length && cells[0].Equals(id.ToString(), StringComparison.OrdinalIgnoreCase))
                     for (var i = 1; i < columns.Length; i++) candidate = SetField(candidate, columns[i], cells[i]);

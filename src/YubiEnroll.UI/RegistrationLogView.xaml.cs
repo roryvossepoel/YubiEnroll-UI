@@ -21,6 +21,8 @@ public partial class RegistrationLogView : UserControl
         InitializeComponent();
         EnabledChoice.IsChecked = journal.Preferences.Enabled;
         FolderPath.Text = journal.Preferences.Directory;
+        FolderPath.ToolTip = FolderPath.Text;
+        LoggingPreferences.IsExpanded = !journal.Preferences.Enabled || journal.SettingsError != null;
         RefreshRecords();
     }
     private void SavePreference_Click(object sender, RoutedEventArgs e)
@@ -28,6 +30,7 @@ public partial class RegistrationLogView : UserControl
         try
         {
             _journal.Configure(EnabledChoice.IsChecked == true, FolderPath.Text);
+            LoggingPreferences.IsExpanded = false;
             RefreshRecords();
         }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
@@ -36,7 +39,7 @@ public partial class RegistrationLogView : UserControl
     private void Browse_Click(object sender, RoutedEventArgs e)
     {
         var picker = new OpenFolderDialog { Title = "Choose the registration log folder", Multiselect = false };
-        if (picker.ShowDialog(Window.GetWindow(this)) == true) FolderPath.Text = picker.FolderName;
+        if (picker.ShowDialog(Window.GetWindow(this)) == true) { FolderPath.Text = picker.FolderName; FolderPath.ToolTip = picker.FolderName; }
     }
     internal void RefreshRecords()
     {
@@ -69,6 +72,7 @@ public partial class RegistrationLogView : UserControl
         var invalidDates = FromDate.SelectedDate > ThroughDate.SelectedDate;
         IReadOnlyList<RegistrationRecord> visible = invalidDates ? [] : RegistrationJournal.Filter(_records, (TenantFilter.SelectedItem as TenantChoice)?.Id, FromDate.SelectedDate, ThroughDate.SelectedDate, SuccessOnly.IsChecked == true);
         Records.ItemsSource = visible;
+        Records.Height = Math.Clamp(visible.Count * 36 + 30, 140, 260);
         CountText.Text = invalidDates ? "Choose an end date on or after the start date." : visible.Count == 0 ? "No enrollment records match this view." : $"{visible.Count} enrollment record(s) · export uses these filters";
         ExportButton.IsEnabled = visible.Count > 0;
         SelectionDetails.Text = "Select a record to see its user, key and profile details.";
@@ -77,7 +81,7 @@ public partial class RegistrationLogView : UserControl
     {
         if (Records.SelectedItem is not RegistrationRecord r) return;
         string Known(string value) => string.IsNullOrEmpty(value) ? "Not provided by YubiEnroll" : value;
-        SelectionDetails.Text = $"UPN: {Known(r.UserPrincipalName)}\nEmail: {Known(r.Email)}\nKey: {r.KeyModel} · target serial {r.TargetSerial}\nProfile: {r.ProfileName} · reset before enrollment: {(r.ResetBeforeEnrollment ? "Yes" : "No")} · PIN change on first use: {(r.ForcePinChangeOnFirstUse ? "Yes" : "No")}\nAttempt: {r.AttemptId}";
+        SelectionDetails.Text = $"UPN: {Known(r.UserPrincipalName)} · Email: {Known(r.Email)}\nKey: {r.KeyModel} · target serial {r.TargetSerial} · Profile: {r.ProfileName}\nReset before enrollment: {(r.ResetBeforeEnrollment ? "Yes" : "No")} · PIN change on first use: {(r.ForcePinChangeOnFirstUse ? "Yes" : "No")}\nAttempt: {r.AttemptId}";
     }
     private void Export_Click(object sender, RoutedEventArgs e)
     {

@@ -71,6 +71,10 @@ internal static class RegistrationJournalTests
             check(unnamed.DisplayName == "" && unnamed.Email == "" && unnamed.UserPrincipalName == "", "Unlabelled user output never guesses export identity fields");
             var absentEmail = UserSearch.Parse($"ID: {userId}\nUsername: upn@example.test\nEmail: None").Single();
             check(absentEmail.Email == "" && absentEmail.UserPrincipalName == "upn@example.test", "Missing email is not replaced with UPN");
+            var aligned = UserSearch.Parse($"{\"ID\",-38}{\"Display name\",-24}{\"Username\",-28}Email\n{userId,-38}{\"Alex  Example\",-24}{\"upn@example.test\",-28}\n").Single();
+            check(aligned.DisplayName == "Alex  Example" && aligned.UserPrincipalName == "upn@example.test" && aligned.Email == "", "Fixed-width user columns preserve double spaces and a blank trailing email");
+            var blankName = UserSearch.Parse($"{\"ID\",-38}{\"Display name\",-24}{\"Username\",-28}Email\n{userId,-38}{\"\",-24}{\"upn@example.test\",-28}mail@example.test\n").Single();
+            check(blankName.DisplayName == "" && blankName.UserPrincipalName == "upn@example.test" && blankName.Email == "mail@example.test", "Empty display-name column cannot shift UPN into the name field");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
     }

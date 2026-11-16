@@ -43,6 +43,14 @@ public partial class MainWindow
         view.FromDate.SelectedDate = null; view.ThroughDate.SelectedDate = null; view.SuccessOnly.IsChecked = false;
         view.Records.SelectedIndex = 2;
         CaptureWindow(settings, "settings-registration-log.png");
+        Assert(!view.LoggingPreferences.IsExpanded, "Enabled logging keeps storage preferences collapsed so records stay prominent");
+        view.LoggingPreferences.IsExpanded = true;
+        CaptureWindow(settings, "registration-preferences.png");
+        view.LoggingPreferences.IsExpanded = false;
+        var width = settings.Width; var height = settings.Height;
+        settings.Width = 740; settings.Height = 600;
+        CaptureWindow(settings, "registration-log-compact.png");
+        settings.Width = width; settings.Height = height;
         _registrationJournal.Configure(false, _registrationJournal.Preferences.Directory);
         Assert(_registrationJournal.Read().Count == 3, "Turning registration logging off preserves previous records");
     }
