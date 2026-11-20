@@ -48,7 +48,7 @@ public partial class MainWindow
         DockPanel.SetDock(note, Dock.Top); layout.Children.Add(note);
         var buttons = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) }; DockPanel.SetDock(buttons, Dock.Bottom); layout.Children.Add(buttons);
         var close = new Button { Content = "Close", IsCancel = true }; close.Click += (_, _) => dialog.Close();
-        var refresh = new Button { Content = "Refresh" }; buttons.Children.Add(refresh); buttons.Children.Add(close);
+        var refresh = new Button { Content = "Refresh", ContentTemplate = (DataTemplate)FindResource("RefreshContent") }; buttons.Children.Add(refresh); buttons.Children.Add(close);
         var display = new StackPanel();
         layout.Children.Add(new ScrollViewer { Content = display, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         void Render(string text)

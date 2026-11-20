@@ -97,9 +97,10 @@ public partial class MainWindow
         EnrollButton.Visibility = Visible(_enrollStep == ReviewStep);
         EnrollButton.IsEnabled = !_busy && _enrollStep == ReviewStep && EnrollmentReady && _reviewValid;
         EnrollNext.Visibility = Visible(_enrollStep != ReviewStep);
-        EnrollNext.Content = _enrollStep == 0 ? (_addPasskey ? "Continue to tenant  →" : "Continue to profile  →") :
-            !_addPasskey && _enrollStep == 1 ? "Continue to tenant  →" : _enrollStep == TenantStepIndex ? "Continue to user  →" :
-            _enrollStep == EnrollmentResultStep ? (_addPasskey ? "Add another passkey" : "Set up another key") : "Review registration  →";
+        EnrollNext.Content = _enrollStep == 0 ? (_addPasskey ? "Continue to tenant" : "Continue to profile") :
+            !_addPasskey && _enrollStep == 1 ? "Continue to tenant" : _enrollStep == TenantStepIndex ? "Continue to user" :
+            _enrollStep == EnrollmentResultStep ? (_addPasskey ? "Add another passkey" : "Set up another key") : "Review registration";
+        EnrollNext.ContentTemplate = _enrollStep == EnrollmentResultStep ? null : (DataTemplate)FindResource("ForwardContent");
         EnrollNext.IsEnabled = !_busy && (_enrollStep == 0 ? CandidateReady && (!_addPasskey || AdditionCandidateReady) :
             !_addPasskey && _enrollStep == 1 ? TargetReady && _reviewValid :
             _enrollStep == TenantStepIndex ? TargetReady && IsConnected :
@@ -116,7 +117,8 @@ public partial class MainWindow
         ResetDescription.Text = new[] { "This removes the key’s FIDO passkeys and PIN.", "Confirm the physical key before erasing its FIDO credentials.", "Check the reported outcome and the target’s PIN status." }[_resetStep];
         OverviewChooser.Visibility = Visible(_resetStep == 0); ResetReview.Visibility = Visible(_resetStep == 1); ResetResult.Visibility = Visible(_resetStep == 2);
         ResetNext.Visibility = Visible(_resetStep != 1); ResetTargetButton.Visibility = Visible(_resetStep == 1);
-        ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset  →";
+        ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset";
+        ResetNext.ContentTemplate = _resetStep == 2 ? null : (DataTemplate)FindResource("ForwardContent");
         ResetNext.IsEnabled = !_busy && (_resetStep == 2 || CandidateReady);
         ResetBack.Content = _resetStep == 1 ? "←  Back" : "Back to Home";
         ResetTargetText.Text = _resetReviewTarget?.Label ?? "No target selected";
