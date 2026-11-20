@@ -51,15 +51,20 @@ public sealed class RegistrationJournal
     private readonly string _settingsPath;
     private readonly Dictionary<Guid, RegistrationAttempt> _pending = new();
     public RegistrationLogPreferences Preferences { get; private set; }
+    public string DefaultLogDirectory { get; }
     public string? SettingsError { get; private set; }
     public int PendingCount => _pending.Count;
     public event Action? Changed;
     public static string DefaultSettingsPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YubiEnroll.UI", "registration-log-settings.json");
 
-    public RegistrationJournal(string settingsPath)
+    public RegistrationJournal(string settingsPath, string? documentsFolder = null)
     {
         _settingsPath = Path.GetFullPath(settingsPath);
-        Preferences = new(false, Path.Combine(Path.GetDirectoryName(_settingsPath)!, "RegistrationLog"));
+        // Resolve the current account's known folder (including OneDrive or network redirection).
+        // If it is unavailable, the operator can still browse to an explicit location.
+        documentsFolder ??= Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments, Environment.SpecialFolderOption.DoNotVerify);
+        DefaultLogDirectory = Path.IsPathFullyQualified(documentsFolder) ? Path.Combine(documentsFolder, "YubiKey Desk", "RegistrationLog") : "";
+        Preferences = new(false, DefaultLogDirectory);
         try
         {
             var preferences = JsonSerializer.Deserialize<RegistrationLogPreferences>(File.ReadAllText(_settingsPath), Json)
@@ -70,7 +75,7 @@ public sealed class RegistrationJournal
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { }
         catch (Exception ex) when (IsStorageError(ex))
         {
-            SettingsError = "Registration log preferences could not be read. Open Settings → Registration log and save your choice before enrollment.";
+            SettingsError = "Registration log preferences could not be read. Open Settings → App settings and save your choice before enrollment.";
         }
     }
 

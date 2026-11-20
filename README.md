@@ -2,7 +2,7 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
-## Preview 0.8.2
+## Preview 0.8.3
 
 NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
@@ -23,7 +23,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.8.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.8.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -31,7 +31,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Starts on Home with Set up a YubiKey and Clear passkeys & PIN as separate guided tasks. Settings remains available in the same window.
-- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → Prerequisites. Opted-in generated-PIN logging uses the in-app terminal for setup.
+- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Opted-in generated-PIN logging uses the in-app terminal for setup.
 - Reports the enrollment outcome; cloud registrations are managed separately from enrollment.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
@@ -40,7 +40,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 
 ## Preview 0.5.4: optional registration log
 
-Enable **Settings → Registration log → Save enrollment records**, choose a folder and save the preference. Logging is off by default. Preferences are stored separately from the shared YubiEnroll TOML in `%LOCALAPPDATA%/YubiEnroll.UI/registration-log-settings.json`. They apply to the current Windows account; elevation into a different account uses that account's preference and history.
+Enable **Settings → App settings → Save enrollment records**, choose a folder and save the preference. Logging is off by default. New configurations suggest `Documents/YubiKey Desk/RegistrationLog` under the current account’s Windows Documents folder (including redirected folders). A saved folder stays selected after an upgrade. To switch, choose **Use default** and **Save logging settings**; existing records are not moved. Review and export records under **Settings → Registration log**. Preferences are stored separately from the shared YubiEnroll TOML in `%LOCALAPPDATA%/YubiEnroll.UI/registration-log-settings.json`. They apply to the current Windows account; elevation into a different account uses that account's preference and history.
 
 Each attempt records its unique ID, start/result timestamps with offsets, tenant name/ID, user display name/UPN/email/object ID, confirmed target model/serial, profile and registration name, configured reset/first-use PIN-change flags and native outcome. Identity fields are read only from recognised labelled CLI columns/fields. An absent or unrecognised email is left blank, never copied from UPN. PIN storage is off by default. Enable **Save generated PINs in the registration log** to include the generated initial PIN in the same JSON record and CSV export. Existing, manually entered PINs are never captured. Tokens, authentication caches and terminal transcripts are excluded. These are personal data stored as local JSON, not an encrypted or tamper-proof audit trail; choose a folder with appropriate access.
 
@@ -84,7 +84,7 @@ Navigation preserves the target and task step without rediscovery. A different c
 
 The SDK remains deferred. YubiEnroll still performs enrollment and PIN handling. For USB enrollment, sign in with the administrator key, disconnect it, and keep only the chosen USB target connected during enrollment. For NFC, keep the selected target on the named reader; a separate USB admin key may remain connected. Fresh inventory checks do not bind the running CLI to a USB serial.
 
-The embedded terminal is enabled by default. Its toggle under Settings → Prerequisites applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
+The embedded terminal is enabled by default. Its toggle under Settings → App settings applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
 Only standalone **FIDO reset** is currently available. Additional application-specific resets (issue #7), final product name/logo (#9), and optional batch handover (#19) remain separate follow-up work. No repository rename or full factory-reset claim is made in this preview.
 

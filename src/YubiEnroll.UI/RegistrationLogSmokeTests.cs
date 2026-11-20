@@ -16,7 +16,16 @@ public partial class MainWindow
         var target = new ResetKey("00123456", "YubiKey 5 NFC (5.7.1)");
         var profile = ProfileCompatibility.Managed("Managed PIN") with { Reset = true };
         Assert(!_registrationJournal.Preferences.Enabled, "Registration logging starts disabled");
-        _registrationJournal.Configure(true, _registrationJournal.Preferences.Directory);
+        settings.AppSettingsTab.IsSelected = true;
+        settings.UpdateLayout();
+        Assert(settings.EmbeddedChoice.IsVisible && settings.EnabledChoice.IsVisible && settings.EnabledChoice.IsChecked == false &&
+            !settings.SavePinChoice.IsEnabled && settings.FolderPath.Text == _registrationJournal.Preferences.Directory,
+            "App settings shows terminal and logging choices with the journal default folder");
+        settings.EnabledChoice.IsChecked = true;
+        settings.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(_registrationJournal.Preferences.Enabled && settings.SavePinChoice.IsEnabled && !_registrationJournal.Preferences.SaveGeneratedPin,
+            "Enabling registration logging in App settings does not opt into PIN storage");
+        CaptureWindow(settings, "settings-app-settings.png");
         var started = BeginRegistrationRecord(tenant, user, target, profile, "Office key");
         using (var lease = new FileStream(Path.Combine(_registrationJournal.Preferences.Directory, ".journal.lock"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
@@ -30,11 +39,10 @@ public partial class MainWindow
         var second = BeginRegistrationRecord(tenant, user with { DisplayName = "Robin Example", UserPrincipalName = "robin@example.test" }, target with { Serial = "00987654" }, profile with { Reset = false }, "Spare key");
         CompleteRegistrationRecord(second, 7);
         BeginRegistrationRecord(tenant, user with { DisplayName = "Sam Example", UserPrincipalName = "sam@example.test", Email = "" }, target with { Serial = "00456789" }, profile, "New key");
-        settings.RegistrationHost.Content = new RegistrationLogView(_registrationJournal);
         var view = (RegistrationLogView)settings.RegistrationHost.Content;
-        settings.SettingsTabs.SelectedIndex = 6;
+        settings.RegistrationTab.IsSelected = true;
         settings.UpdateLayout();
-        Assert(view.EnabledChoice.IsChecked == true && view.Records.Items.Count == 3 && view.ExportButton.IsEnabled, "Registration log shows successful, interrupted and unknown attempts");
+        Assert(view.PreferenceStatus.Text.StartsWith("Logging on") && view.Records.Items.Count == 3 && view.ExportButton.IsEnabled, "Registration log shows successful, interrupted and unknown attempts");
         view.SuccessOnly.IsChecked = true;
         Assert(view.Records.Items.Count == 1, "Registration export success filter matches the visible records");
         view.FromDate.SelectedDate = DateTime.Today.AddDays(1);
@@ -51,15 +59,23 @@ public partial class MainWindow
         view.TenantFilter.SelectedIndex = 0;
         view.Records.SelectedIndex = 2;
         CaptureWindow(settings, "settings-registration-log.png");
-        Assert(!view.LoggingPreferences.IsExpanded, "Enabled logging keeps storage preferences collapsed so records stay prominent");
-        view.LoggingPreferences.IsExpanded = true;
-        CaptureWindow(settings, "registration-preferences.png");
-        view.LoggingPreferences.IsExpanded = false;
         var width = settings.Width; var height = settings.Height;
         settings.Width = 740; settings.Height = 600;
         CaptureWindow(settings, "registration-log-compact.png");
         settings.Width = width; settings.Height = height;
-        _registrationJournal.Configure(false, _registrationJournal.Preferences.Directory);
+        view.AppSettingsLink.RaiseEvent(new RoutedEventArgs(System.Windows.Documents.Hyperlink.ClickEvent));
+        settings.UpdateLayout();
+        Assert(settings.AppSettingsTab.IsSelected && settings.EmbeddedChoice.IsVisible, "Registration log links directly to the shared app preferences");
+        settings.FolderPath.Text = originalFolder + "-empty";
+        settings.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        settings.DefaultFolderButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(settings.FolderPath.Text == originalFolder && _registrationJournal.Preferences.Directory == originalFolder + "-empty",
+            "Use default suggests Documents without changing the saved folder until Save");
+        settings.EnabledChoice.IsChecked = false;
+        settings.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        settings.RegistrationTab.IsSelected = true;
+        Assert(view.PreferenceStatus.Text.StartsWith("Logging is off") && view.Records.Items.Count == 3,
+            "Returning to the registration log reflects saved preferences and retains history");
         Assert(_registrationJournal.Read().Count == 3, "Turning registration logging off preserves previous records");
     }
 }

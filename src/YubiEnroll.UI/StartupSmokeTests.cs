@@ -132,8 +132,8 @@ public partial class MainWindow
             {
                 try
                 {
-                    Assert(settings.SettingsTabs.Items.Count == 7 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
-                        "Settings separates tenants, profiles, system and transfer");
+                    Assert(settings.SettingsTabs.Items.Count == 8 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                        "Settings includes app preferences alongside tenant, profile and tool management");
                     var transfer = ConfigTransfer.Export(File.ReadAllText(path));
                     var beforePreview = File.ReadAllText(path);
                     settings.PreviewImport(transfer);
@@ -145,14 +145,14 @@ public partial class MainWindow
                     settings.ApplyImport();
                     Assert(settings.Changed && ConfigReader.Read(path).Profiles.Count == 2, "Import applies both tenants and profiles");
                     CaptureWindow(settings, "settings-tenants.png");
-                    settings.SettingsTabs.SelectedIndex = 1;
+                    settings.ProfilesTab.IsSelected = true;
                     CaptureWindow(settings, "settings-profiles.png");
                     settings.SetRequirements(new RequirementReport(true, new(true, "Installed · version 1.2.0"), new(true, "Installed · version 5.9.2"), mockExecutable));
-                    settings.SettingsTabs.SelectedIndex = 2;
+                    settings.PrerequisitesTab.IsSelected = true;
                     CaptureWindow(settings, "settings-system.png");
-                    settings.SettingsTabs.SelectedIndex = 3;
+                    settings.TransferTab.IsSelected = true;
                     CaptureWindow(settings, "settings-transfer.png");
-                    settings.SettingsTabs.SelectedIndex = 4;
+                    settings.AboutTab.IsSelected = true;
                     CaptureWindow(settings, "settings-about.png");
                     TestRegistrationLogView(settings);
                 }
@@ -277,17 +277,17 @@ public partial class MainWindow
             UpdateLayout();
             var hosted = (SettingsWindow)_hostedWindow!;
             Assert(System.Windows.Documents.TextElement.GetFontSize((System.Windows.DependencyObject)HostedPage.Content!) == 14, "Hosted settings retains the shared body font size");
-            hosted.SettingsTabs.SelectedIndex = 5;
+            hosted.ActivityTab.IsSelected = true;
             UpdateLayout();
             Assert(hosted.ActivityHost.Content == _activityView && _activityView.IsVisible, "Activity log is visible directly in its Settings tab");
             Assert(System.Windows.Documents.TextElement.GetFontWeight(_activityView) == System.Windows.FontWeights.Normal, "Selected tab does not make all activity text bold");
-            hosted.SettingsTabs.SelectedIndex = 0;
+            hosted.TenantsTab.IsSelected = true;
             CaptureWindow(this, "shell-settings.png");
             ShowPage(OverviewPage);
             Assert(double.IsPositiveInfinity(MaxWidth) && double.IsPositiveInfinity(MaxHeight), "Main window does not constrain maximization to a reduced work area");
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
             _activityView.Add("Synthetic summary only.", "Info", "   ");
-            OpenSettings(5); UpdateLayout();
+            OpenSettings(s => s.ActivityTab); UpdateLayout();
             var disclosures = VisualDescendants<System.Windows.Controls.Expander>(_activityView).ToArray();
             Assert(!disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic summary only.")).IsVisible,
                 "Activity entries with empty or whitespace details have no disclosure control");
@@ -368,7 +368,7 @@ public partial class MainWindow
         Host(settings);
         var prerequisiteVisits = 0;
         settings.PrerequisitesOpened += () => prerequisiteVisits++;
-        settings.SettingsTabs.SelectedIndex = 2;
+        settings.PrerequisitesTab.IsSelected = true;
         Assert(prerequisiteVisits == 1, "Opening the Prerequisites tab requests automatic detection");
         // Preserve the actual object reference; probing must not reload the config or clear a session.
         var session = _connectedProvider;

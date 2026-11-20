@@ -40,9 +40,12 @@ public partial class MainWindow : Window
     public MainWindow(bool smokeTest = false)
     {
         _smokeTest = smokeTest;
-        _registrationJournal = new RegistrationJournal(smokeTest
-            ? Path.Combine(Path.GetTempPath(), "YubiEnroll-log-test-" + Guid.NewGuid().ToString("N"), "preferences.json")
-            : RegistrationJournal.DefaultSettingsPath);
+        if (smokeTest)
+        {
+            var root = Path.Combine(Path.GetTempPath(), "YubiEnroll-log-test-" + Guid.NewGuid().ToString("N"));
+            _registrationJournal = new RegistrationJournal(Path.Combine(root, "preferences.json"), Path.Combine(root, "Documents"));
+        }
+        else _registrationJournal = new RegistrationJournal(RegistrationJournal.DefaultSettingsPath);
         InitializeComponent();
         Closed += (_, _) => EndManagementSession();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
@@ -98,7 +101,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.8.2" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.8.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -246,7 +249,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiKey Desk 0.8.2\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiKey Desk 0.8.3\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)

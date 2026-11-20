@@ -111,21 +111,21 @@ public partial class MainWindow
         ShowPage(ResetPage);
         if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
     }
-    private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(5);
-    private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(2);
-    private void About_Click(object sender, RoutedEventArgs e) => OpenSettings(4);
+    private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.ActivityTab);
+    private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.PrerequisitesTab);
+    private void About_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.AboutTab);
     private void Host(Window window)
     {
         LeaveHostedPage(); _hostedWindow = window; window.Owner = this; window.ShowInTaskbar = false;
         var content = window.Content; window.Content = null; HostedPage.Content = content;
         ShowPage(HostedPage);
     }
-    private void OpenSettings(int tab = 0)
+    private void OpenSettings(Func<SettingsWindow, TabItem>? initialTab = null)
     {
         if (_busy) return;
         LeaveHostedPage();
         var settings = new SettingsWindow(_configPath, _exePath, _versionText, _registrationJournal) { EmbeddedTerminal = EmbeddedTerminal };
-        settings.SettingsTabs.SelectedIndex = tab; settings.ActivityHost.Content = _activityView;
+        settings.SettingsTabs.SelectedItem = initialTab?.Invoke(settings) ?? settings.TenantsTab; settings.ActivityHost.Content = _activityView;
         settings.PrerequisitesOpened += async () =>
         {
             if (!_smokeTest && _startupChecksComplete && !_busy) await CheckRequirementsAsync();

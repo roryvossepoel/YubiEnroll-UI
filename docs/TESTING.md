@@ -9,7 +9,7 @@
 ## Preview 0.5.4: registration records
 
 - Start with logging off: perform enrollment, login and standalone reset. No registration files should be created. Existing records remain readable when disabled.
-- Enable logging under Settings → Registration log and select a writable folder. Restart with the same Windows account and confirm the saved preference. Elevation into a different account must not reuse the original account's history silently.
+- Enable logging under Settings → App settings and select a writable folder. Restart with the same Windows account and confirm the saved preference. Elevation into a different account must not reuse the original account's history silently.
 - Enroll two disposable keys for different test users and tenants. Compare each record with its original review, especially serial, UPN versus email, profile, reset and first-use PIN flags. Check the actual CLI table format; missing identity fields must never be guessed.
 - Cancel or interrupt enrollment. Confirm it is not labelled successful; check Entra before retrying because a partial registration may exist. Simulate app termination after native launch: the saved attempt must remain unknown.
 - Deny folder write access before enrollment: the command must not start. Deny access after it starts: a successful native result must remain successful while the app clearly reports the unsaved log and offers save-only retry. Restore access, retry and verify one row with the same attempt ID. Navigate to another key while a result is pending; closing must warn about losing its final result. Do not use production keys for this test.
@@ -42,7 +42,7 @@
 - Install a missing tool in its standard location, then return to the app: the card updates automatically. No Recheck button is required. Open Home to continue when all checks pass.
 - Confirm that returning from documentation does not discard tenant login, user selection or target identity. No enrollment or reset may start from a software check.
 - Check Home, navigation, logo, titlebar and taskbar at 100%, 125%, 150% and 200% Windows scale. The app mark must be the same shape everywhere, with crisp contours. Cards have matching neutral borders at rest and visible hover/keyboard focus.
-- Prerequisites has two tool cards with status/download/docs; no administrator status or restart controls. Terminal preferences remains expandable; Technical details is removed. Profiles explains the key PIN/reset scope.
+- Prerequisites shows software and runtime cards with status/download/docs; no administrator status or restart controls. Terminal preferences are under App settings. Profiles explains the key PIN/reset scope.
 
 ## Preview 0.5.0: current acceptance workflow
 
@@ -147,7 +147,7 @@ Synthetic UI tests cover refreshed selection/status, cancellation, failed reads,
 2. Open Settings and Key Management from the sidebar. Verify they use the same content area; edit dialogs may still be modal. Inspect all pages at small window sizes and 100/150/200% display scaling.
 3. Rename a shared profile using spaces; confirm every linked tenant retains that profile and other settings remain unchanged. Reject duplicate names. Remove an unused profile; refuse removal while referenced. Rename/remove an active tenant, reopen the app and explicitly reconnect before enrollment.
 4. Import a test configuration: confirm incoming entries and existing entries being replaced are visible, Cancel changes nothing, and a successful replacement reports the backup path. Confirm export omits credentials/authentication data.
-5. Enable **Use embedded terminal (preview, this session)** under Settings → Prerequisites and navigate back to Prepare Key. Run login and then a disposable-key preparation. Test typing, hidden PIN input, generated PIN output, confirmation, touch and remove/reinsert. Record PIN securely before returning. Confirm no interactive transcript appears in activity/diagnostics or exported settings.
+5. Enable **Use embedded terminal (preview, this session)** under Settings → App settings and navigate back to Prepare Key. Run login and then a disposable-key preparation. Test typing, hidden PIN input, generated PIN output, confirmation, touch and remove/reinsert. Record PIN securely before returning. Confirm no interactive transcript appears in activity/diagnostics or exported settings.
 6. Verify native failures return their exit code, do not auto-retry, and leave the UI usable. Never interrupt a live reset as a casual test. Use the external console for the next attempt if the embedded mode cannot support your CLI/UAC environment, after inspecting any uncertain outcome.
 7. Reset FIDO on a disposable key. After completion, verify the same device is selected if still present and PIN status has been reread. Disconnecting it must not select another key automatically.
 8. No claim of physical-device acceptance is made by the synthetic CI checks. CI exercises ConPTY input, no-echo synthetic input, VT rendering and exit-code propagation without authenticating or touching a key.

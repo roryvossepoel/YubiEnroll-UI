@@ -14,7 +14,7 @@ public partial class MainWindow
         try { return _registrationJournal.Begin(RegistrationRecord.Start(tenant, user, target, profile, name)); }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
         {
-            throw new InvalidOperationException("Enrollment has not started: the registration log could not be initialized. Check Settings → Registration log, restore folder access or explicitly turn logging off.");
+            throw new InvalidOperationException("Enrollment has not started: the registration log could not be initialized. Check Settings → App settings, restore folder access or explicitly turn logging off.");
         }
     }
 
