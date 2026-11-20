@@ -24,11 +24,16 @@ public partial class MainWindow
         ShowPage(ManagePage); ResetManagement();
     }
 
+    private void EndManagementSession()
+    {
+        var pending = _managementLogin; _managementLogin = null; pending?.Cancel();
+        _management = null;
+    }
+
     private void ResetManagement()
     {
         if (ManageBack == null) return;
-        var pending = _managementLogin; _managementLogin = null; pending?.Cancel();
-        _management = null;
+        EndManagementSession();
         _manageStep = 0;
         ManageQuery.Clear(); ManageUsers.ItemsSource = null; ManageSearchHint.Text = "";
         ClearManagedList(); RenderManagement();

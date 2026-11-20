@@ -44,7 +44,7 @@ public partial class MainWindow : Window
             ? Path.Combine(Path.GetTempPath(), "YubiEnroll-log-test-" + Guid.NewGuid().ToString("N"), "preferences.json")
             : RegistrationJournal.DefaultSettingsPath);
         InitializeComponent();
-        Closed += (_, _) => { _dateRequest?.Cancel(); _dateSession = null; };
+        Closed += (_, _) => EndManagementSession();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
         Activated += Window_Activated;
@@ -446,6 +446,5 @@ public partial class MainWindow : Window
         }
         else if (_registrationJournal.PendingCount > 0)
             e.Cancel = MessageBox.Show(this, $"{_registrationJournal.PendingCount} enrollment result(s) have not been saved. Closing loses their final outcomes; the on-disk attempts will remain unknown. Close anyway?", "Unsaved enrollment records", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes;
-        if (!e.Cancel) _managementLogin?.Cancel();
     }
 }
