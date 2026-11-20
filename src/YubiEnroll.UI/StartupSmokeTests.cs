@@ -170,19 +170,29 @@ public partial class MainWindow
                 ReferenceEquals(targetBeforeProbe, _selectedKey) && ReferenceEquals(inventoryBeforeProbe, _knownKeys),
                 "Automatic software detection preserves the authenticated tenant and selected target");
             Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
-            var keysCapture = Dispatcher.InvokeAsync(() =>
-            {
-                var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
-                CaptureWindow(keys, "registered-keys.png"); keys.Close();
-            });
-            ShowRegisteredKeys(SelectedUser, SelectedProvider, "Display name  Model  ID\nDemo key  YubiKey 5 NFC  synthetic-credential-id");
-            await keysCapture.Task;
+            Manage_Click(this, new RoutedEventArgs()); UpdateLayout();
+            Assert(ManagePage.IsVisible && _manageStep == 0 && ManageConnect.IsEnabled,
+                "Manage user passkeys opens independently of target selection");
+            ManageConnect_Click(this, new RoutedEventArgs());
+            var managedUser = SelectedUser;
+            ManageUsers.ItemsSource = new[] { managedUser }; ManageUsers.SelectedIndex = 0;
+            _manageStep = 2; RenderManagement();
+            SetManagedList(SelectedProvider, managedUser, [new("Demo office key", "YubiKey 5 NFC", "synthetic-credential-id")]);
+            CaptureWindow(this, "manage-user-passkeys.png");
+            ManageBack_Click(this, new RoutedEventArgs());
+            Assert(_managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
+                "Changing management user clears registrations and the removal target");
+            ManageUsers.SelectedIndex = 0; _manageStep = 2;
+            SetManagedList(SelectedProvider, managedUser, [new("Demo", "Key", "other-id")]);
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);
             _connectedProvider = SelectedProvider;
             UpdateSummary();
             Tenants.SelectedIndex = 1;
+            Assert(_managedList == null && ManageRows.ItemsSource == null && _manageStep == 0 && !ManageView.IsEnabled,
+                "Changing tenant clears the passkey management context");
+            ShowPage(OverviewPage);
             Assert(!IsConnected && !SearchPanel.IsEnabled && !EnrollButton.IsEnabled && Users.SelectedItem == null,
                 "Changing tenants invalidates connection and selected user");
             File.WriteAllText(path, "[broken-secret-marker");

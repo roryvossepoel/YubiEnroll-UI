@@ -1,11 +1,11 @@
 # YubiEnroll UI
 
-## Preview 0.6.1
+## Preview 0.7.0
 
 NFC readers are now supported alongside USB for Set up a key, Add a passkey and Reset FIDO. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
 
-- Home offers **Set up a key**, **Add a passkey**, and **Reset FIDO**.
+- Home offers **Set up a key**, **Add a passkey**, **Reset FIDO**, and **Manage user passkeys**.
 - Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
 - Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
 - Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
@@ -20,7 +20,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.6.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.7.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -29,7 +29,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Starts on Home with Enroll key and Reset FIDO as separate guided tasks. Settings remains available in the same window.
 - Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → Prerequisites. Opted-in generated-PIN logging uses the in-app terminal for setup.
-- Reports the CLI exit code and retrieves the registered credential list after a successful command.
+- Reports the enrollment outcome; cloud registrations are managed separately from enrollment.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
 - Offers **Reset FIDO** to erase a USB or NFC key independently of enrollment, using the separately installed YubiKey Manager CLI.
@@ -158,7 +158,7 @@ Profile saves preserve configuration values, including provider endpoints and ot
 
 **The UI does not bind the YubiEnroll process to a USB serial.** YubiEnroll 1.2.0 has no documented USB serial selector. Inventory checks cannot prevent a device swap during the native operation; physical confirmation and the one-key rule remain necessary. The app never disables or modifies the administrator key to hide it from the CLI. SDK-based enrollment is deferred.
 
-Switching tenants or reloading configuration requires Connect again. A successful CLI exit is not independent proof of hardware or sign-in success. Activity is under **Settings → Activity log**; registered keys are presented in their own window. PINs and interactive transcripts are not written to the activity log.
+Switching tenants or reloading configuration requires Connect again. A successful CLI exit is not independent proof of hardware or sign-in success. Activity is under **Settings → Activity log**; use **Manage user passkeys** on Home or in the sidebar for Entra registrations. PINs and interactive transcripts are not written to the activity log.
 
 ### Erase a key without enrollment
 
@@ -180,7 +180,7 @@ Closing the GUI is not a logout operation. Yubico currently documents the native
 
 Import validates types, profile references, duplicate names and policy values, and previews the tenant/profile names before any write. Confirming import **replaces the current configuration**, including other custom settings; it does not merge. An exact backup is made and stale previews are refused. Authentication caches are neither copied nor cleared. Reconnect afterward. Unknown import fields are rejected rather than silently discarded.
 
-When enrollment fails or its console is closed early, a credential may already have been created. Inspect **Registered keys…** and the key before retrying. There is no automatic retry, rollback, deletion or reset.
+When enrollment fails or its console is closed early, a credential may already have been created. Inspect **Manage user passkeys** and the key before retrying. There is no automatic retry, rollback, deletion or reset.
 
 ## Elevation
 
@@ -238,3 +238,7 @@ Overview focuses on the connected key; Key Management shares its selection and r
 Settings now hosts Activity directly, with no Done button or persistent totals. Typography is retained when pages are hosted, navigation uses neutral colors, and prerequisites separates component status from project help. Overview reuses its inspected state until Refresh, a device change or a completed key operation. Blocked PIN guidance links to Key Management without performing a reset.
 
 Prepare Key suggests an editable model/serial registration name and leaves reset warnings in the final review. Registered keys shows IDs directly without a raw tool-output section. The main window starts taller, and the original charcoal/green icon is explicitly applied to native window/taskbar identity. The terminal reads and decodes pipe output immediately and requests unbuffered Python output; CI checks live prompts and the real native help renderer. Real authentication and physical-key acceptance are still required.
+
+### Manage user passkeys (preview 0.7.0)
+
+Choose the tenant, connect using your delegated account, search for the user and select **View passkeys**. No target key or profile is required. Each registration has its own **Remove from Entra** action. Review the tenant, user and exact registration before confirming. This revokes that sign-in registration; it does not erase the credential or PIN on the physical key. The app checks the list again after removal. If it cannot verify the result, refresh before trying again. There is no bulk removal or automatic retry.

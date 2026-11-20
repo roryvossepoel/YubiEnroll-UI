@@ -423,7 +423,38 @@ Check(WindowsCommandLine.Quote("name with spaces") == "\"name with spaces\"", "N
 Check(WindowsCommandLine.Quote("x\"y") == "\"x\\\"y\"", "Native process argument quoting escapes quotes");
 var registrations = RegisteredCredentials.Parse("Fetching credentials...\nDisplay name  Model  ID\nDesk key  YubiKey 5 NFC  credential-1\nBackup key  Security Key  credential-2\n");
 Check(registrations.Count == 2 && registrations[0].Name == "Desk key" && registrations[1].Id == "credential-2", "Registered keys table preserves names and credential identifiers");
-Check(RegisteredCredentials.Parse("unrecognized output\nkey  model  id").Count == 0, "Unknown registration format is not guessed");
+foreach (var malformed in new[] { "unrecognized output", "Display name  Model  ID\nDesk key  YubiKey  prefix…",
+    "Display name  Model  ID\nDesk key  YubiKey  same\nBackup  Key  same", "Display name  Model  ID\nUnexpected row" })
+{
+    bool refused = false;
+    try { RegisteredCredentials.Parse(malformed); } catch (InvalidDataException) { refused = true; }
+    Check(refused, "Unknown, truncated, partial and duplicate registrations fail closed");
+}
+var regHeader = "Display name  Model  ID\n";
+var firstRow = "Desk key  YubiKey  -credential-1\n";
+var otherRow = "Desk key  YubiKey  credential-2\n";
+var managedUser = Guid.Parse(id);
+var wanted = RegisteredCredentials.Parse(regHeader + firstRow).Single();
+foreach (var scenario in new[] { "removed", "changed", "still-present", "ambiguous-result", "denied", "invalid-user" })
+{
+    var commands = new List<string[]>();
+    var service = new PasskeyRegistrationService(a =>
+    {
+        commands.Add(a);
+        if (a[1] == "delete") return Task.FromResult(scenario == "denied" ? new CliResult(1, "", "ERROR: 403") : new CliResult(0, "", ""));
+        var output = commands.Count == 1 ? regHeader + (scenario == "changed" ? "" : firstRow) + otherRow :
+            scenario == "ambiguous-result" ? "failed to read" : regHeader + (scenario == "still-present" ? firstRow : "") + otherRow;
+        return Task.FromResult(new CliResult(0, output, ""));
+    });
+    bool removed = false;
+    try { var remaining = await service.RemoveAsync(scenario == "invalid-user" ? Guid.Empty : managedUser, wanted);
+        removed = remaining.Count == 1 && remaining[0].Id == "credential-2"; }
+    catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { }
+    var deletes = commands.Where(a => a[1] == "delete").ToArray();
+    Check(removed == (scenario == "removed") && deletes.Length == (scenario is "changed" or "invalid-user" ? 0 : 1) &&
+        deletes.All(a => a.SequenceEqual(new[]{"credentials", "delete", "--force", "--", managedUser.ToString(), "-credential-1"})),
+        "Registration removal binds one user and exact method, never retries, verifies outcome · " + scenario);
+}
 var failure = InteractiveFailure.Describe("ERROR: 405 Method Not Allowed\nrequest-id: 11111111-2222-3333-4444-555555555555\nPIN: secret-marker\naccess_token: secret-token");
 Check(failure.Contains("405") && failure.Contains("11111111-2222-3333-4444-555555555555") && !failure.Contains("secret") && !failure.Contains("PIN"), "Interactive diagnostic extraction keeps codes and excludes PINs and tokens");
 Check(new ResetKey("12345678", "YubiKey 5C (5.7.1)").RegistrationName == "YubiKey 5C (12345678)", "Suggested registration name omits firmware and includes serial");

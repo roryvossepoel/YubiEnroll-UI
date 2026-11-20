@@ -16,6 +16,11 @@ if ($LASTEXITCODE -ne 0) { throw 'YubiEnroll version check failed' }
 # Login has no force option; our dedicated screen uses the documented browser suppression flag.
 $loginHelp = & $exe login --help 2>&1
 if ($LASTEXITCODE -ne 0 -or ($loginHelp -join "`n") -notmatch '--no-launch-browser') { throw 'Missing native login browser option' }
+# Inspect the actual 1.2.0 read and remove command contracts; no tenant call or deletion.
+$listHelp = & $exe credentials list --help
+if ($LASTEXITCODE -ne 0 -or ($listHelp -join ' ') -notmatch 'USER_ID') { throw 'Unexpected passkey list command' }
+$deleteHelp = & $exe credentials delete --help
+if ($LASTEXITCODE -ne 0 -or ($deleteHelp -join ' ') -notmatch 'CREDENTIAL_IDS' -or ($deleteHelp -join ' ') -notmatch '--force') { throw 'Unexpected passkey removal command' }
 # Confirm the documented enrollment contract against the exact supported executable.
 $enrollmentHelp = & $exe credentials add --help 2>&1
 $enrollmentHelpCode = $LASTEXITCODE

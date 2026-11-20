@@ -35,16 +35,16 @@ public partial class MainWindow
         BrandTitle.FontSize = compact ? 13 : 19;
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         var stackedCards = ActualWidth < 1100;
-        HomeTasks.Columns = stackedCards ? 1 : 3;
-        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeResetCard };
-        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeResetLayout };
-        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeResetIcon };
-        var labels = new[] { HomeSetupText, HomeAdditionText, HomeResetText };
-        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeResetArrow };
+        HomeTasks.Columns = stackedCards ? 1 : 2;
+        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeResetCard, HomeManageCard };
+        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeResetLayout, HomeManageLayout };
+        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeResetIcon, HomeManageIcon };
+        var labels = new[] { HomeSetupText, HomeAdditionText, HomeResetText, HomeManageText };
+        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeResetArrow, HomeManageArrow };
         for (var i = 0; i < cards.Length; i++)
         {
             cards[i].Padding = new Thickness(stackedCards ? 16 : 24);
-            cards[i].Margin = stackedCards ? new Thickness(0, 0, 0, 12) : new Thickness(i == 0 ? 0 : 6, 0, i == 2 ? 0 : 6, 0);
+            cards[i].Margin = stackedCards ? new Thickness(0, 0, 0, 12) : new Thickness(i % 2 == 0 ? 0 : 6, 0, i % 2 == 0 ? 6 : 0, 12);
             layouts[i].ColumnDefinitions[0].Width = stackedCards ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
             layouts[i].ColumnDefinitions[1].Width = stackedCards ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
             layouts[i].ColumnDefinitions[2].Width = stackedCards ? GridLength.Auto : new GridLength(0);
@@ -73,18 +73,20 @@ public partial class MainWindow
     {
         if (_busy) return;
         if ((page == OverviewPage || page == PreparePage || page == ResetPage) && RequirementsBlockTasks) page = StartupPage;
+        if (page == ManagePage && !_cliReady) page = StartupPage;
+        if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage) LeaveHostedPage();
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, HostedPage, StartupPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, ManagePage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, SettingsButton })
+        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, ManageButton, SettingsButton })
         {
             var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage && !_addPasskey ||
                 button == AddPasskeyButton && page == PreparePage && _addPasskey ||
-                button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
+                button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
             button.Tag = active ? "active" : null;
         }
         // A clean Home has no technical footer. Errors/requirements remain discoverable in Settings.
-        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage ? Visibility.Collapsed : Visibility.Visible;
+        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage || page == ManagePage ? Visibility.Collapsed : Visibility.Visible;
         RenderWizard();
     }
     private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);
@@ -93,19 +95,19 @@ public partial class MainWindow
         if (_busy) return;
         if (_addPasskey) { _addPasskey = false; BeginNextKey(); }
         ShowPage(PreparePage);
-        if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
     }
     private async void AddPasskey_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
         if (!_addPasskey) { _addPasskey = true; BeginNextKey(); }
         ShowPage(PreparePage);
-        if (!RequirementsBlockTasks && !_inventoryLoaded) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty)) await RefreshOverviewAsync();
     }
     private async void ResetPage_Click(object sender, RoutedEventArgs e)
     {
         ShowPage(ResetPage);
-        if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
     }
     private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(5);
     private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(2);
@@ -287,7 +289,7 @@ public partial class MainWindow
         {
             if (_busy || _checkingRequirements) return;
             _deviceRefresh.Stop();
-            if (_inventoryLoaded) await RefreshOverviewAsync();
+            if (_inventoryLoaded && ManagePage.Visibility != Visibility.Visible) await RefreshOverviewAsync();
         };
         System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(DeviceMessage);
     }

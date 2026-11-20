@@ -97,10 +97,11 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.6.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.7.0" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
+        ResetManagement();
         _connectedProvider = null;
         var oldTenant = (Tenants.SelectedItem as Provider)?.Name;
         var oldProfile = (Profiles.SelectedItem as ProfileChoice)?.Profile.Name;
@@ -153,6 +154,7 @@ public partial class MainWindow : Window
     {
         if (_loading) return;
         _connectedProvider = null;
+        ResetManagement();
         ResetSelection();
         Query.Clear();
         KeyName.Clear();
@@ -184,10 +186,9 @@ public partial class MainWindow : Window
         PreparePanel.IsEnabled = TargetReady;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
         // Wizard rendering determines which action is available at the current step.
-        CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
-        CredentialsButton.Visibility = Users.SelectedItem != null ? Visibility.Visible : Visibility.Collapsed;
         SelectedUserText.Visibility = Users.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
         UpdateEnrollmentGuidance();
+        RenderManagement();
     }
 
     private void ResetSelection()
@@ -195,7 +196,6 @@ public partial class MainWindow : Window
         Users.ItemsSource = null;
         SelectedUserText.Text = "Search and select a user.";
         EnrollButton.IsEnabled = false;
-        CredentialsButton.IsEnabled = false;
         PreparePanel.IsEnabled = false;
     }
 
@@ -245,7 +245,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.6.3\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.7.0\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -298,7 +298,8 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
 
-    private async void Login_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
+    private async void Login_Click(object sender, RoutedEventArgs e) => await LoginAsync();
+    private async Task LoginAsync() => await RunAsync(async () =>
     {
         var provider = SelectedProvider;
         _connectedProvider = null;
@@ -311,12 +312,12 @@ public partial class MainWindow : Window
         {
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, null);
             _connectedProvider = provider;
-            StatusText.Text = "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
-            _deviceRefresh?.Start();
+            StatusText.Text = ManagePage.IsVisible ? $"Signed in to {provider.Name}." : "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
+            if (!ManagePage.IsVisible) _deviceRefresh?.Start();
         }
         else StatusText.Text = $"{_lastInteractiveFailure} Select Connect to try again.";
         UpdateSummary();
-        if (IsConnected) _ = Dispatcher.BeginInvoke(() => Query.Focus());
+        if (IsConnected && !ManagePage.IsVisible) _ = Dispatcher.BeginInvoke(() => Query.Focus());
     }, "Connect tenant");
 
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync();
@@ -327,17 +328,9 @@ public partial class MainWindow : Window
 
     private async Task SearchAsync() => await RunAsync(async () =>
     {
-        RequireConnection();
-        var query = Query.Text.Trim();
-        if (query.Length < 2) throw new ArgumentException("Enter at least two characters to search.");
-        var provider = SelectedProvider;
         ResetSelection();
-        await ActivateAsync(provider);
         StatusText.Text = "Searching users…";
-        var result = await Runner.CaptureAsync("users", "--", query);
-        RequireSuccess(result, "User search");
-        Details.Text = result.Output;
-        var users = UserSearch.Parse(result.Output);
+        var users = await FindUsersAsync(Query.Text.Trim());
         Users.ItemsSource = users;
         SelectedUserText.Text = users.Count == 0 ? "No users found." : $"{users.Count} user(s) found. Select a user.";
         Record($"User search completed: {users.Count} user(s) found.");
@@ -345,18 +338,15 @@ public partial class MainWindow : Window
             $"Select a user from {users.Count} result(s).";
     });
 
-    private async void Credentials_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
+    private async Task<IReadOnlyList<UserCandidate>> FindUsersAsync(string query)
     {
         RequireConnection();
-        var user = SelectedUser;
+        if (query.Length < 2) throw new ArgumentException("Enter at least two characters to search.");
         await ActivateAsync(SelectedProvider);
-        var result = await Runner.CaptureAsync("credentials", "list", user.Id);
-        RequireSuccess(result, "Credential lookup");
-        Details.Text = result.Output;
-        ShowRegisteredKeys(user, SelectedProvider, result.Output);
-        Record("Registered keys retrieved.");
-        StatusText.Text = "Registered keys retrieved for the selected user.";
-    });
+        var result = await Runner.CaptureAsync("users", "--", query);
+        RequireSuccess(result, "User search");
+        return UserSearch.Parse(result.Output);
+    }
 
     private async void Enroll_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
@@ -396,7 +386,7 @@ public partial class MainWindow : Window
         catch
         {
             CompleteRegistrationRecord(registration, null);
-            ShowEnrollmentResult("The enrollment outcome is unknown. Check Registered keys and Entra before retrying.");
+            ShowEnrollmentResult("The enrollment outcome is unknown. Check Manage user passkeys before retrying.");
             throw;
         }
         finally
@@ -413,26 +403,11 @@ public partial class MainWindow : Window
         Record(code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.", code == 0 ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
         if (code != 0)
         {
-            ShowEnrollmentResult("Enrollment failed or was interrupted. A credential may already exist. Check Registered keys before retrying.");
+            ShowEnrollmentResult("Enrollment failed or was interrupted. A credential may already exist. Check Manage user passkeys before retrying.");
             return;
         }
         // Exit 0 is CLI-reported success, not an independent authentication test.
-        StatusText.Text = "YubiEnroll reported success. Retrieving registered credentials…";
-        try
-        {
-            await ActivateAsync(provider, profile);
-            var result = await Runner.CaptureAsync("credentials", "list", user.Id);
-            if (result.ExitCode != 0) throw new InvalidOperationException();
-            Details.Text = result.Output;
-            // The result page offers Registered keys without opening a second modal automatically.
-            StatusText.Text = "YubiEnroll reported success. Review the registered keys and test sign-in.";
-            Record("Post-enrollment credential list retrieved; sign-in validation is still required.");
-        }
-        catch
-        {
-            StatusText.Text = "YubiEnroll reported success, but the credential list could not be retrieved. Verify in Entra before retrying.";
-            Record("Post-enrollment lookup unavailable; enrollment was not repeated.");
-        }
+        StatusText.Text = "YubiEnroll reported success. Test sign-in with the new passkey.";
         ShowEnrollmentResult(StatusText.Text);
     });
 

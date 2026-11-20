@@ -52,7 +52,7 @@
 Earlier version sections below are historical checks; use this workflow for the current navigation.
 
 - Choose a target explicitly on Overview or Enroll key. A sole discovered key is not selected automatically. Navigate between Overview, Enroll key and Settings: no discovery is triggered by navigation and the serial remains the same.
-- Connect an administrator key and target. Sign-in remains available. Before sign-in the UI says to authenticate first; afterward it lists the other serials to disconnect. Enrollment stays disabled until only the target remains. User search and Registered keys remain available.
+- Connect an administrator key and target. Sign-in remains available. Before sign-in the UI says to authenticate first; afterward it lists the other serials to disconnect. Enrollment stays disabled until only the target remains. User search remains available; cloud registrations have a separate management task.
 - Disconnect the administrator key: inventory refresh keeps the target and enables enrollment when the tenant, user and profile are ready. Disconnect the target instead: it must never be replaced by the administrator key.
 - While device discovery is pending, key actions are disabled immediately. Failed or unrecognized discovery cannot leave stale action readiness enabled. Explicit Refresh recovers normally.
 - Review the vertical target/tenant/user/profile steps and fixed action footer at 100%, 150% and 200% scaling. The target serial must remain visible when scrolling down to the profile. Inspect the compact registered-keys list and confirmation dialog.
@@ -155,7 +155,7 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Verify blocked / unset / unknown PIN presentation. Unknown is not evidence that a key is empty.
 - Connect using the embedded terminal (now default). Native confirmation remains. Browser sign-in success returns automatically; failures remain visible until Return. External console remains available in Settings.
 - Close the external console AFTER the native tool has completed: the log must retain the native exit code, not the host window's close code. Closing before completion must not be treated as success.
-- Search a user, open Registered keys, refresh, close: tenant/user/profile selection stays intact. These are cloud registrations, not a physical-key inventory.
+- Open Manage user passkeys with no target connected, select a tenant, sign in, search for a test user, then view and refresh registrations. These are cloud registrations, not a physical-key inventory.
 - Inspect Settings → Activity log after a failed enrollment. HTTP status/request IDs may be recorded; no generated PIN, tokens or terminal transcript may be exported.
 - A 405 response must remain reported as a 405; do not infer missing role activation. Retry with the required role activated in the correct tenant and retain request IDs if the error persists.
 - Enrollment still uses native YubiEnroll device selection. The review dialog explicitly distinguishes the inspected key from the native enrollment target. Use one test key and confirm the physical device.
@@ -169,7 +169,7 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Confirm the default 1120 × 860 window, capped to the current work area, fits the preparation form at normal desktop scaling. At small sizes, scrolling must remain available with the prepare action visible.
 - Settings body text must retain Segoe UI 14 when hosted. Prerequisites lists YubiEnroll, ykman, then administrative permissions. Help & About is project information/documentation.
 - Settings has no Done button or persistent tenant/profile totals. Activity appears directly inside its tab; the same session events survive navigating away and back. Copy/export remain explicit and exclude terminal transcripts/PINs.
-- Registered keys displays the registration ID directly, without a Tool response section. An unrecognized response is not proof of no keys.
+- Manage user passkeys displays the registration ID under Details. Cancel a removal and verify nothing changes. With a disposable registration, remove only that registration and verify in Entra; switching user or tenant must clear prior results. An unrecognized response is not proof of no keys.
 - The key-name suggestion uses the inspected model without firmware and its serial, e.g. `YubiKey 5C (12345678)`. Custom names survive device refresh. The native CLI still chooses the enrollment device; verify the physical device in the confirmation/prompt. No claim of automatic serial targeting is made.
 - Prepare Key has no profile-details expander or repeated reset notice; the final enrollment review retains the exact profile reset warning.
 - Confirm the original charcoal/green icon in Explorer, title bar, Alt+Tab and the taskbar after launching the new executable. Existing pinned shortcuts may reference an older download; unpin that old shortcut and pin the new executable when testing.

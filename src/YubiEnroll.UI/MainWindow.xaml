@@ -4,7 +4,7 @@
  <Border Background="#F2F3F2" BorderBrush="#E5E8E5" BorderThickness="0,0,1,0"><DockPanel Margin="12,28,12,20">
   <Grid DockPanel.Dock="Top" Margin="10,0,0,34"><Grid.ColumnDefinitions><ColumnDefinition Width="46"/><ColumnDefinition/></Grid.ColumnDefinitions><Image Source="{StaticResource BrandMark}" Width="36" Height="36" VerticalAlignment="Top"/><StackPanel Grid.Column="1"><TextBlock x:Name="BrandTitle" Text="YubiEnroll UI" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/><TextBlock x:Name="BrandSubtitle" Text="Community preview" Foreground="#68747A" FontSize="12" Margin="0,5,0,0"/></StackPanel></Grid>
   <Button DockPanel.Dock="Bottom" x:Name="SettingsButton" Style="{StaticResource NavigationButton}" Click="Settings_Click"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource SettingsGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Settings" VerticalAlignment="Center"/></StackPanel></Button>
-  <StackPanel x:Name="Navigation"><Button x:Name="OverviewButton" Style="{StaticResource NavigationButton}" Click="Overview_Click" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource HomeGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Home" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="PrepareButton" Style="{StaticResource NavigationButton}" Click="Prepare_Click" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource EnrollGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Set up a key" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="AddPasskeyButton" Style="{StaticResource NavigationButton}" Click="AddPasskey_Click" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource PasskeyGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Add a passkey" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="ResetButton" Style="{StaticResource NavigationButton}" Click="ResetPage_Click"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource ResetGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Reset FIDO" VerticalAlignment="Center"/></StackPanel></Button></StackPanel>
+  <StackPanel x:Name="Navigation"><Button x:Name="OverviewButton" Style="{StaticResource NavigationButton}" Click="Overview_Click" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource HomeGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Home" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="PrepareButton" Style="{StaticResource NavigationButton}" Click="Prepare_Click" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource EnrollGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Set up a key" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="AddPasskeyButton" Style="{StaticResource NavigationButton}" Click="AddPasskey_Click" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource PasskeyGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Add a passkey" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="ResetButton" Style="{StaticResource NavigationButton}" Click="ResetPage_Click"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource ResetGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Reset FIDO" VerticalAlignment="Center"/></StackPanel></Button><Button x:Name="ManageButton" Style="{StaticResource NavigationButton}" Click="Manage_Click" Margin="0,8,0,0"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource ManageGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock Text="Manage user passkeys" TextWrapping="Wrap" MaxWidth="125" VerticalAlignment="Center"/></StackPanel></Button></StackPanel>
  </DockPanel></Border>
  <Grid Grid.Column="1"><DockPanel>
   <Border x:Name="StatusBar" DockPanel.Dock="Bottom" BorderBrush="#E5E8E5" BorderThickness="0,1,0,0" Padding="28,10" Visibility="Collapsed"><TextBlock x:Name="StatusText" Text="Starting…" TextWrapping="Wrap" Foreground="#52606B" MaxHeight="70"/></Border>
@@ -24,8 +24,8 @@
     <TextBlock Text="Requirements are checked automatically when you return to this window." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
    </StackPanel></ScrollViewer>
    <ScrollViewer x:Name="OverviewPage" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="HomeBody" Margin="44,64,44,32" MaxWidth="900" HorizontalAlignment="Stretch">
-    <TextBlock Text="What would you like to do?" Style="{StaticResource PageTitle}"/><TextBlock Text="Choose a task. You’ll select the target key in the next step." Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="16" Margin="0,12,0,36"/>
-    <UniformGrid x:Name="HomeTasks" Columns="3"><Button x:Name="HomeSetupCard" Click="Prepare_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeSetupLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBlock Text="What would you like to do?" Style="{StaticResource PageTitle}"/><TextBlock Text="Set up a security key or manage passkeys." Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="16" Margin="0,12,0,36"/>
+    <UniformGrid x:Name="HomeTasks" Columns="2"><Button x:Name="HomeSetupCard" Click="Prepare_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeSetupLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Border x:Name="HomeSetupIcon" Background="#F1F7E3" CornerRadius="12" Width="64" Height="64" HorizontalAlignment="Left" Margin="0,0,0,20"><Image Source="{StaticResource EnrollGlyph}" Width="40" Height="40"/></Border>
 <StackPanel x:Name="HomeSetupText" Grid.Row="1"><TextBlock Text="Set up a key" TextWrapping="Wrap" Foreground="{StaticResource Heading}" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Set up a security key and register it for a user." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="16" Margin="0,10,0,12"/></StackPanel>
 <TextBlock x:Name="HomeSetupArrow" Grid.Row="2" Text="→" Foreground="{StaticResource Heading}" FontSize="24" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Button>
@@ -36,7 +36,11 @@
 <Button x:Name="HomeResetCard" Click="ResetPage_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeResetLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Border x:Name="HomeResetIcon" Background="#F1F7E3" CornerRadius="12" Width="64" Height="64" HorizontalAlignment="Left" Margin="0,0,0,20"><Image Source="{StaticResource ResetGlyph}" Width="40" Height="40"/></Border>
 <StackPanel x:Name="HomeResetText" Grid.Row="1"><TextBlock Text="Reset FIDO" TextWrapping="Wrap" Foreground="{StaticResource Heading}" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="Erase all FIDO passkeys and reset the key’s PIN." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="16" Margin="0,10,0,12"/></StackPanel>
-<TextBlock x:Name="HomeResetArrow" Grid.Row="2" Text="→" Foreground="{StaticResource Heading}" FontSize="24" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Button></UniformGrid>
+<TextBlock x:Name="HomeResetArrow" Grid.Row="2" Text="→" Foreground="{StaticResource Heading}" FontSize="24" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Button>
+<Button x:Name="HomeManageCard" Click="Manage_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeManageLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<Border x:Name="HomeManageIcon" Background="#F1F7E3" CornerRadius="12" Width="64" Height="64" HorizontalAlignment="Left" Margin="0,0,0,20"><Image Source="{StaticResource ManageGlyph}" Width="40" Height="40"/></Border>
+<StackPanel x:Name="HomeManageText" Grid.Row="1"><TextBlock Text="Manage user passkeys" TextWrapping="Wrap" Foreground="{StaticResource Heading}" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="View or remove a user’s passkey registrations in Microsoft Entra." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="16" Margin="0,10,0,12"/></StackPanel>
+<TextBlock x:Name="HomeManageArrow" Grid.Row="2" Text="→" Foreground="{StaticResource Heading}" FontSize="24" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Button></UniformGrid>
     <TextBlock Text="Your key is only changed after you review and confirm." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,20,0,0"/>
    </StackPanel></ScrollViewer>
    <DockPanel x:Name="PreparePage" Visibility="Collapsed">
@@ -60,7 +64,7 @@
       <TextBlock x:Name="ContextBanner" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{StaticResource Muted}"/>
       <TextBlock x:Name="EnrollmentTargetNotice" TextWrapping="Wrap" Margin="0,20,0,0" Foreground="{StaticResource Muted}"/>
      </StackPanel>
-     <StackPanel x:Name="UserCard" Visibility="Collapsed"><StackPanel x:Name="SearchPanel" IsEnabled="False"><TextBlock Text="Search by name or email" Margin="0,12,0,8"/><DockPanel><Button Content="Search" DockPanel.Dock="Right" Click="Search_Click" Margin="12,0,0,0"/><TextBox x:Name="Query" KeyDown="Query_KeyDown" AutomationProperties.Name="Search users"/></DockPanel><ListBox x:Name="Users" SelectionChanged="User_Changed" Margin="0,16,0,0" MinHeight="100" MaxHeight="220" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" Margin="10,9" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle></ListBox><TextBlock x:Name="SelectedUserText" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/><Button x:Name="CredentialsButton" Content="Registered keys…" Click="Credentials_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left" Margin="0,12,0,0" IsEnabled="False"/></StackPanel></StackPanel>
+     <StackPanel x:Name="UserCard" Visibility="Collapsed"><StackPanel x:Name="SearchPanel" IsEnabled="False"><TextBlock Text="Search by name or email" Margin="0,12,0,8"/><DockPanel><Button Content="Search" DockPanel.Dock="Right" Click="Search_Click" Margin="12,0,0,0"/><TextBox x:Name="Query" KeyDown="Query_KeyDown" AutomationProperties.Name="Search users"/></DockPanel><ListBox x:Name="Users" SelectionChanged="User_Changed" Margin="0,16,0,0" MinHeight="100" MaxHeight="220" ScrollViewer.HorizontalScrollBarVisibility="Disabled"><ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}" Margin="10,9" TextWrapping="Wrap"/></DataTemplate></ListBox.ItemTemplate><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle></ListBox><TextBlock x:Name="SelectedUserText" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel></StackPanel>
      <StackPanel x:Name="ProfileStep" Visibility="Collapsed"><StackPanel x:Name="PreparePanel" IsEnabled="False">
       <TextBlock Text="Configuration profile" Style="{StaticResource SectionTitle}" Margin="0,8,0,12"/>
       <ListBox x:Name="Profiles" SelectionChanged="Profile_Changed" BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled" MaxHeight="300">
@@ -77,7 +81,7 @@
       <TextBlock x:Name="RegistrationReviewNote" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,16,0,0" FontSize="12"/>
       <TextBlock x:Name="ReviewTargetNotice" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="#854018"/>
      </StackPanel>
-     <StackPanel x:Name="EnrollmentResult" Visibility="Collapsed"><TextBlock x:Name="EnrollmentResultText" TextWrapping="Wrap" FontSize="16" Margin="0,0,0,16"/><TextBlock x:Name="RegistrationLogStatus" TextWrapping="Wrap" Margin="0,0,0,12"/><Button x:Name="RetryRegistrationLog" Content="Retry saving registration log" Click="RetryRegistrationLog_Click" HorizontalAlignment="Left" Margin="0,0,0,12" Visibility="Collapsed"/><Button Content="Registered keys…" Click="Credentials_Click" HorizontalAlignment="Left" Style="{StaticResource QuietButton}"/></StackPanel>
+     <StackPanel x:Name="EnrollmentResult" Visibility="Collapsed"><TextBlock x:Name="EnrollmentResultText" TextWrapping="Wrap" FontSize="16" Margin="0,0,0,16"/><TextBlock x:Name="RegistrationLogStatus" TextWrapping="Wrap" Margin="0,0,0,12"/><Button x:Name="RetryRegistrationLog" Content="Retry saving registration log" Click="RetryRegistrationLog_Click" HorizontalAlignment="Left" Margin="0,0,0,12" Visibility="Collapsed"/></StackPanel>
     </StackPanel></ScrollViewer>
    </DockPanel>
    <DockPanel x:Name="ResetPage" Visibility="Collapsed">
@@ -92,6 +96,38 @@
     <StackPanel x:Name="ResetResult" Visibility="Collapsed"><TextBlock x:Name="ResetResultText" TextWrapping="Wrap" FontSize="16"/><Button Content="Refresh key status" ContentTemplate="{StaticResource RefreshContent}" Click="RefreshKeys_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left" Margin="0,20,0,0"/></StackPanel>
     </StackPanel></ScrollViewer>
    </DockPanel>
+   <ScrollViewer x:Name="ManagePage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+    <StackPanel Margin="40,32,40,28" MaxWidth="900">
+     <UniformGrid x:Name="ManageProgress" Columns="3" Margin="0,0,0,28"/>
+     <TextBlock Text="Manage user passkeys" Style="{StaticResource PageTitle}"/>
+     <TextBlock x:Name="ManageContext" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,20"/>
+     <StackPanel x:Name="ManageTenantStep">
+      <TextBlock Text="Tenant" Margin="0,0,0,6"/>
+      <ComboBox x:Name="ManageTenants" ItemsSource="{Binding ItemsSource, ElementName=Tenants}" SelectedItem="{Binding SelectedItem, ElementName=Tenants, Mode=TwoWay}" DisplayMemberPath="Name" AutomationProperties.Name="Management tenant"/>
+      <TextBlock x:Name="ManageTenantHint" TextWrapping="Wrap" Margin="0,10,0,12"/>
+      <Button x:Name="ManageConnect" Content="Connect" Click="ManageConnect_Click" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}"/>
+     </StackPanel>
+     <StackPanel x:Name="ManageUserStep" Visibility="Collapsed">
+      <TextBlock Text="Search by name or email" Margin="0,0,0,6"/>
+      <DockPanel><Button DockPanel.Dock="Right" Content="Search" Click="ManageSearch_Click" Margin="12,0,0,0"/><TextBox x:Name="ManageQuery" KeyDown="ManageQuery_KeyDown" TextChanged="ManageQuery_Changed" AutomationProperties.Name="Find user"/></DockPanel>
+      <ListBox x:Name="ManageUsers" DisplayMemberPath="Label" AutomationProperties.Name="User search results" SelectionChanged="ManageUser_Changed" MaxHeight="240" Margin="0,14,0,8"/>
+      <TextBlock x:Name="ManageSearchHint" Foreground="{StaticResource Muted}" Margin="0,0,0,16"/>
+      <Button x:Name="ManageView" Content="View passkeys" Click="ManageView_Click" ContentTemplate="{StaticResource ForwardContent}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"/>
+     </StackPanel>
+     <StackPanel x:Name="ManageListStep" Visibility="Collapsed">
+      <DockPanel><Button DockPanel.Dock="Right" Content="Refresh" Click="ManageView_Click" Style="{StaticResource QuietButton}" ContentTemplate="{StaticResource RefreshContent}"/><TextBlock Text="Registered passkeys" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/></DockPanel>
+      <TextBlock x:Name="ManageFeedback" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,12"/>
+      <ItemsControl x:Name="ManageRows"><ItemsControl.ItemTemplate><DataTemplate>
+       <Border Style="{StaticResource Card}"><DockPanel>
+        <Button Content="Remove from Entra" Click="ManageRemove_Click" Foreground="#A21C2B" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="12,0,0,0"/>
+        <StackPanel><TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding Model}" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
+         <Expander Header="Registration ID" Margin="0,8,0,0"><TextBox Text="{Binding Id, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"/></Expander>
+        </StackPanel></DockPanel></Border>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+     </StackPanel>
+     <Button x:Name="ManageBack" Content="Back to Home" Click="ManageBack_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left" Margin="0,24,0,0"/>
+    </StackPanel>
+   </ScrollViewer>
    <ContentControl x:Name="HostedPage" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Visibility="Collapsed"/>
   </Grid>
  </DockPanel><ContentControl x:Name="TerminalOverlay" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Visibility="Collapsed" Background="White"/></Grid>
