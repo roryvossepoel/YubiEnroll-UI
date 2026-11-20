@@ -12,6 +12,7 @@ SCRIPT = (Path(__file__).resolve().parents[1] / "src/YubiEnroll.Core/Resources/D
 
 class NoCard(Exception): pass
 class ReaderError(Exception): pass
+class ContextError(Exception): pass
 
 class DiscoveryTests(unittest.TestCase):
     def run_probe(self, cards=(), reader_error=False):
@@ -28,7 +29,7 @@ class DiscoveryTests(unittest.TestCase):
             def __enter__(self): return self
             def __exit__(self, *args): pass
         def list_devices(name):
-            if reader_error: raise ReaderError()
+            if reader_error: raise (ContextError() if reader_error == "context" else ReaderError())
             return [Device(*c) for c in cards]
         def read_info(conn, pid):
             return types.SimpleNamespace(serial=conn.serial, version="5.7.1", config=types.SimpleNamespace(enabled_capabilities={"nfc": conn.fido}))
@@ -40,7 +41,7 @@ class DiscoveryTests(unittest.TestCase):
             "yubikit.management": {"CAPABILITY": types.SimpleNamespace(FIDO2=1)},
             "yubikit.support": {"read_info": read_info, "get_name": lambda info, key_type: "YubiKey 5C NFC"},
             "smartcard.Exceptions": {"NoCardException": NoCard},
-            "smartcard.pcsc.PCSCExceptions": {"ListReadersException": ReaderError},
+            "smartcard.pcsc.PCSCExceptions": {"ListReadersException": ReaderError, "EstablishContextException": ContextError},
         }.items():
             module = types.ModuleType(name); module.__dict__.update(members); modules[name] = module
         output = io.StringIO()
@@ -70,7 +71,8 @@ class DiscoveryTests(unittest.TestCase):
     def test_duplicate_names_and_service_failure_are_not_empty_success(self):
         data, opened = self.run_probe([("OMNIKEY 0", 1), ("OMNIKEY 0", 2)])
         self.assertEqual((opened, data["unavailable"]), ([], 2))
-        data, _ = self.run_probe(reader_error=True)
-        self.assertEqual((data["keys"], data["unavailable"]), ([], 1))
+        for error in (True, "context"):
+            data, _ = self.run_probe(reader_error=error)
+            self.assertEqual((data["keys"], data["unavailable"]), ([], 1))
 
 if __name__ == "__main__": unittest.main()

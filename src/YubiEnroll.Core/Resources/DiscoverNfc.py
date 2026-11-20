@@ -6,13 +6,13 @@ from yubikit.core.smartcard import SmartCardConnection
 from yubikit.management import CAPABILITY
 from yubikit.support import read_info, get_name
 from smartcard.Exceptions import NoCardException
-from smartcard.pcsc.PCSCExceptions import ListReadersException
+from smartcard.pcsc.PCSCExceptions import ListReadersException, EstablishContextException
 
 keys = []
 unavailable = 0
 try:
     devices = list_devices("")
-except ListReadersException:
+except (ListReadersException, EstablishContextException):
     devices = []
     unavailable = 1
 readers = [d for d in devices if d.transport == TRANSPORT.NFC]
