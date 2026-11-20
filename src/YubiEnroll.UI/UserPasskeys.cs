@@ -39,7 +39,7 @@ public partial class MainWindow
         ManageTenantStep.Visibility = Visible(_manageStep == 0);
         ManageUserStep.Visibility = Visible(_manageStep == 1);
         ManageListStep.Visibility = Visible(_manageStep == 2);
-        ManageContext.Text = _manageStep == 0 ? "View or remove a user’s Microsoft Entra registrations. No target key is required." :
+        ManageContext.Text = _manageStep == 0 ? "View or remove a user’s YubiKey registrations in Microsoft Entra. No connected key is required." :
             _manageStep == 1 ? $"Tenant · {SelectedProvider.Name}" :
             $"{SelectedProvider.Name}  ·  {(ManageUsers.SelectedItem as UserCandidate)?.Label}";
         ManageTenantHint.Text = Tenants.Items.Count == 0 ? "Add a tenant in Settings → Tenants." :
@@ -108,10 +108,11 @@ public partial class MainWindow
     private void SetManagedList(Provider provider, UserCandidate user, IReadOnlyList<RegisteredCredential> rows)
     {
         if (!MatchesManagementContext(provider, user)) throw new InvalidOperationException("The selected tenant or user changed.");
-        _managedList = new(provider, user, rows);
-        ManageRows.ItemsSource = rows;
-        ManageFeedback.Text = rows.Count == 0 ? "No passkeys registered for this user." :
-            $"{rows.Count} {(rows.Count == 1 ? "passkey" : "passkeys")} registered in Entra.";
+        var hardware = rows.Where(row => row.IsYubicoHardware).ToArray();
+        _managedList = new(provider, user, hardware);
+        ManageRows.ItemsSource = hardware;
+        ManageFeedback.Text = hardware.Length == 0 ? "No recognized YubiKey registrations found for this user." :
+            $"{hardware.Length} YubiKey {(hardware.Length == 1 ? "registration" : "registrations")} in Entra.";
     }
     private bool MatchesManagementContext(Provider provider, UserCandidate user) =>
         ManagePage.IsVisible && _manageStep == 2 && IsConnected && SelectedProvider == provider && ManageUsers.SelectedItem is UserCandidate u && u.Id == user.Id;
@@ -143,9 +144,7 @@ public partial class MainWindow
     {
         if (_busy || sender is not Button { DataContext: RegisteredCredential row } || _managedList is not { } list ||
             !list.Rows.Contains(row) || !MatchesManagementContext(list.Tenant, list.User)) return;
-        var message = $"Tenant: {list.Tenant.Name}\nUser: {list.User.Label}\nUser ID: {list.User.Id}\nPasskey: {row.Name} · {row.Model}\nRegistration ID: {row.Id}\n\nThis passkey will no longer sign in to this account. The physical key, its PIN and its other passkeys are unchanged.";
-        if (MessageBox.Show(this, message, "Remove this passkey from Entra?", MessageBoxButton.YesNo,
-            MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        if (new RemoveRegistrationWindow(this, list.Tenant, list.User, row).ShowDialog() != true) return;
         if (_busy || !ReferenceEquals(_managedList, list) || !MatchesManagementContext(list.Tenant, list.User)) return;
         ClearManagedList(); ManageFeedback.Text = "Checking and removing the selected registration…";
         await ManageOperationAsync(async service =>

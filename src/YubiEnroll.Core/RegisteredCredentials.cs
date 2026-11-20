@@ -2,7 +2,14 @@ using System.Text.RegularExpressions;
 
 namespace YubiEnroll.Core;
 
-public sealed record RegisteredCredential(string Name, string Model, string Id);
+public sealed record RegisteredCredential(string Name, string Model, string Id)
+{
+    // The CLI reports Entra's model separately from the user-editable display name.
+    // Classify known Yubico hardware families only; "Security Key" alone has no vendor.
+    public bool IsYubicoHardware => Regex.IsMatch(Model,
+        @"^(?:(?:Yubico )?YubiKey (?:5(?:Ci?)?|Bio|4|NEO|FIPS)|Yubico Security Key|Security Key (?:C )?(?:NFC )?by Yubico)(?: |$)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+}
 
 public static class RegisteredCredentials
 {
@@ -45,8 +52,11 @@ public sealed class PasskeyRegistrationService(Func<string[], Task<CliResult>> r
 
     public async Task<IReadOnlyList<RegisteredCredential>> RemoveAsync(Guid user, RegisteredCredential target)
     {
+        if (!target.IsYubicoHardware) throw new InvalidOperationException("Only a recognized YubiKey registration can be removed here.");
         var current = await ListAsync(user);
         if (!current.Contains(target)) throw new InvalidOperationException("The selected registration changed. Refresh and review it again.");
+        if (current.Any(r => r.Id != target.Id && r.Id.StartsWith(target.Id, StringComparison.Ordinal)))
+            throw new InvalidOperationException("The registration ID is ambiguous. No removal was attempted.");
         try
         {
             // The UI already confirmed this specific tenant, user and credential. '--' also protects IDs starting with '-'.
@@ -58,6 +68,9 @@ public sealed class PasskeyRegistrationService(Func<string[], Task<CliResult>> r
         try { after = await ListAsync(user); }
         catch (Exception ex) { throw new InvalidOperationException("The removal was submitted, but the updated list could not be verified. Refresh before trying again.", ex); }
         if (after.Any(r => r.Id == target.Id)) throw new InvalidOperationException("Removal has not been verified. Refresh to check the registration.");
+        var remainingIds = after.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
+        if (current.Any(r => r.Id != target.Id && !remainingIds.Contains(r.Id)))
+            throw new InvalidOperationException("Another registration is also missing from the updated list. Check the user's registrations in Entra before continuing.");
         return after;
     }
 

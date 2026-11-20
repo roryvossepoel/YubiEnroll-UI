@@ -177,13 +177,37 @@ public partial class MainWindow
             var managedUser = SelectedUser;
             ManageUsers.ItemsSource = new[] { managedUser }; ManageUsers.SelectedIndex = 0;
             _manageStep = 2; RenderManagement();
-            SetManagedList(SelectedProvider, managedUser, [new("Demo office key", "YubiKey 5 NFC", "synthetic-credential-id")]);
+            SetManagedList(SelectedProvider, managedUser, [
+                new("YubiKey 5C NFC", "Microsoft Authenticator - Android", "phone-id"),
+                new("Demo office key", "YubiKey 5 Series with NFC", "office-id"),
+                new("Backup", "YubiKey Bio Series - FIDO Edition", "backup-id")]);
+            Assert(ManageRows.Items.Count == 2 && _managedList!.Rows.All(row => row.Id != "phone-id") &&
+                ManageFeedback.Text.StartsWith("2 YubiKey registrations"), "Only recognized hardware registrations are shown, counted and actionable");
             CaptureWindow(this, "manage-user-passkeys.png");
+            var removalReview = new RemoveRegistrationWindow(this, SelectedProvider, managedUser, _managedList!.Rows[0]);
+            var inspectReview = removalReview.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    Assert(removalReview.RegistrationId.Text == "office-id" && removalReview.KeyName.Text == "Demo office key" &&
+                        removalReview.UserId.Text == managedUser.Id && removalReview.TenantLabel.Text == SelectedProvider.Name,
+                        "Removal review identifies exactly the selected registration, tenant and user");
+                    Assert(removalReview.CancelAction.IsDefault && removalReview.CancelAction.IsCancel &&
+                        !removalReview.RemoveAction.IsDefault && !removalReview.Details.IsExpanded,
+                        "Removal requires an explicit action; Cancel is the default");
+                    CaptureWindow(removalReview, "remove-registration.png");
+                }
+                finally { removalReview.Close(); }
+            });
+            Assert(removalReview.ShowDialog() != true, "Closing the removal review does not confirm");
+            await inspectReview.Task;
             ManageBack_Click(this, new RoutedEventArgs());
             Assert(_managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
                 "Changing management user clears registrations and the removal target");
             ManageUsers.SelectedIndex = 0; _manageStep = 2;
             SetManagedList(SelectedProvider, managedUser, [new("Demo", "Key", "other-id")]);
+            Assert(ManageRows.Items.Count == 0 && ManageFeedback.Text.Contains("No recognized YubiKey"),
+                "Unknown models leave the list empty without saying the user has no passkeys");
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);

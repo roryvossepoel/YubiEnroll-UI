@@ -1,6 +1,6 @@
 # YubiEnroll UI
 
-## Preview 0.7.0
+## Preview 0.7.1
 
 NFC readers are now supported alongside USB for Set up a key, Add a passkey and Reset FIDO. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
@@ -20,7 +20,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.7.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.7.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -239,6 +239,8 @@ Settings now hosts Activity directly, with no Done button or persistent totals. 
 
 Prepare Key suggests an editable model/serial registration name and leaves reset warnings in the final review. Registered keys shows IDs directly without a raw tool-output section. The main window starts taller, and the original charcoal/green icon is explicitly applied to native window/taskbar identity. The terminal reads and decodes pipe output immediately and requests unbuffered Python output; CI checks live prompts and the real native help renderer. Real authentication and physical-key acceptance are still required.
 
-### Manage user passkeys (preview 0.7.0)
+### Manage user passkeys (preview 0.7.1)
 
-Choose the tenant, connect using your delegated account, search for the user and select **View passkeys**. No target key or profile is required. Each registration has its own **Remove from Entra** action. Review the tenant, user and exact registration before confirming. This revokes that sign-in registration; it does not erase the credential or PIN on the physical key. The app checks the list again after removal. If it cannot verify the result, refresh before trying again. There is no bulk removal or automatic retry.
+Choose the tenant, connect using your delegated account, search for the user and select **View passkeys**. No target key or profile is required. The list shows registrations whose Entra model identifies a supported Yubico hardware family, regardless of the user-editable display name. Software passkeys, other vendors and unrecognized models stay hidden.
+
+Each listed registration has its own **Remove** action. Review the tenant, user and exact registration before confirming. This revokes that sign-in registration in Entra; it does not erase the credential or PIN on the physical key. The app checks the list again after removal. If it cannot verify the result, refresh before trying again. There is no bulk removal or automatic retry.

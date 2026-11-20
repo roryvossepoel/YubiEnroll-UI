@@ -431,27 +431,45 @@ foreach (var malformed in new[] { "unrecognized output", "Display name  Model  I
     Check(refused, "Unknown, truncated, partial and duplicate registrations fail closed");
 }
 var regHeader = "Display name  Model  ID\n";
-var firstRow = "Desk key  YubiKey  -credential-1\n";
-var otherRow = "Desk key  YubiKey  credential-2\n";
+var firstRow = "Desk key  YubiKey 5 Series  -credential-1\n";
+var otherRow = "Desk key  YubiKey 5 Series  credential-2\n";
+var phoneRow = "Desk key  Microsoft Authenticator - Android  phone-3\n";
 var managedUser = Guid.Parse(id);
 var wanted = RegisteredCredentials.Parse(regHeader + firstRow).Single();
-foreach (var scenario in new[] { "removed", "changed", "still-present", "ambiguous-result", "denied", "invalid-user" })
+foreach (var model in new[] { "YubiKey 5 Series with NFC", "YubiKey 5Ci", "YubiKey Bio Series - FIDO Edition",
+    "Security Key by Yubico with NFC", "Security Key NFC by Yubico - Enterprise Edition" })
+    Check((wanted with { Name = "Phone", Model = model }).IsYubicoHardware, "A renamed Yubico hardware registration is still recognized: " + model);
+foreach (var model in new[] { "Microsoft Authenticator - Android", "Windows Hello", "Google Password Manager",
+    "Unknown", "Security Key", "Feitian BioPass FIDO2 Authenticator" })
+{
+    var unrelated = wanted with { Name = "YubiKey 5C NFC", Model = model };
+    Check(!unrelated.IsYubicoHardware, "A display name cannot substitute for a recognized Yubico model: " + model);
+    var refused = false;
+    try { await new PasskeyRegistrationService(_ => throw new Exception("Unexpected CLI call")).RemoveAsync(managedUser, unrelated); }
+    catch (InvalidOperationException) { refused = true; }
+    Check(refused, "A hidden registration cannot be removed: " + model);
+}
+foreach (var scenario in new[] { "removed", "changed", "id-prefix", "still-present", "missing-phone", "ambiguous-result", "denied", "timeout", "invalid-user" })
 {
     var commands = new List<string[]>();
     var service = new PasskeyRegistrationService(a =>
     {
         commands.Add(a);
-        if (a[1] == "delete") return Task.FromResult(scenario == "denied" ? new CliResult(1, "", "ERROR: 403") : new CliResult(0, "", ""));
-        var output = commands.Count == 1 ? regHeader + (scenario == "changed" ? "" : firstRow) + otherRow :
-            scenario == "ambiguous-result" ? "failed to read" : regHeader + (scenario == "still-present" ? firstRow : "") + otherRow;
+        if (a[1] == "delete") return scenario == "timeout" ? throw new TimeoutException() :
+            Task.FromResult(scenario == "denied" ? new CliResult(1, "", "ERROR: 403") : new CliResult(0, "", ""));
+        var output = commands.Count == 1 ? regHeader + (scenario == "changed" ? "" : firstRow) + otherRow + phoneRow +
+            (scenario == "id-prefix" ? "Prefix match  YubiKey 5 Series  -credential-10\n" : "") :
+            scenario == "ambiguous-result" ? "failed to read" : regHeader + (scenario == "still-present" ? firstRow : "") + otherRow +
+            (scenario == "missing-phone" ? "" : phoneRow);
         return Task.FromResult(new CliResult(0, output, ""));
     });
     bool removed = false;
     try { var remaining = await service.RemoveAsync(scenario == "invalid-user" ? Guid.Empty : managedUser, wanted);
-        removed = remaining.Count == 1 && remaining[0].Id == "credential-2"; }
+        removed = true;
+        Check(remaining.Select(r => r.Id).SequenceEqual(new[] { "credential-2", "phone-3" }), "The identically named YubiKey and phone registration both remain"); }
     catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { }
     var deletes = commands.Where(a => a[1] == "delete").ToArray();
-    Check(removed == (scenario == "removed") && deletes.Length == (scenario is "changed" or "invalid-user" ? 0 : 1) &&
+    Check(removed == (scenario == "removed") && deletes.Length == (scenario is "changed" or "id-prefix" or "invalid-user" ? 0 : 1) &&
         deletes.All(a => a.SequenceEqual(new[]{"credentials", "delete", "--force", "--", managedUser.ToString(), "-credential-1"})),
         "Registration removal binds one user and exact method, never retries, verifies outcome · " + scenario);
 }
