@@ -114,6 +114,13 @@ if (args.Length == 2 && args[0] == "--check-ykman")
     if (probe.ExitCode != 4 || probe.Output.Length != 0)
         throw new Exception($"Bundled read-only probe failed in native ykman: exit {probe.ExitCode}; output: {probe.Output}; error: {probe.Error}");
     Console.WriteLine("PASS: bundled capability script runs through native ykman without Python/SDK installation and rejects an absent target.");
+    try
+    {
+        await LocalPasskeys.ListAsync(native, new ResetKey("12345678","Synthetic (5.4.3)"), "ci-only");
+        throw new Exception("Absent target accepted.");
+    }
+    catch (InvalidOperationException ex) when (ex.Message.Contains("missing or changed"))
+    { Console.WriteLine("PASS: actual ykman loads the bundled local passkey helper and refuses an absent USB key before PIN verification."); }
     Console.WriteLine("PASS: native ykman version, empty USB inventory and serial-targeted reset help; no reset executed.");
     return 0;
 }

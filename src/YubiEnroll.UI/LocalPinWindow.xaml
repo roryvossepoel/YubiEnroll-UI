@@ -1,0 +1,18 @@
+<Window x:Class="YubiEnroll.UI.LocalPinWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="YubiKey passkeys" Width="470" SizeToContent="Height" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="NoResize" Background="White"
+ FontFamily="Segoe UI" FontSize="14" Icon="pack://application:,,,/Assets/App.ico">
+ <DockPanel Margin="24"><StackPanel DockPanel.Dock="Bottom" Margin="0,18,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+  <Button x:Name="CancelAction" Content="Cancel" IsCancel="True"/><Button x:Name="Proceed" Click="Proceed_Click" IsEnabled="False"/>
+ </StackPanel>
+ <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+  <TextBlock x:Name="Heading" Style="{StaticResource SettingsTitle}" TextWrapping="Wrap"/>
+  <TextBlock x:Name="Target" TextWrapping="Wrap" Margin="0,8,0,12"/>
+  <StackPanel x:Name="Review"><TextBlock x:Name="Origin" FontWeight="SemiBold" TextWrapping="Wrap"/>
+   <TextBlock x:Name="Account" TextWrapping="Wrap"/>
+   <Expander Header="Credential ID" Margin="0,6,0,6"><TextBox x:Name="CredentialId" IsReadOnly="True" TextWrapping="Wrap"/></Expander>
+   <TextBlock Text="This passkey will no longer work from this YubiKey. Other passkeys and the PIN are kept. The registration at the service is unchanged." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14"/>
+  </StackPanel>
+  <TextBlock Text="FIDO PIN for this YubiKey" Margin="0,0,0,6"/>
+  <PasswordBox x:Name="Pin" AutomationProperties.Name="Current YubiKey FIDO PIN" Padding="8" MaxLength="63" PasswordChanged="Pin_Changed"/>
+ </StackPanel></ScrollViewer></DockPanel>
+</Window>

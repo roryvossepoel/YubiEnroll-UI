@@ -162,6 +162,7 @@ public partial class MainWindow
             await settingsOperation.Task;
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
+            await TestLocalPasskeyPageAsync();
             TestGuidedWorkflow();
             var connectedBeforeProbe = _connectedProvider;
             var targetBeforeProbe = _selectedKey;

@@ -1,3 +1,9 @@
+## Local YubiKey passkeys (preview 0.8.0)
+
+- With no tenant signed in, choose a disposable USB key by serial, unlock the list and compare its RP IDs and accounts with Yubico Authenticator. Repeat on the named OMNIKEY 5022 reader, including an empty key and an unsupported device.
+- With another USB key attached, open Remove for one exact test credential. Cancel: neither key nor Entra changes. Swap or lift the selected key during review: the old action must be invalid. A wrong PIN is attempted once only; stop before exhausting retries.
+- Only on a disposable credential: confirm removal, verify the other local IDs in Authenticator and verify the Entra registration is unchanged. Check navigation and reconnect clear the list, and that activity/diagnostic logs contain no local PIN or credential inventory.
+
 # Manual acceptance checks for preview 0.5.4
 
 ## Preview 0.5.4: registration records

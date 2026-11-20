@@ -1,12 +1,12 @@
 # YubiEnroll UI
 
-## Preview 0.7.4
+## Preview 0.8.0
 
 NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
 
 - **Manage user passkeys** now signs in once at **Connect**. Searching, viewing dates and refreshing share that Graph session.
-- Home offers **Set up a YubiKey**, **Add a passkey**, **Clear passkeys & PIN**, and **Manage user passkeys**.
+- Home offers **Set up a YubiKey**, **Add a passkey**, **Passkeys on a YubiKey**, **Manage user passkeys**, and **Clear passkeys & PIN**.
 - Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
 - Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
 - Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
@@ -21,7 +21,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.7.4 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.8.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -239,6 +239,12 @@ Overview focuses on the connected key; Key Management shares its selection and r
 Settings now hosts Activity directly, with no Done button or persistent totals. Typography is retained when pages are hosted, navigation uses neutral colors, and prerequisites separates component status from project help. Overview reuses its inspected state until Refresh, a device change or a completed key operation. Blocked PIN guidance links to Key Management without performing a reset.
 
 Prepare Key suggests an editable model/serial registration name and leaves reset warnings in the final review. Registered keys shows IDs directly without a raw tool-output section. The main window starts taller, and the original charcoal/green icon is explicitly applied to native window/taskbar identity. The terminal reads and decodes pipe output immediately and requests unbuffered Python output; CI checks live prompts and the real native help renderer. Real authentication and physical-key acceptance are still required.
+
+### Passkeys on a YubiKey (preview 0.8.0)
+
+Choose a physical key by model, serial and connection (USB or named NFC reader), select **View passkeys** and enter its existing FIDO PIN. No tenant, account search or Graph connection is required. Each discoverable credential shows its service (RP ID), available account names and full credential ID. Non-discoverable/U2F credentials cannot be listed. Registration and last-use dates are not supplied by the device.
+
+**Remove from YubiKey** requires a separate review of the target and credential and a fresh PIN entry. Only that credential is removed; the PIN, other credentials and registrations at services such as Entra remain. The app checks the key and exact credential over the same connection, performs one deletion and verifies the remaining IDs. If verification fails, unlock the list again; there is no automatic retry. Device changes or leaving the page clear the list. The local PIN is passed only through a private stdin stream and is not saved or logged. A physical USB/NFC acceptance test is still required.
 
 ### Manage user passkeys (preview 0.7.3)
 

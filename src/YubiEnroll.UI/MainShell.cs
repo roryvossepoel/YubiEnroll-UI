@@ -36,11 +36,11 @@ public partial class MainWindow
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         var stackedCards = ActualWidth < 1100;
         HomeTasks.Columns = stackedCards ? 1 : 2;
-        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeResetCard, HomeManageCard };
-        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeResetLayout, HomeManageLayout };
-        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeResetIcon, HomeManageIcon };
-        var labels = new[] { HomeSetupText, HomeAdditionText, HomeResetText, HomeManageText };
-        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeResetArrow, HomeManageArrow };
+        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeLocalCard, HomeManageCard, HomeResetCard };
+        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeLocalLayout, HomeManageLayout, HomeResetLayout };
+        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeLocalIcon, HomeManageIcon, HomeResetIcon };
+        var labels = new[] { HomeSetupText, HomeAdditionText, HomeLocalText, HomeManageText, HomeResetText };
+        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeLocalArrow, HomeManageArrow, HomeResetArrow };
         for (var i = 0; i < cards.Length; i++)
         {
             cards[i].Padding = new Thickness(stackedCards ? 16 : 24);
@@ -73,19 +73,22 @@ public partial class MainWindow
     {
         if (_busy) return;
         if ((page == OverviewPage || page == PreparePage || page == ResetPage) && RequirementsBlockTasks) page = StartupPage;
+        if (page == LocalPage && (!_smokeTest || _startupChecksComplete) &&
+            (_requirements?.Administrator != true || !_requirements.Manager.Ready)) page = StartupPage;
+        if (LocalPage.Visibility == Visibility.Visible && page != LocalPage) ResetLocalPage();
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage) LeaveHostedPage();
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, ManagePage, HostedPage, StartupPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, LocalPage, ManagePage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, ManageButton, SettingsButton })
+        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, LocalButton, ManageButton, SettingsButton })
         {
             var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage && !_addPasskey ||
                 button == AddPasskeyButton && page == PreparePage && _addPasskey ||
-                button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
+                button == LocalButton && page == LocalPage || button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
             button.Tag = active ? "active" : null;
         }
         // A clean Home has no technical footer. Errors/requirements remain discoverable in Settings.
-        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage || page == ManagePage ? Visibility.Collapsed : Visibility.Visible;
+        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage || page == ManagePage || page == LocalPage ? Visibility.Collapsed : Visibility.Visible;
         RenderWizard();
     }
     private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);
@@ -173,7 +176,7 @@ public partial class MainWindow
     }
     private void SetInventoryMessage(string text)
     {
-        KeyInfo.Text = ResetInventoryInfo.Text = text;
+        KeyInfo.Text = ResetInventoryInfo.Text = LocalInventoryHint.Text = text;
         KeyInfo.Visibility = ResetInventoryInfo.Visibility = Visible(!string.IsNullOrWhiteSpace(text));
     }
     private void SetSelectedKey(KeyStatus? key)
@@ -214,6 +217,7 @@ public partial class MainWindow
             OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = entries.FirstOrDefault(x => x.Key == candidate);
         }
         finally { _readingKeys = false; }
+        LocalKeys.ItemsSource = entries;
         RenderReaderInventory(readers ?? Array.Empty<NfcReaderStatus>());
         SetInventoryMessage(unavailable > 0 ? "Some USB devices could not be identified. Check device access and FIDO support." :
             entries.Count == 0 ? (EnrollmentReaderStatus.Visibility == Visibility.Visible
@@ -264,6 +268,7 @@ public partial class MainWindow
     private void InvalidateDeviceInventory()
     {
         _inventoryDirty = true;
+        ResetLocalPage();
         EnrollButton.IsEnabled = ResetTargetButton.IsEnabled = EnrollNext.IsEnabled = ResetNext.IsEnabled = false;
         // A USB change invalidates a destructive acknowledgment even if the same key returns.
         ResetAcknowledged.IsChecked = false;

@@ -11,7 +11,7 @@ public partial class MainWindow
     private void RenderReaderInventory(IReadOnlyList<NfcReaderStatus> readers)
     {
         var visible = _readerCatalog.Visible(readers);
-        foreach (var host in new[] { EnrollmentReaderStatus, ResetReaderStatus })
+        foreach (var host in new[] { EnrollmentReaderStatus, ResetReaderStatus, LocalReaderStatus })
         {
             host.Children.Clear();
             host.Visibility = Visible(visible.Count > 0);
