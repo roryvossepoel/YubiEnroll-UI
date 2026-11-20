@@ -66,7 +66,7 @@
     <TextBlock Text="Find documentation, application information and updates." Style="{StaticResource SettingsDescription}"/>
     <Border Style="{StaticResource Card}" Margin="0,0,0,20"><StackPanel>
     <StackPanel Orientation="Horizontal"><Image Source="{StaticResource BrandMark}" Width="32" Height="32" Margin="0,0,12,0"/><TextBlock Text="YubiEnroll UI" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/></StackPanel>
-    <TextBlock Text="Community preview 0.8.0 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
+    <TextBlock Text="Community preview 0.8.1 · Windows x64" Foreground="#617084" Margin="0,8,0,16"/>
     <TextBlock x:Name="UpdateStatus" Text="Check for published releases, including previews." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
     <WrapPanel><Button x:Name="CheckUpdatesButton" Content="Check for updates" Click="CheckUpdates_Click"/><Button x:Name="ReleaseButton" Content="View release" Click="Link_Click" Visibility="Collapsed"/></WrapPanel>
     </StackPanel></Border>
