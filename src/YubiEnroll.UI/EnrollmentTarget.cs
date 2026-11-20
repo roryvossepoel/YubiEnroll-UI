@@ -12,7 +12,7 @@ public partial class MainWindow
         if (executable.Length == 0)
             throw new InvalidOperationException("YubiKey Manager CLI is required to verify the connected keys.");
         var runner = new CliRunner(executable);
-        var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
+        var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException(), () => NfcDiscovery.ReadAsync(runner));
         InvalidateDeviceInventory();
         var generation = _deviceGeneration;
         try

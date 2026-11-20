@@ -119,10 +119,14 @@ public partial class MainWindow
         ResetBack.Content = _resetStep == 1 ? "←  Back" : "Back to Home";
         ResetTargetText.Text = _resetReviewTarget?.Label ?? "No target selected";
         KeyPinStatus.Text = _selectedKey is { } currentKey && currentKey.Key == _resetReviewTarget ? currentKey.PinLabel : "Target unavailable";
+        ResetConnectionHelp.Text = _resetReviewTarget?.IsNfc == true
+            ? "Keep this key on the NFC reader. Remove and place the same key back only when the native tool asks."
+            : "Follow the native prompts to unplug, reinsert and touch this same key.";
         ResetAvailability.Text = !IsAdministrator() ? "Restart as administrator from the startup requirements screen to reset this key." :
-            !TargetReady || _selectedKey?.Key != _resetReviewTarget ? "The reviewed target is unavailable. Go back, reconnect it and Refresh." : "";
+            !TargetReady || _selectedKey?.Key != _resetReviewTarget ? "The reviewed target is unavailable. Go back, reconnect it and Refresh." :
+            _selectedKey.Key.IsNfc && _selectedKey.Capabilities?.ResetAllowed != true ? "FIDO reset over NFC is unavailable or could not be verified for this key. Connect it by USB and select it again." : "";
         ResetAcknowledged.IsEnabled = !_busy && TargetReady && _selectedKey?.Key == _resetReviewTarget;
-        ResetTargetButton.IsEnabled = !_busy && _resetStep == 1 && TargetReady && _selectedKey?.Key == _resetReviewTarget && IsAdministrator() && ResetAcknowledged.IsChecked == true;
+        ResetTargetButton.IsEnabled = !_busy && _resetStep == 1 && TargetReady && _selectedKey?.Key == _resetReviewTarget && IsAdministrator() && (!_selectedKey.Key.IsNfc || _selectedKey.Capabilities?.ResetAllowed == true) && ResetAcknowledged.IsChecked == true;
     }
     private bool AdditionCandidateReady => EnrollmentKeys.SelectedItem is KeyStatus k && PasskeyAddition.Evaluate(k.Capabilities, k.Pin).Compatible;
     private void ReadReviewWarning()
@@ -176,6 +180,7 @@ public partial class MainWindow
         }
         var user = Users.SelectedItem as UserCandidate;
         Row("Key", _selectedKey?.Key.Model ?? "Unavailable"); Row("Serial number", _selectedKey?.Key.Serial ?? "—");
+        Row("Connection", _selectedKey?.Key.ConnectionLabel ?? "—");
         Row("Tenant", (Tenants.SelectedItem as Provider)?.Name ?? "—");
         Row("User", !string.IsNullOrWhiteSpace(user?.DisplayName) ? user.DisplayName : user?.Label ?? "—");
         if (!string.IsNullOrWhiteSpace(user?.UserPrincipalName)) Row("Sign-in name", user.UserPrincipalName);

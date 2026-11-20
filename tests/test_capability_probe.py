@@ -13,7 +13,7 @@ SCRIPT = (Path(__file__).resolve().parents[1] / "src/YubiEnroll.Core/Resources/I
 
 class ProbeTests(unittest.TestCase):
     def probe(self, *, serials=(12345678,), bio=False, minimum=4, maximum=63,
-              blocked=0, transports=(), client_pin=False, extra_options=None):
+              blocked=0, transports=(), client_pin=False, extra_options=None, reader=None, reader_names=None):
         calls = []
         options = {"clientPin": client_pin, "rk": True, **(extra_options or {})}
         ctap_info = types.SimpleNamespace(options=options, min_pin_length=minimum,
@@ -23,12 +23,15 @@ class ProbeTests(unittest.TestCase):
             def __enter__(self): calls.append(("open", self.serial)); return self
             def __exit__(self, *args): calls.append(("close", self.serial))
         class Device:
-            transport = "usb"
-            def __init__(self, serial): self.serial = serial
+            transport = "nfc" if reader else "usb"
+            pid = None
+            def __init__(self, serial, name=None):
+                self.serial = serial
+                self.fingerprint = name or reader
             def open_connection(self, kind): return Connection(self.serial)
         def device_info(serial):
             return types.SimpleNamespace(serial=serial, version="5.7.1", _is_bio=bio,
-                config=types.SimpleNamespace(enabled_capabilities={"usb": 3 if bio else 1}),
+                config=types.SimpleNamespace(enabled_capabilities={"usb": 3 if bio else 1, "nfc": 1}),
                 reset_blocked=blocked, fips_capable=0)
         def ctap(connection):
             calls.append(("get_info", connection.serial))
@@ -36,16 +39,19 @@ class ProbeTests(unittest.TestCase):
         modules = {}
         for name, members in {
             "ykman.device": {"list_all_devices": lambda: [(Device(s), device_info(s)) for s in serials]},
-            "yubikit.core": {"TRANSPORT": types.SimpleNamespace(USB="usb")},
+            "yubikit.core": {"TRANSPORT": types.SimpleNamespace(USB="usb", NFC="nfc")},
             "yubikit.core.fido": {"FidoConnection": Connection},
             "yubikit.management": {"CAPABILITY": types.SimpleNamespace(FIDO2=1, PIV=2)},
             "fido2.ctap2": {"Ctap2": ctap},
+            "ykman.pcsc": {"list_devices": lambda name: [Device(serials[0], n) for n in (reader_names or [reader])] if serials else []},
+            "yubikit.core.smartcard": {"SmartCardConnection": Connection},
+            "yubikit.support": {"read_info": lambda conn, pid: device_info(conn.serial)},
         }.items():
             module = types.ModuleType(name)
             module.__dict__.update(members)
             modules[name] = module
         output = io.StringIO()
-        with patch.dict(sys.modules, modules), patch.object(sys, "argv", ["-", "12345678"]), contextlib.redirect_stdout(output):
+        with patch.dict(sys.modules, modules), patch.object(sys, "argv", ["-", "12345678", reader or ""]), contextlib.redirect_stdout(output):
             exec(compile(SCRIPT, "InspectFido.py", "exec"), {})
         return json.loads(output.getvalue()), calls
 
@@ -72,6 +78,19 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual((data["minimumPinLength"], data["maximumPinLength"]), (6, 8))
         self.assertTrue(data["resetBlocked"])
         self.assertFalse(data["resetOverUsb"])
+
+    def test_nfc_exact_reader_serial_and_transport_reset(self):
+        data, calls = self.probe(reader="OMNIKEY 5022 0", transports=("usb",))
+        self.assertEqual(data["reader"], "OMNIKEY 5022 0")
+        self.assertFalse(data["resetOverNfc"])
+        self.assertTrue(data["resetOverUsb"])
+        self.assertEqual(data["serial"], "12345678")
+        for kwargs in ({"serials": (87654321,)}, {"serials": ()},
+                       {"reader_names": ["OMNIKEY 5022 0", "OMNIKEY 5022 0 2"]},
+                       {"reader_names": ["OMNIKEY 5022 other"]}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(SystemExit) as result:
+                self.probe(reader="OMNIKEY 5022 0", **kwargs)
+            self.assertEqual(result.exception.code, 4)
 
     def test_legacy_default_transport(self):
         data, _ = self.probe()

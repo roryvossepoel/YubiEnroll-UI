@@ -79,7 +79,7 @@ public sealed class CliRunner(string executable)
 
 public static class EnrollmentCommand
 {
-    public static string[] Build(string userId, string profile, string displayName, bool? reset)
+    public static string[] Build(string userId, string profile, string displayName, bool? reset, string? reader = null)
     {
         if (!Guid.TryParse(userId, out var id) || id == Guid.Empty)
             throw new ArgumentException("Select a search result with a valid Entra object ID.");
@@ -87,6 +87,11 @@ public static class EnrollmentCommand
         var args = new List<string> { "credentials", "add", id.ToString(), "--profile", profile };
         if (reset.HasValue) args.Add(reset.Value ? "--reset" : "--no-reset");
         if (!string.IsNullOrWhiteSpace(displayName)) args.AddRange(["--display-name", displayName.Trim()]);
+        if (reader != null)
+        {
+            KeyResetService.ValidateReader(reader);
+            args.AddRange(["--reader", reader]);
+        }
         // Retain native confirmation prompts; do not use --force.
         return args.ToArray();
     }

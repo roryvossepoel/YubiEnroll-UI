@@ -27,7 +27,7 @@ internal sealed class TerminalPanel : Border
     private readonly bool _enrollment, _addPasskey;
     internal int? CompletedExitCode { get; private set; }
     private readonly bool _autoCloseOnSuccess;
-    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null)
+    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null, bool nfc = false)
     {
         _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
@@ -35,7 +35,7 @@ internal sealed class TerminalPanel : Border
         var layout = new DockPanel(); Child = layout;
         var heading = new TextBlock { Text = title, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(heading, Dock.Top); layout.Children.Add(heading);
-        var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+        var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : nfc ? "Follow the Yubico prompts below. Click the terminal to type. Keep the key flat on the NFC reader; remove and replace it only when prompted." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
         var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
         footer.Children.Add(_status);

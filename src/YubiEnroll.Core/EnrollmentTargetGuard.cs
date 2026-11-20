@@ -6,12 +6,16 @@ namespace YubiEnroll.Core;
 public static class EnrollmentTargetGuard
 {
     public static bool CanStart(ResetKey? target, IReadOnlyList<ResetKey> connected, int unavailable) =>
-        target != null && unavailable == 0 && connected.Count == 1 && connected[0] == target;
+        target != null && connected.Contains(target) && (target.IsNfc
+            ? connected.Count(k => k.Reader == target.Reader) == 1
+            : unavailable == 0 && connected.Count(k => !k.IsNfc) == 1);
 
     public static string Explain(ResetKey? target, IReadOnlyList<ResetKey> connected, int unavailable, bool signedIn = true)
     {
         if (target == null) return "Choose and confirm the target key first.";
         if (!connected.Contains(target)) return "The target key is unavailable. Reconnect it and refresh; no other key will be selected automatically.";
+        if (target.IsNfc) return $"Keep target {target.Serial} on {target.Reader} until the operation finishes. Remove and replace this same key only when prompted. USB keys are not used for this registration.";
+        connected = connected.Where(k => !k.IsNfc).ToArray();
         if (unavailable > 0) return "Some connected devices could not be identified. Enrollment is blocked until the device inventory can be verified.";
         if (connected.Count > 1)
         {

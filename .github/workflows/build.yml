@@ -15,7 +15,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Test read-only capability probe
-        run: python tests/test_capability_probe.py
+        run: python -m unittest discover -s tests -p "test_*.py"
       - name: Test and publish
         shell: pwsh
         run: ./build.ps1 -Runtime win-x64

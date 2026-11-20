@@ -97,7 +97,7 @@ public partial class MainWindow : Window
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
         "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.6" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.6.0" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -245,7 +245,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.6\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: YubiEnroll UI 0.6.0\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -264,13 +264,14 @@ public partial class MainWindow : Window
     {
         if (_busy || _resetStep != 1 || !TargetReady || _selectedKey?.Key != _resetReviewTarget || ResetAcknowledged.IsChecked != true || !IsAdministrator()) return;
         var target = _selectedKey!.Key;
+        if (target.IsNfc && _selectedKey.Capabilities?.ResetAllowed != true) return;
         int? resetExit = null;
         var resetCompleted = await RunWithResultAsync(async () =>
         {
             var path = KeyResetService.FindExecutable();
             if (path.Length == 0) throw new InvalidOperationException("Install YubiKey Manager CLI in Prerequisites.");
             var runner = new CliRunner(path);
-            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a));
+            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a), () => NfcDiscovery.ReadAsync(runner));
             // The dedicated review page is the destructive confirmation. Native prompts remain enabled.
             var exit = resetExit = await service.ResetAsync(target, key =>
                 _resetStep == 1 && _resetReviewTarget == key && _selectedKey?.Key == key && ResetAcknowledged.IsChecked == true);
@@ -389,7 +390,7 @@ public partial class MainWindow : Window
                     _selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")));
             var operationProfile = lease?.Profile ?? profile!;
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, operationProfile);
-            var arguments = EnrollmentCommand.Build(user.Id, operationProfile.Name, KeyName.Text, reset);
+            var arguments = EnrollmentCommand.Build(user.Id, operationProfile.Name, KeyName.Text, reset, target.Reader);
             code = await RunInteractiveAsync(_exePath, arguments);
         }
         catch

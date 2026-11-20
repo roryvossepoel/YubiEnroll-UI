@@ -455,6 +455,28 @@ public partial class MainWindow
         ApplyInventory(new[] { existing }, 0);
         Prepare_Click(this, e);
         Assert(!_addPasskey && _enrollStep == 0 && !EnrollButton.IsVisible, "Switching tasks requires a fresh key choice");
+        var nfc = existing with { Key = existing.Key with { Reader = "HID Global OMNIKEY 5022 Smart Card Reader 0" },
+            Capabilities = existing.Capabilities! with { IsNfc = true, ResetOverNfc = true } };
+        ApplyInventory([nfc, admin], 0); EnrollmentKeys.SelectedIndex = 0;
+        CaptureWindow(this, "nfc-key-selection.png");
+        EnrollNext_Click(this, e); Profiles.SelectedIndex = 0;
+        Assert(_selectedKey == nfc && _reviewValid, "NFC target supports the same profile-first setup flow");
+        AddPasskey_Click(this, e); ApplyInventory([nfc, admin], 0); EnrollmentKeys.SelectedIndex = 0;
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test" } }; Users.SelectedIndex = 0;
+        EnrollNext_Click(this, e);
+        Assert(EnrollButton.IsEnabled && _selectedKey == nfc, "NFC passkey addition can retain a USB admin key");
+        CaptureWindow(this, "nfc-passkey-review.png");
+        ShowPage(ResetPage); _resetStep = 0; ResetNext_Click(this, e); ResetAcknowledged.IsChecked = true;
+        Assert(ResetTargetButton.IsEnabled && ResetConnectionHelp.Text.Contains("NFC reader"), "NFC reset review shows reader instructions");
+        CaptureWindow(this, "nfc-reset-review.png");
+        ApplyInventory([existing, admin], 0);
+        Assert(_selectedKey == null && !ResetTargetButton.IsEnabled && ResetAcknowledged.IsChecked != true,
+            "NFC target removal cannot switch to a USB key with the same serial");
+        ApplyInventory([nfc with { Key = nfc.Key with { Serial = "11112222" } }], 0);
+        Assert(_selectedKey == null && !EnrollButton.IsEnabled, "Replacing a card on the same reader requires explicit selection");
+        Assert(NfcPresenceMonitor.Snapshot().Length > 0, "Windows PC/SC presence probe handles readers or absent service without opening a card");
+        ShowPage(OverviewPage);
 
     }
 

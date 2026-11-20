@@ -197,3 +197,7 @@ Automated regressions include live terminal text before input/process exit, actu
 - Enable registration logging and generated-PIN storage, use a disposable setup key and confirm the PIN appears in its JSON record, detail view and CSV. Repeat with PIN storage off and with Add a passkey: no existing PIN must be captured. Confirm leading zeroes survive CSV import. PIN logging selects the in-app terminal even if the external-console preference is set.
 - Inspect each Settings tab at normal and compact widths: matching title/description spacing, readable profile names and tenant IDs, pill status/version labels and aligned log filters. Verify both CLI links and the .NET links open the documented destinations without tracking parameters.
 - In Help & About, check updates while online and offline. Until releases are published, expect “No releases published yet.” Verify a newer published preview appears when available; checking never downloads or installs an update.
+
+## Preview 0.6.0 NFC acceptance
+
+Follow [the HID OMNIKEY 5022 checklist](NFC.md#hardware-acceptance--hid-omnikey-5022). CI checks reader routing, transport restrictions, card replacement, mixed USB/NFC inventory and presence-monitor interop. Physical NFC operations remain manual acceptance.

@@ -100,6 +100,12 @@ if (args.Length == 2 && args[0] == "--check-ykman")
     var help = await native.CaptureAsync("--device", "12345678", "fido", "reset", "--help");
     if (help.ExitCode != 0 || !help.Output.Contains("Reset all FIDO applications"))
         throw new Exception("Native reset help did not accept the serial-targeted command.");
+    var nfcHelp = await native.CaptureAsync("--reader", "HID Global OMNIKEY 5022 Smart Card Reader 0", "fido", "reset", "--help");
+    if (nfcHelp.ExitCode != 0 || !nfcHelp.Output.Contains("Reset all FIDO applications")) throw new Exception("NFC reset command rejected.");
+    var nfcProbe = await native.CaptureWithInputAsync(TimeSpan.FromSeconds(15), NfcDiscovery.Script, "script", "--force", "-");
+    if (nfcProbe.ExitCode != 0 || NfcDiscovery.Parse(nfcProbe.Output).Keys.Count != 0)
+        throw new Exception("NFC inventory probe failed: " + nfcProbe.Error);
+    Console.WriteLine("PASS: native NFC reader reset syntax and bundled NFC inventory; no hardware operations.");
     var inventory = await service.DiscoverAsync();
     if (inventory.Keys.Count != 0) throw new Exception("Unexpected hardware on CI runner.");
     var probe = await native.CaptureWithInputAsync(TimeSpan.FromSeconds(15), FidoCapabilityProbe.Script, "script", "--force", "-", "12345678");
@@ -454,6 +460,7 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Con
 RegistrationJournalTests.Run(Check);
 Workflow055Tests.Run(Check);
 Workflow056Tests.Run(Check);
+await NfcTests.Run(Check);
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 

@@ -23,6 +23,7 @@ public partial class MainWindow
     private bool _choosingTarget = true;
     private string _suggestedName = "";
     private System.Windows.Threading.DispatcherTimer? _deviceRefresh;
+    private NfcPresenceMonitor? _nfcPresence;
     private string _lastInteractiveFailure = "";
 
     private void ResizePreparation()
@@ -145,7 +146,7 @@ public partial class MainWindow
                 return;
             }
             var runner = new CliRunner(path);
-            var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
+            var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException(), () => NfcDiscovery.ReadAsync(runner));
             try
             {
                 await service.CheckVersionAsync();
@@ -159,7 +160,10 @@ public partial class MainWindow
                     if (IsAdministrator()) try { capabilities = await FidoCapabilityProbe.ReadAsync(runner, key); } catch { }
                     entries.Add(new(key, pin, capabilities));
                 }
-                TryApplyInventory(entries, inventory.Unavailable, generation);
+                if (TryApplyInventory(entries, inventory.Unavailable, generation) && inventory.NfcUnavailable > 0)
+                    SetInventoryMessage("An NFC reader or key could not be read. Place the key flat on the reader, close other key tools and Refresh. USB keys remain available.");
+                else if (entries.Count == 0 && inventory.NfcReaders > 0)
+                    SetInventoryMessage("Place a YubiKey on the NFC reader or connect it by USB. The list updates automatically.");
             }
             catch
             {
@@ -212,7 +216,7 @@ public partial class MainWindow
         }
         finally { _readingKeys = false; }
         SetInventoryMessage(unavailable > 0 ? "Some devices could not be identified. Check device access and FIDO support." :
-            entries.Count == 0 ? "No supported key detected. Connect a key; the list updates automatically." : "");
+            entries.Count == 0 ? "No supported key detected. Connect a key by USB or place it on an NFC reader; the list updates automatically." : "");
         SetSelectedKey(entries.FirstOrDefault(x => x.Key == _lastKnownKey));
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)
@@ -274,6 +278,8 @@ public partial class MainWindow
     {
         base.OnSourceInitialized(e); TaskbarIdentity.Apply(this);
         if (_smokeTest) return;
+        _nfcPresence = new(() => Dispatcher.BeginInvoke(() => { if (IsLoaded) ScheduleDeviceRefresh(); }));
+        Closed += (_, _) => { _nfcPresence?.Dispose(); _deviceRefresh?.Stop(); };
         _deviceRefresh = new() { Interval = TimeSpan.FromSeconds(1) };
         _deviceRefresh.Tick += async (_, _) =>
         {
@@ -315,7 +321,7 @@ public partial class MainWindow
         if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a key · serial ") + _selectedKey?.Key.Serial : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null);
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a key · serial ") + _selectedKey?.Key.Serial : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null, _selectedKey?.Key.IsNfc == true);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }

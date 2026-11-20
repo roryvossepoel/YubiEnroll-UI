@@ -1,13 +1,16 @@
 # YubiEnroll UI
 
-## Preview 0.5.6
+## Preview 0.6.0
+
+NFC readers are now supported alongside USB for Set up a key, Add a passkey and Reset FIDO. Each target shows its connection and full reader name. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
+
 
 - Home offers **Set up a key**, **Add a passkey**, and **Reset FIDO**.
 - Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
 - Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
 - Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
 - The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-enrollment-*` profile; it can be removed in Settings. Configuration backups retain the previous TOML, as for other edits. Basic setup profiles with an omitted PIN floor also use a temporary, complete native profile with the freshly detected floor: YubiEnroll 1.2.0 requires this field even when no policy change is intended. The reusable profile stays unchanged.
-- Both tasks keep the existing single-target USB preflight restriction. YubiEnroll has no USB serial selector; keep only the intended key connected throughout the native operation. NFC is not implemented in this preview.
+- Both tasks support USB and NFC. USB retains the single-target USB preflight restriction because YubiEnroll has no USB serial selector. NFC uses an explicit reader; a separate USB administrator key can remain connected. Keep the selected target in place throughout the native operation.
 - Help & About includes a manual GitHub update check, including published previews. No release yet and network failures have separate messages. Updates open the release page; installation remains manual.
 - Prerequisites includes .NET Desktop Runtime 10 x64 alongside YubiEnroll CLI and YubiKey Manager CLI (ykman).
 - Review deduplicates the user's sign-in/email information. Task icons share one background; the reset button has explicit readable active/hover/focus/disabled states.
@@ -17,7 +20,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.5.6 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.6.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -29,7 +32,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Reports the CLI exit code and retrieves the registered credential list after a successful command.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
-- Offers **Reset FIDO** to erase a USB key independently of enrollment, using the separately installed YubiKey Manager CLI.
+- Offers **Reset FIDO** to erase a USB or NFC key independently of enrollment, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
 
 ## Preview 0.5.4: optional registration log
@@ -47,7 +50,7 @@ Filter the registration list by tenant, local date range and successful outcome;
 ## Preview 0.5.3: profile compatibility
 
 - Profile editor offers Basic FIDO2 and Managed PIN starting settings, with live requirement descriptions. Basic keeps generated initial PINs while omitting enforced minimum length and forced PIN change; FIDO reset remains a separate explicit choice.
-- Read-only capability discovery runs a bundled, fixed Python script through the installed ykman scripting runtime. No additional Python installation or SDK is required. It reads only the selected USB serial's CTAP GetInfo and device metadata; it never requests a PIN, verifies a PIN, reads credentials or changes a key.
+- Read-only capability discovery runs a bundled, fixed Python script through the installed ykman scripting runtime. No additional Python installation or SDK is required. It reads only the selected key's CTAP GetInfo and device metadata; it never requests a PIN, verifies a PIN, reads credentials or changes a key.
 - Enrollment checks configurable minimum length / forced change, Always UV, enterprise provisioning, PIN limits, reset restrictions and FIDO2 support. Unknown or malformed readings block enrollment. The same checks run again on fresh data before native enrollment. Unsupported settings are never silently dropped or used to rewrite a shared profile.
 - CLI-default checkboxes and generated PIN lengths must be made explicit for verification; existing TOML is preserved until the operator edits it. Current minimum PIN length is a conservative floor even when reset is requested. No destructive probe is used to discover the factory floor.
 - Firmware is checked for identity consistency but is not the feature gate. Native YubiEnroll still performs enrollment and final PIN/complexity checks; platform/IdP support and physical hardware tests remain necessary.
@@ -74,9 +77,9 @@ Home offers two tasks: **Enroll a key** and **Reset FIDO**. Enrollment shows one
 
 The approved visual system uses `#84BD00` accents, `#0B536F` headings, and one original community key mark. `Assets/App.png` and the multi-resolution executable/taskbar `App.ico` are generated together by `tools/build_icon.py`; `App.svg` describes the same mark. No official Yubico wordmark is included.
 
-Navigation preserves the target and task step without rediscovery. A different confirmed target clears the previous recipient/name. Missing targets never substitute the remaining administrator key. USB changes invalidate readiness and revoke any reset acknowledgment. Reset requires a reviewed serial, explicit acknowledgment and administrator access; native ykman confirmations and same-key reinsertion remain enabled.
+Navigation preserves the target and task step without rediscovery. A different confirmed target clears the previous recipient/name. Missing targets never substitute the remaining administrator key. USB and NFC presence changes invalidate readiness and revoke any reset acknowledgment. Reset requires a reviewed serial, explicit acknowledgment and administrator access; native ykman confirmations and same-key reinsertion remain enabled.
 
-The SDK remains deferred. YubiEnroll still performs enrollment and PIN handling. Sign in with the administrator key, disconnect it, and keep only the chosen target connected during enrollment. Fresh inventory checks do not bind the running CLI to a USB serial.
+The SDK remains deferred. YubiEnroll still performs enrollment and PIN handling. For USB enrollment, sign in with the administrator key, disconnect it, and keep only the chosen USB target connected during enrollment. For NFC, keep the selected target on the named reader; a separate USB admin key may remain connected. Fresh inventory checks do not bind the running CLI to a USB serial.
 
 The embedded terminal is enabled by default. Its toggle under Settings → Prerequisites applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
@@ -147,7 +150,7 @@ Profile saves preserve configuration values, including provider endpoints and ot
 
 1. Open **Set up a key**, choose the intended target by model and serial, and select **Continue to profile**, choose a compatible profile, then continue to the tenant. Do not select your administrator sign-in key.
 2. Select a tenant and click **Connect**. Complete browser sign-in with your administrator key. The app verifies and confirms the native login parameters. **Open browser again** reopens the same session; **Cancel sign-in** returns to tenant selection. Sign-in times out after five minutes. Closing the app offers to cancel sign-in; enrollment/reset retain their busy guard.
-3. After sign-in, **disconnect the administrator key and all other security keys**, leaving only the target. The app refreshes on USB changes; **Refresh keys** is also available. User search and registered-key lookup remain available while multiple keys are connected, but enrollment is blocked.
+3. For USB enrollment, after sign-in **disconnect the administrator key and all other USB security keys**, leaving only the target. For NFC enrollment, keep the target on the selected reader; the USB administrator key can remain connected. The app refreshes on USB changes; **Refresh keys** is also available. User search and registered-key lookup remain available while multiple keys are connected, but enrollment is blocked.
 4. Search for and select the intended recipient, then review the suggested editable registration name.
 5. Continue to **Review**. Check the target serial, tenant, user, profile and reset warning. Select **Start enrollment** after reviewing the details. The app rechecks the inventory before and after provider activation before launching YubiEnroll.
 6. Keep only the target connected until YubiEnroll finishes. Follow its native PIN, touch and same-key reinsertion prompts. If authentication is requested again, cancel that attempt before reconnecting the administrator key; inspect any uncertain outcome before restarting.
@@ -161,11 +164,11 @@ Switching tenants or reloading configuration requires Connect again. A successfu
 
 Open **Reset FIDO**. Target verification and this reset feature require **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it blocks enrollment until target verification is available.
 
-Run the GUI as administrator, connect the key via USB, Refresh, and select its model/serial number. Each entry shows the FIDO PIN status read from that key (set, not set, blocked, disabled/unsupported or unknown). No tenant connection or user selection is required. Select **Review reset**, check the serial, acknowledge the erasure and select **Erase FIDO passkeys and PIN**. Then follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI reloads the connected keys and their PIN status, restoring the same selected key if it is still available. After exit 0 it reports whether the PIN is now unset; an unreadable status stays unknown, and a PIN still present requires inspection. This checks PIN state, not every passkey or cloud registration. A different key is never selected automatically. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
+Run the GUI as administrator, connect the key via USB or place it on an NFC reader, Refresh, and select its model/serial number. Each entry shows the FIDO PIN status read from that key (set, not set, blocked, disabled/unsupported or unknown). No tenant connection or user selection is required. Select **Review reset**, check the serial, acknowledge the erasure and select **Erase FIDO passkeys and PIN**. Then follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI reloads the connected keys and their PIN status, restoring the same selected key if it is still available. After exit 0 it reports whether the PIN is now unset; an unreadable status stays unknown, and a PIN still present requires inspection. This checks PIN state, not every passkey or cloud registration. A different key is never selected automatically. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
 
 **This permanently resets all FIDO2/U2F credentials and the FIDO PIN on the selected key, for all accounts. Entra and other service registrations remain and must be removed separately.** PIV, OATH, OpenPGP and OTP are outside this reset. Native restrictions and model-specific warnings still apply (including YubiKey 4 FIPS attestation warnings); if ykman refuses the reset, the GUI does not bypass it. Read [Yubico's FIDO reset documentation](https://docs.yubico.com/software/yubikey/tools/ykman/FIDO_Commands.html).
 
-This preview only selects keys with FIDO enabled and a readable serial number. Serial-less keys and external NFC readers are not supported. Device identity is checked again after confirmation, and the command always targets the selected serial. A successful message means **ykman reported success**; physical-key verification remains necessary. Closing or cancelling the console does not prove that nothing changed. Inspect the key before retrying.
+This preview only selects keys with FIDO enabled and a readable serial number. Serial-less keys remain unsupported. Device identity is checked again after confirmation. USB commands target the selected serial; NFC commands target the verified reader, with serial checks before launch and native same-key reinsertion checks. A successful message means **ykman reported success**; physical-key verification remains necessary. Closing or cancelling the console does not prove that nothing changed. Inspect the key before retrying.
 
 ### Entra logout
 
