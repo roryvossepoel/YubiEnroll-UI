@@ -40,6 +40,11 @@ public partial class MainWindow
         BatchNext_Click(this, e); BatchKeys.SelectedItem = status;
         Assert(!BatchRegister.IsEnabled && BatchRecipient.Text == b.DisplayName && BatchKeyHint.Text.Contains("already attempted"),
             "Leaving the first key on the reader cannot register it for the next person");
+        var second = status with { Key = key with { Serial = "98765432", Reader = "Test NFC 0" }, Capabilities = status.Capabilities! with { Serial = "98765432", IsNfc = true } };
+        ApplyInventory([status, second], 0); BatchKeys.SelectedItem = second;
+        Assert(!BatchRegister.IsEnabled, "An issued USB key still connected blocks the next NFC target");
+        ApplyInventory([second], 0); BatchKeys.SelectedItem = second;
+        Assert(BatchRegister.IsEnabled, "Removing the issued key unlocks the new serial for the next recipient");
         BatchSkip_Click(this, e);
         Assert(_batchStage == BatchStage.Results && BatchRows.Items.Count == 2 && BatchTotals.Text.Contains("Skipped"),
             "Results distinguish an issued YubiKey from a skipped user");

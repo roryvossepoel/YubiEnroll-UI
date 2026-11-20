@@ -84,6 +84,7 @@ public sealed class EnrollmentBatch
     }
 
     public bool Used(string serial) => _attempted.Contains(serial);
+    public string? StillConnected(IEnumerable<ResetKey> connected) => connected.Select(k => k.Serial).FirstOrDefault(Used);
     public void Start(UserCandidate user, ResetKey key, FidoPinState pin, ProfileSetup setup)
     {
         if (Current is not { Status: IssueStatus.Pending } row || row.User != user || !key.Serial.All(char.IsAsciiDigit) || key.Serial.Length == 0 ||

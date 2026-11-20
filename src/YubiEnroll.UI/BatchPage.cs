@@ -175,8 +175,9 @@ public partial class MainWindow
     {
         if (!BatchSignedIn) return "Reconnect to the reviewed tenant before registering a key.";
         if (_inventoryDirty) return "Checking connected keys…";
+        if (batch.StillConnected(_knownKeys.Select(k => k.Key)) is { } previous)
+            return $"Serial {previous} was already attempted in this batch. Remove it before issuing the next YubiKey.";
         if (candidate == null || !_knownKeys.Contains(candidate)) return "Connect a new YubiKey by USB or place it on your NFC reader, then select it.";
-        if (batch.Used(candidate.Key.Serial)) return "This serial number was already attempted in this batch. Remove it and select a different YubiKey.";
         if (candidate.Pin != FidoPinState.NotSet) return "Only a YubiKey verified to have no FIDO PIN can be issued here.";
         if (!EnrollmentTargetGuard.CanStart(candidate.Key, _knownKeys.Select(k => k.Key).ToArray(), _unavailableKeys))
             return EnrollmentTargetGuard.Explain(candidate.Key, _knownKeys.Select(k => k.Key).ToArray(), _unavailableKeys);

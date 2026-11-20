@@ -383,7 +383,7 @@ public partial class MainWindow : Window
         var setup = _addPasskey ? PasskeyAddition.Settings(_selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")) :
             ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile!.Name);
         var reset = setup.Reset;
-        await CheckEnrollmentTargetAsync(target, setup, batch != null);
+        await CheckEnrollmentTargetAsync(target, setup, batch);
         // The Review step is the confirmation; never silently skip its fresh target checks.
         await ActivateAsync(provider, profile);
         if (batch != null)
@@ -392,7 +392,7 @@ public partial class MainWindow : Window
             if (resolved == null || !string.Equals(resolved.Id, user.Id, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("The reviewed account could not be verified. No registration was started.");
         }
-        var fresh = await CheckEnrollmentTargetAsync(target, setup, batch != null);
+        var fresh = await CheckEnrollmentTargetAsync(target, setup, batch);
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, name);
         _generatedPin = null;
