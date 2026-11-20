@@ -11,9 +11,12 @@ public partial class SettingsWindow : Window
     public event Action? PrerequisitesOpened;
     private void SettingsTab_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (e.Source == SettingsTabs && Feedback != null) Feedback.Text = "";
-        if (e.Source == SettingsTabs && SettingsTabs.SelectedIndex == 2) PrerequisitesOpened?.Invoke();
+        if (e.Source != SettingsTabs) return;
+        if (Feedback != null) Feedback.Text = "";
+        if (PrerequisitesTab?.IsSelected == true) PrerequisitesOpened?.Invoke();
+        if (RegistrationTab?.IsSelected == true && RegistrationHost?.Content is RegistrationLogView log) log.RefreshRecords();
     }
+    private readonly RegistrationJournal _journal;
     private readonly string _path;
     private ConfigSnapshot? _importSnapshot;
     private string? _importText;
@@ -31,11 +34,52 @@ public partial class SettingsWindow : Window
     {
         _path = path;
         InitializeComponent();
-        RegistrationHost.Content = new RegistrationLogView(registrationJournal ?? new RegistrationJournal(RegistrationJournal.DefaultSettingsPath));
+        _journal = registrationJournal ?? new RegistrationJournal(RegistrationJournal.DefaultSettingsPath);
+        EnabledChoice.IsChecked = _journal.Preferences.Enabled;
+        SavePinChoice.IsChecked = _journal.Preferences.SaveGeneratedPin;
+        FolderPath.Text = _journal.Preferences.Directory;
+        DefaultFolderButton.IsEnabled = _journal.DefaultLogDirectory.Length > 0;
+        DefaultFolderButton.ToolTip = _journal.DefaultLogDirectory;
+        LogSettingsFeedback.Text = _journal.SettingsError ?? "";
+        var log = new RegistrationLogView(_journal);
+        log.OpenAppSettings += () => AppSettingsTab.IsSelected = true;
+        RegistrationHost.Content = log;
         MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 32);
         VersionInfo.Text = version.StartsWith("YubiEnroll", StringComparison.OrdinalIgnoreCase) ? version : "YubiEnroll: " + version;
         RuntimeVersion.Text = "Version " + Environment.Version;
         Attempt(RefreshLists);
+    }
+
+    private void BrowseLogFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new OpenFolderDialog { Title = "Choose the registration log folder", Multiselect = false };
+        if (Directory.Exists(FolderPath.Text)) picker.InitialDirectory = FolderPath.Text;
+        if (picker.ShowDialog(DialogOwner) == true) SelectLogFolder(picker.FolderName);
+    }
+
+    private void DefaultLogFolder_Click(object sender, RoutedEventArgs e) => SelectLogFolder(_journal.DefaultLogDirectory);
+
+    private void SelectLogFolder(string folder)
+    {
+        FolderPath.Text = folder;
+        LogSettingsFeedback.Text = folder.Equals(_journal.Preferences.Directory, StringComparison.OrdinalIgnoreCase) ? ""
+            : "Save to use this folder. Existing records stay in their original folder.";
+    }
+
+    private void SaveLogSettings_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _journal.Configure(EnabledChoice.IsChecked == true, FolderPath.Text, SavePinChoice.IsChecked == true);
+            FolderPath.Text = _journal.Preferences.Directory;
+            LogSettingsFeedback.Text = "Logging settings saved.";
+        }
+        catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
+        {
+            LogSettingsFeedback.Text = _journal.PendingCount > 0
+                ? "Restore access to the original folder and retry saving the pending results in Registration log before changing folders."
+                : "Could not save your settings. Choose a writable log folder and try again. Your previous settings are unchanged.";
+        }
     }
 
     internal void SetRequirements(RequirementReport report)
@@ -173,7 +217,7 @@ public partial class SettingsWindow : Window
     {
         _importText = null; _importSnapshot = null; ImportReview.Visibility = Visibility.Collapsed; ImportButton.IsEnabled = false;
     }
-    private void Prerequisites_Click(object sender, RoutedEventArgs e) => SettingsTabs.SelectedIndex = 2;
+    private void Prerequisites_Click(object sender, RoutedEventArgs e) => PrerequisitesTab.IsSelected = true;
     private void Link_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string url }) return;

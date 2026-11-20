@@ -15,7 +15,10 @@ internal static class RegistrationJournalTests
         var record = RegistrationRecord.Start(tenant, user, key, new ProfileSetup("Basic", Reset: false, ForcePinChange: true), "Desk key");
         try
         {
-            var journal = new RegistrationJournal(preferences);
+            var documents = Path.Combine(root, "Redirected documents");
+            var journal = new RegistrationJournal(preferences, documents);
+            check(journal.Preferences.Directory == Path.Combine(documents, "YubiKey Desk", "RegistrationLog") && !journal.Preferences.SaveGeneratedPin,
+                "A fresh account uses its Documents folder without opting into PIN storage");
             check(!journal.Preferences.Enabled && journal.Begin(record) == null && !Directory.Exists(root), "Logging is opt-in and writes no user data when disabled");
             journal.Configure(true, folder);
             check(new RegistrationJournal(preferences).Preferences == journal.Preferences, "Logging preference and chosen folder persist across restarts");

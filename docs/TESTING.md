@@ -1,9 +1,20 @@
+## Local YubiKey passkeys (preview 0.8.0)
+
+## Batch issuance — physical acceptance
+
+Use two disposable new YubiKeys and two test users in one tenant. Include a duplicate and a nonexistent UPN first; neither should allow starting. Correct the list, review both UPNs and start. Register the first user over USB with an eligible profile (reset off); verify the new Entra registration and test sign-in. Leave the key connected, choose Next user and confirm its serial cannot be used again. Then select the second key on the OMNIKEY 5022, register the second user and check the resulting account, serial and sign-in. Confirm the results CSV has one row per user and no PINs. Separately test a skipped user, an already configured key, loss of a connection during issuance, and pausing / returning in the same app session.
+
+
+- With no tenant signed in, choose a disposable USB key by serial, unlock the list and compare its RP IDs and accounts with Yubico Authenticator. Repeat on the named OMNIKEY 5022 reader, including an empty key and an unsupported device.
+- With another USB key attached, open Remove for one exact test credential. Cancel: neither key nor Entra changes. Swap or lift the selected key during review: the old action must be invalid. A wrong PIN is attempted once only; stop before exhausting retries.
+- Only on a disposable credential: confirm removal, verify the other local IDs in Authenticator and verify the Entra registration is unchanged. Check navigation and reconnect clear the list, and that activity/diagnostic logs contain no local PIN or credential inventory.
+
 # Manual acceptance checks for preview 0.5.4
 
 ## Preview 0.5.4: registration records
 
 - Start with logging off: perform enrollment, login and standalone reset. No registration files should be created. Existing records remain readable when disabled.
-- Enable logging under Settings → Registration log and select a writable folder. Restart with the same Windows account and confirm the saved preference. Elevation into a different account must not reuse the original account's history silently.
+- Enable logging under Settings → App settings and select a writable folder. Restart with the same Windows account and confirm the saved preference. Elevation into a different account must not reuse the original account's history silently.
 - Enroll two disposable keys for different test users and tenants. Compare each record with its original review, especially serial, UPN versus email, profile, reset and first-use PIN flags. Check the actual CLI table format; missing identity fields must never be guessed.
 - Cancel or interrupt enrollment. Confirm it is not labelled successful; check Entra before retrying because a partial registration may exist. Simulate app termination after native launch: the saved attempt must remain unknown.
 - Deny folder write access before enrollment: the command must not start. Deny access after it starts: a successful native result must remain successful while the app clearly reports the unsaved log and offers save-only retry. Restore access, retry and verify one row with the same attempt ID. Navigate to another key while a result is pending; closing must warn about losing its final result. Do not use production keys for this test.
@@ -36,7 +47,7 @@
 - Install a missing tool in its standard location, then return to the app: the card updates automatically. No Recheck button is required. Open Home to continue when all checks pass.
 - Confirm that returning from documentation does not discard tenant login, user selection or target identity. No enrollment or reset may start from a software check.
 - Check Home, navigation, logo, titlebar and taskbar at 100%, 125%, 150% and 200% Windows scale. The app mark must be the same shape everywhere, with crisp contours. Cards have matching neutral borders at rest and visible hover/keyboard focus.
-- Prerequisites has two tool cards with status/download/docs; no administrator status or restart controls. Terminal preferences remains expandable; Technical details is removed. Profiles explains the key PIN/reset scope.
+- Prerequisites shows software and runtime cards with status/download/docs; no administrator status or restart controls. Terminal preferences are under App settings. Profiles explains the key PIN/reset scope.
 
 ## Preview 0.5.0: current acceptance workflow
 
@@ -52,7 +63,7 @@
 Earlier version sections below are historical checks; use this workflow for the current navigation.
 
 - Choose a target explicitly on Overview or Enroll key. A sole discovered key is not selected automatically. Navigate between Overview, Enroll key and Settings: no discovery is triggered by navigation and the serial remains the same.
-- Connect an administrator key and target. Sign-in remains available. Before sign-in the UI says to authenticate first; afterward it lists the other serials to disconnect. Enrollment stays disabled until only the target remains. User search and Registered keys remain available.
+- Connect an administrator key and target. Sign-in remains available. Before sign-in the UI says to authenticate first; afterward it lists the other serials to disconnect. Enrollment stays disabled until only the target remains. User search remains available; cloud registrations have a separate management task.
 - Disconnect the administrator key: inventory refresh keeps the target and enables enrollment when the tenant, user and profile are ready. Disconnect the target instead: it must never be replaced by the administrator key.
 - While device discovery is pending, key actions are disabled immediately. Failed or unrecognized discovery cannot leave stale action readiness enabled. Explicit Refresh recovers normally.
 - Review the vertical target/tenant/user/profile steps and fixed action footer at 100%, 150% and 200% scaling. The target serial must remain visible when scrolling down to the profile. Inspect the compact registered-keys list and confirmation dialog.
@@ -141,7 +152,7 @@ Synthetic UI tests cover refreshed selection/status, cancellation, failed reads,
 2. Open Settings and Key Management from the sidebar. Verify they use the same content area; edit dialogs may still be modal. Inspect all pages at small window sizes and 100/150/200% display scaling.
 3. Rename a shared profile using spaces; confirm every linked tenant retains that profile and other settings remain unchanged. Reject duplicate names. Remove an unused profile; refuse removal while referenced. Rename/remove an active tenant, reopen the app and explicitly reconnect before enrollment.
 4. Import a test configuration: confirm incoming entries and existing entries being replaced are visible, Cancel changes nothing, and a successful replacement reports the backup path. Confirm export omits credentials/authentication data.
-5. Enable **Use embedded terminal (preview, this session)** under Settings → Prerequisites and navigate back to Prepare Key. Run login and then a disposable-key preparation. Test typing, hidden PIN input, generated PIN output, confirmation, touch and remove/reinsert. Record PIN securely before returning. Confirm no interactive transcript appears in activity/diagnostics or exported settings.
+5. Enable **Use embedded terminal (preview, this session)** under Settings → App settings and navigate back to Prepare Key. Run login and then a disposable-key preparation. Test typing, hidden PIN input, generated PIN output, confirmation, touch and remove/reinsert. Record PIN securely before returning. Confirm no interactive transcript appears in activity/diagnostics or exported settings.
 6. Verify native failures return their exit code, do not auto-retry, and leave the UI usable. Never interrupt a live reset as a casual test. Use the external console for the next attempt if the embedded mode cannot support your CLI/UAC environment, after inspecting any uncertain outcome.
 7. Reset FIDO on a disposable key. After completion, verify the same device is selected if still present and PIN status has been reread. Disconnecting it must not select another key automatically.
 8. No claim of physical-device acceptance is made by the synthetic CI checks. CI exercises ConPTY input, no-echo synthetic input, VT rendering and exit-code propagation without authenticating or touching a key.
@@ -155,7 +166,8 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Verify blocked / unset / unknown PIN presentation. Unknown is not evidence that a key is empty.
 - Connect using the embedded terminal (now default). Native confirmation remains. Browser sign-in success returns automatically; failures remain visible until Return. External console remains available in Settings.
 - Close the external console AFTER the native tool has completed: the log must retain the native exit code, not the host window's close code. Closing before completion must not be treated as success.
-- Search a user, open Registered keys, refresh, close: tenant/user/profile selection stays intact. These are cloud registrations, not a physical-key inventory.
+- Open Manage user passkeys with no target connected, select a tenant, sign in, search for a test user, then view and refresh registrations. Verify one browser sign-in at Connect, none for dates or refresh, and compare the IDs and dates to Entra before testing any removal. Open Remove and cancel; the list must remain unchanged. These are cloud registrations, not a physical-key inventory.
+- With two identically named YubiKey registrations, compare the dates to the matching Entra registration IDs. Test a missing last-used value, cancellation, denied Graph access, tenant switching and session expiry. A required new sign-in must return to Connect without replaying any action. A missing timestamp must never be shown as “never used”.
 - Inspect Settings → Activity log after a failed enrollment. HTTP status/request IDs may be recorded; no generated PIN, tokens or terminal transcript may be exported.
 - A 405 response must remain reported as a 405; do not infer missing role activation. Retry with the required role activated in the correct tenant and retain request IDs if the error persists.
 - Enrollment still uses native YubiEnroll device selection. The review dialog explicitly distinguishes the inspected key from the native enrollment target. Use one test key and confirm the physical device.
@@ -169,7 +181,7 @@ The optional temporary enrollment register/PIN handover is tracked in issue #19;
 - Confirm the default 1120 × 860 window, capped to the current work area, fits the preparation form at normal desktop scaling. At small sizes, scrolling must remain available with the prepare action visible.
 - Settings body text must retain Segoe UI 14 when hosted. Prerequisites lists YubiEnroll, ykman, then administrative permissions. Help & About is project information/documentation.
 - Settings has no Done button or persistent tenant/profile totals. Activity appears directly inside its tab; the same session events survive navigating away and back. Copy/export remain explicit and exclude terminal transcripts/PINs.
-- Registered keys displays the registration ID directly, without a Tool response section. An unrecognized response is not proof of no keys.
+- Manage user passkeys displays the registration ID under Details. Cancel a removal and verify nothing changes. With a disposable registration, remove only that registration and verify in Entra; switching user or tenant must clear prior results. An unrecognized response is not proof of no keys.
 - The key-name suggestion uses the inspected model without firmware and its serial, e.g. `YubiKey 5C (12345678)`. Custom names survive device refresh. The native CLI still chooses the enrollment device; verify the physical device in the confirmation/prompt. No claim of automatic serial targeting is made.
 - Prepare Key has no profile-details expander or repeated reset notice; the final enrollment review retains the exact profile reset warning.
 - Confirm the original charcoal/green icon in Explorer, title bar, Alt+Tab and the taskbar after launching the new executable. Existing pinned shortcuts may reference an older download; unpin that old shortcut and pin the new executable when testing.
@@ -197,3 +209,7 @@ Automated regressions include live terminal text before input/process exit, actu
 - Enable registration logging and generated-PIN storage, use a disposable setup key and confirm the PIN appears in its JSON record, detail view and CSV. Repeat with PIN storage off and with Add a passkey: no existing PIN must be captured. Confirm leading zeroes survive CSV import. PIN logging selects the in-app terminal even if the external-console preference is set.
 - Inspect each Settings tab at normal and compact widths: matching title/description spacing, readable profile names and tenant IDs, pill status/version labels and aligned log filters. Verify both CLI links and the .NET links open the documented destinations without tracking parameters.
 - In Help & About, check updates while online and offline. Until releases are published, expect “No releases published yet.” Verify a newer published preview appears when available; checking never downloads or installs an update.
+
+## Preview 0.6.0 NFC acceptance
+
+Follow [the HID OMNIKEY 5022 checklist](NFC.md#hardware-acceptance--hid-omnikey-5022). CI checks reader routing, transport restrictions, card replacement, mixed USB/NFC inventory and presence-monitor interop. Physical NFC operations remain manual acceptance.

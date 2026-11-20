@@ -1,4 +1,6 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Controls;
 using System.Runtime.InteropServices;
 using YubiEnroll.Core;
 
@@ -20,6 +22,7 @@ public partial class MainWindow
             await TestEmbeddedTerminalAsync(mockExecutable);
             await TestExternalOutcomeAsync(mockExecutable);
             await TestLoginCancellationAsync(mockExecutable);
+            await TestManagementCallbackAsync();
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -129,8 +132,8 @@ public partial class MainWindow
             {
                 try
                 {
-                    Assert(settings.SettingsTabs.Items.Count == 7 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
-                        "Settings separates tenants, profiles, system and transfer");
+                    Assert(settings.SettingsTabs.Items.Count == 8 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                        "Settings includes app preferences alongside tenant, profile and tool management");
                     var transfer = ConfigTransfer.Export(File.ReadAllText(path));
                     var beforePreview = File.ReadAllText(path);
                     settings.PreviewImport(transfer);
@@ -142,14 +145,14 @@ public partial class MainWindow
                     settings.ApplyImport();
                     Assert(settings.Changed && ConfigReader.Read(path).Profiles.Count == 2, "Import applies both tenants and profiles");
                     CaptureWindow(settings, "settings-tenants.png");
-                    settings.SettingsTabs.SelectedIndex = 1;
+                    settings.ProfilesTab.IsSelected = true;
                     CaptureWindow(settings, "settings-profiles.png");
                     settings.SetRequirements(new RequirementReport(true, new(true, "Installed · version 1.2.0"), new(true, "Installed · version 5.9.2"), mockExecutable));
-                    settings.SettingsTabs.SelectedIndex = 2;
+                    settings.PrerequisitesTab.IsSelected = true;
                     CaptureWindow(settings, "settings-system.png");
-                    settings.SettingsTabs.SelectedIndex = 3;
+                    settings.TransferTab.IsSelected = true;
                     CaptureWindow(settings, "settings-transfer.png");
-                    settings.SettingsTabs.SelectedIndex = 4;
+                    settings.AboutTab.IsSelected = true;
                     CaptureWindow(settings, "settings-about.png");
                     TestRegistrationLogView(settings);
                 }
@@ -159,6 +162,8 @@ public partial class MainWindow
             await settingsOperation.Task;
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
+            await TestBatchPageAsync();
+            await TestLocalPasskeyPageAsync();
             TestGuidedWorkflow();
             var connectedBeforeProbe = _connectedProvider;
             var targetBeforeProbe = _selectedKey;
@@ -167,20 +172,79 @@ public partial class MainWindow
             Assert(connectedBeforeProbe != null && ReferenceEquals(connectedBeforeProbe, _connectedProvider) &&
                 ReferenceEquals(targetBeforeProbe, _selectedKey) && ReferenceEquals(inventoryBeforeProbe, _knownKeys),
                 "Automatic software detection preserves the authenticated tenant and selected target");
-            Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
-            var keysCapture = Dispatcher.InvokeAsync(() =>
+            var previousCliReady = _cliReady;
+            _cliReady = false; _connectedProvider = null;
+            Manage_Click(this, new RoutedEventArgs()); UpdateLayout();
+            Assert(ManagePage.IsVisible && _manageStep == 0 && ManageConnect.IsEnabled,
+                "Cloud management does not depend on the CLI, an enrollment login, or a target key");
+            var directory = new SmokeGraphHandler();
+            using var graphHttp = new System.Net.Http.HttpClient(directory);
+            int signIns = 0;
+            Task<ManagementGraph> ConnectTestGraph(TenantSetup tenant, CancellationToken ct)
             {
-                var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
-                CaptureWindow(keys, "registered-keys.png"); keys.Close();
+                ++signIns;
+                return Task.FromResult(new ManagementGraph(graphHttp, _ => Task.FromResult("synthetic")));
+            }
+            await ConnectManagementAsync(ConnectTestGraph);
+            ManageQuery.Text = "Alex";
+            await SearchManagedUsersAsync();
+            ManageUsers.SelectedIndex = 0;
+            var managedUser = (UserCandidate)ManageUsers.SelectedItem;
+            await ReadManagedListAsync(); await ReadManagedListAsync();
+            Assert(!IsConnected && signIns == 1 && directory.Reads == 3 && directory.Writes == 0,
+                "Connect, search, view and refresh use one Graph session and only GET requests");
+            Assert(ManageRows.Items.Count == 2 && _managedList!.Rows.All(row => row.Id != "phone-id") &&
+                ManageFeedback.Text.StartsWith("2 YubiKey registrations"), "Only recognized hardware registrations are shown, counted and actionable");
+            Assert(ManageRows.Items[0] is RegistrationCard { Dates.LastUsed: not null } &&
+                ManageRows.Items[1] is RegistrationCard { Dates.LastUsed: null }, "Cards show dates from the same Graph list; missing dates stay unknown");
+            CaptureWindow(this, "manage-user-passkeys.png");
+            var office = (RegistrationCard)ManageRows.Items[0];
+            var removalReview = new RemoveRegistrationWindow(this, SelectedProvider, managedUser, office.Credential, office.DateLine);
+            var inspectReview = removalReview.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    Assert(removalReview.RegistrationId.Text == "office-id" && removalReview.KeyName.Text == "Demo office key" &&
+                        removalReview.UserId.Text == managedUser.Id && removalReview.TenantLabel.Text == SelectedProvider.Name,
+                        "Removal review identifies exactly the selected registration, tenant and user");
+                    Assert(removalReview.CancelAction.IsDefault && removalReview.CancelAction.IsCancel &&
+                        !removalReview.RemoveAction.IsDefault && !removalReview.Details.IsExpanded,
+                        "Removal requires an explicit action; Cancel is the default");
+                    CaptureWindow(removalReview, "remove-registration.png");
+                }
+                finally { removalReview.Close(); }
             });
-            ShowRegisteredKeys(SelectedUser, SelectedProvider, "Display name  Model  ID\nDemo key  YubiKey 5 NFC  synthetic-credential-id");
-            await keysCapture.Task;
+            Assert(removalReview.ShowDialog() != true, "Closing the removal review does not confirm");
+            await inspectReview.Task;
+            var dismiss = Dispatcher.InvokeAsync(() =>
+            {
+                var cancel = OwnedWindows.OfType<RemoveRegistrationWindow>().Single().CancelAction;
+                var peer = new System.Windows.Automation.Peers.ButtonAutomationPeer(cancel);
+                ((System.Windows.Automation.Provider.IInvokeProvider)peer).Invoke();
+            });
+            ManageRemove_Click(new Button { DataContext = office }, new RoutedEventArgs());
+            await dismiss.Task;
+            Assert(directory.Writes == 0 && directory.Reads == 3, "Cancelling the actual Remove action sends no Graph request");
+            ManageBack_Click(this, new RoutedEventArgs());
+            Assert(_managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
+                "Changing management user clears registrations and the removal target");
+            ManageUsers.SelectedIndex = 0;
+            directory.OnlyPhone = true; await ReadManagedListAsync();
+            Assert(ManageRows.Items.Count == 0 && ManageFeedback.Text.Contains("No recognized YubiKey"),
+                "Unknown models leave the list empty without saying the user has no passkeys");
+            directory.Expired = true; await ReadManagedListAsync();
+            Assert(_manageStep == 0 && _management == null && _managedList == null && signIns == 1 &&
+                ManageTenantHint.Text.Contains("Connect again"), "An expired session offers Connect without opening a browser or replaying an action");
+            _cliReady = previousCliReady;
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);
             _connectedProvider = SelectedProvider;
             UpdateSummary();
             Tenants.SelectedIndex = 1;
+            Assert(_managedList == null && ManageRows.ItemsSource == null && _manageStep == 0 && !ManageView.IsEnabled,
+                "Changing tenant clears the passkey management context");
+            ShowPage(OverviewPage);
             Assert(!IsConnected && !SearchPanel.IsEnabled && !EnrollButton.IsEnabled && Users.SelectedItem == null,
                 "Changing tenants invalidates connection and selected user");
             File.WriteAllText(path, "[broken-secret-marker");
@@ -214,17 +278,17 @@ public partial class MainWindow
             UpdateLayout();
             var hosted = (SettingsWindow)_hostedWindow!;
             Assert(System.Windows.Documents.TextElement.GetFontSize((System.Windows.DependencyObject)HostedPage.Content!) == 14, "Hosted settings retains the shared body font size");
-            hosted.SettingsTabs.SelectedIndex = 5;
+            hosted.ActivityTab.IsSelected = true;
             UpdateLayout();
             Assert(hosted.ActivityHost.Content == _activityView && _activityView.IsVisible, "Activity log is visible directly in its Settings tab");
             Assert(System.Windows.Documents.TextElement.GetFontWeight(_activityView) == System.Windows.FontWeights.Normal, "Selected tab does not make all activity text bold");
-            hosted.SettingsTabs.SelectedIndex = 0;
+            hosted.TenantsTab.IsSelected = true;
             CaptureWindow(this, "shell-settings.png");
             ShowPage(OverviewPage);
             Assert(double.IsPositiveInfinity(MaxWidth) && double.IsPositiveInfinity(MaxHeight), "Main window does not constrain maximization to a reduced work area");
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
             _activityView.Add("Synthetic summary only.", "Info", "   ");
-            OpenSettings(5); UpdateLayout();
+            OpenSettings(s => s.ActivityTab); UpdateLayout();
             var disclosures = VisualDescendants<System.Windows.Controls.Expander>(_activityView).ToArray();
             Assert(!disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic summary only.")).IsVisible,
                 "Activity entries with empty or whitespace details have no disclosure control");
@@ -305,7 +369,7 @@ public partial class MainWindow
         Host(settings);
         var prerequisiteVisits = 0;
         settings.PrerequisitesOpened += () => prerequisiteVisits++;
-        settings.SettingsTabs.SelectedIndex = 2;
+        settings.PrerequisitesTab.IsSelected = true;
         Assert(prerequisiteVisits == 1, "Opening the Prerequisites tab requests automatic detection");
         // Preserve the actual object reference; probing must not reload the config or clear a session.
         var session = _connectedProvider;
@@ -455,6 +519,61 @@ public partial class MainWindow
         ApplyInventory(new[] { existing }, 0);
         Prepare_Click(this, e);
         Assert(!_addPasskey && _enrollStep == 0 && !EnrollButton.IsVisible, "Switching tasks requires a fresh key choice");
+        var nfc = existing with { Key = existing.Key with { Reader = "HID Global OMNIKEY 5022 Smart Card Reader 0" },
+            Capabilities = existing.Capabilities! with { IsNfc = true, ResetOverNfc = true } };
+        ApplyInventory([nfc, admin], 0); EnrollmentKeys.SelectedIndex = 0;
+        CaptureWindow(this, "nfc-key-selection.png");
+        EnrollNext_Click(this, e); Profiles.SelectedIndex = 0;
+        Assert(_selectedKey == nfc && _reviewValid, "NFC target supports the same profile-first setup flow");
+        AddPasskey_Click(this, e); ApplyInventory([nfc, admin], 0); EnrollmentKeys.SelectedIndex = 0;
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test" } }; Users.SelectedIndex = 0;
+        EnrollNext_Click(this, e);
+        Assert(EnrollButton.IsEnabled && _selectedKey == nfc, "NFC passkey addition can retain a USB admin key");
+        CaptureWindow(this, "nfc-passkey-review.png");
+        ShowPage(ResetPage); _resetStep = 0; ResetNext_Click(this, e); ResetAcknowledged.IsChecked = true;
+        Assert(ResetTargetButton.IsEnabled && ResetConnectionHelp.Text.Contains("NFC reader"), "NFC reset review shows reader instructions");
+        CaptureWindow(this, "nfc-reset-review.png");
+        ApplyInventory([existing, admin], 0);
+        Assert(_selectedKey == null && !ResetTargetButton.IsEnabled && ResetAcknowledged.IsChecked != true,
+            "NFC target removal cannot switch to a USB key with the same serial");
+        ApplyInventory([nfc with { Key = nfc.Key with { Serial = "11112222" } }], 0);
+        Assert(_selectedKey == null && !EnrollButton.IsEnabled, "Replacing a card on the same reader requires explicit selection");
+        Assert(NfcPresenceMonitor.Snapshot().Length > 0, "Windows PC/SC presence probe handles readers or absent service without opening a card");
+        BeginNextKey(); ShowPage(PreparePage);
+        var emptyReader = new NfcReaderStatus(nfc.Key.Reader!, true, "empty");
+        ApplyInventory([], 0, [emptyReader]);
+        Assert(EnrollmentReaderStatus.IsVisible && ResetReaderStatus.Children.Count == 1 && EnrollmentKeys.Items.Count == 0 &&
+            !EnrollNext.IsEnabled && KeyInfo.Text == "Connect a YubiKey by USB or place it on the NFC reader.",
+            "Empty connected NFC reader has a named status and one USB/NFC instruction");
+        CaptureWindow(this, "nfc-reader-empty.png");
+        ApplyInventory([nfc], 0, [emptyReader with { State = "ready" }, new("Internal contact reader", false, "unavailable"),
+            new("Windows Hello for Business 1", true, "unavailable")]);
+        Assert(EnrollmentReaderStatus.Children.Count == 1 && KeyInfo.Visibility == System.Windows.Visibility.Collapsed,
+            "Unrelated reader failure does not warn about a successfully discovered NFC key");
+        Assert(EnrollmentReaderStatus.ActualHeight < 50 &&
+            !VisualDescendants<TextBlock>(EnrollmentReaderStatus).Any(t => t.Text.Contains("Windows Hello") || t.Text == "YubiKey detected"),
+            "Reader presence is compact and excludes Windows Hello and redundant detection text");
+        CaptureWindow(this, "nfc-reader-ready.png");
+        EnrollmentKeys.SelectedIndex = 0;
+        InvalidateDeviceInventory(); UpdateLayout();
+        Assert(EnrollmentKeys.Items.Count == 1 && EnrollmentReaderStatus.Children.Count == 1 &&
+            !EnrollNext.IsEnabled && !ResetNext.IsEnabled && !EnrollButton.IsEnabled &&
+            KeyInfo.Visibility == Visibility.Collapsed && FooterInstruction.Visibility == Visibility.Collapsed &&
+            VisualDescendants<TextBlock>(this).Count(t => t.IsVisible && t.Text == "Checking connected keys…") == 1,
+            "Refreshing preserves inventory, gates actions and shows one progress message beside Refresh");
+        CaptureWindow(this, "nfc-reader-refreshing.png");
+        ApplyInventory([existing], 0, []); EnrollmentKeys.SelectedIndex = 0;
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && ResetReaderStatus.Visibility == System.Windows.Visibility.Collapsed && EnrollNext.IsEnabled,
+            "USB remains selectable with no NFC block when the reader is disconnected");
+        CaptureWindow(this, "usb-without-nfc-reader.png");
+        ApplyInventory([], 0, [new("Windows Hello for Business 1", true, "unavailable")]);
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && !KeyInfo.Text.Contains("NFC") &&
+            !EnrollNext.IsEnabled && EnrollmentInventoryProgress.Visibility == Visibility.Collapsed,
+            "No reader and no key has simple USB guidance without NFC text");
+        CaptureWindow(this, "no-reader-no-key.png");
+
+        ShowPage(OverviewPage);
 
     }
 
@@ -580,6 +699,44 @@ public partial class MainWindow
             if (child is T match) yield return match;
             foreach (var descendant in VisualDescendants<T>(child)) yield return descendant;
         }
+    }
+
+    private sealed class SmokeGraphHandler : System.Net.Http.HttpMessageHandler
+    {
+        public int Reads, Writes;
+        public bool OnlyPhone, Expired;
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage req, CancellationToken ct)
+        {
+            if (req.Method != System.Net.Http.HttpMethod.Get) { Writes++; throw new InvalidOperationException("Unexpected write"); }
+            Reads++;
+            if (Expired) return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized));
+            var json = req.RequestUri!.AbsolutePath switch
+            {
+                "/v1.0/users" => """{"value":[{"id":"11111111-2222-3333-4444-555555555555","displayName":"Alex Example","userPrincipalName":"alex@example.test"}]}""",
+                "/v1.0/users/11111111-2222-3333-4444-555555555555/authentication/fido2Methods" => OnlyPhone ?
+                    """{"value":[{"id":"phone-id","displayName":"Phone","model":"Unknown"}]}""" :
+                    """{"value":[{"id":"phone-id","displayName":"YubiKey 5C NFC","model":"Microsoft Authenticator - Android"},{"id":"office-id","displayName":"Demo office key","model":"YubiKey 5 Series with NFC","createdDateTime":"2026-04-18T12:00:00Z","lastUsedDateTime":"2026-11-19T09:00:00Z"},{"id":"backup-id","displayName":"Backup","model":"YubiKey Bio Series - FIDO Edition"}]}""",
+                _ => throw new InvalidOperationException("Unexpected Graph resource")
+            };
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        }
+    }
+
+    private static async Task TestManagementCallbackAsync()
+    {
+        // Verify the exact existing Entra callback path against the same Windows HTTP listener prefix MSAL uses.
+        var redirect = ManagementSignIn.LoopbackAddress("http://localhost/yubienroll-redirect");
+        using var listener = new System.Net.HttpListener();
+        listener.Prefixes.Add(redirect.AbsoluteUri + "/"); listener.Start();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var browser = new System.Net.Http.HttpClient(new System.Net.Http.HttpClientHandler { UseProxy = false });
+        var pending = listener.GetContextAsync().WaitAsync(timeout.Token);
+        var post = browser.PostAsync(redirect, new System.Net.Http.StringContent("synthetic"), timeout.Token);
+        var context = await pending;
+        context.Response.Close();
+        using var accepted = await post;
+        Assert(accepted.IsSuccessStatusCode && context.Request.Url?.AbsolutePath == "/yubienroll-redirect",
+            "The Windows management sign-in listener accepts the configured redirect path without a trailing slash");
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)

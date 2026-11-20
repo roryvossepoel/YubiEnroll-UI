@@ -100,6 +100,12 @@ if (args.Length == 2 && args[0] == "--check-ykman")
     var help = await native.CaptureAsync("--device", "12345678", "fido", "reset", "--help");
     if (help.ExitCode != 0 || !help.Output.Contains("Reset all FIDO applications"))
         throw new Exception("Native reset help did not accept the serial-targeted command.");
+    var nfcHelp = await native.CaptureAsync("--reader", "HID Global OMNIKEY 5022 Smart Card Reader 0", "fido", "reset", "--help");
+    if (nfcHelp.ExitCode != 0 || !nfcHelp.Output.Contains("Reset all FIDO applications")) throw new Exception("NFC reset command rejected.");
+    var nfcProbe = await native.CaptureWithInputAsync(TimeSpan.FromSeconds(15), NfcDiscovery.Script, "script", "--force", "-");
+    if (nfcProbe.ExitCode != 0 || NfcDiscovery.Parse(nfcProbe.Output).Keys.Count != 0)
+        throw new Exception("NFC inventory probe failed: " + nfcProbe.Error);
+    Console.WriteLine("PASS: native NFC reader reset syntax and bundled NFC inventory; no hardware operations.");
     var inventory = await service.DiscoverAsync();
     if (inventory.Keys.Count != 0) throw new Exception("Unexpected hardware on CI runner.");
     var probe = await native.CaptureWithInputAsync(TimeSpan.FromSeconds(15), FidoCapabilityProbe.Script, "script", "--force", "-", "12345678");
@@ -108,6 +114,13 @@ if (args.Length == 2 && args[0] == "--check-ykman")
     if (probe.ExitCode != 4 || probe.Output.Length != 0)
         throw new Exception($"Bundled read-only probe failed in native ykman: exit {probe.ExitCode}; output: {probe.Output}; error: {probe.Error}");
     Console.WriteLine("PASS: bundled capability script runs through native ykman without Python/SDK installation and rejects an absent target.");
+    try
+    {
+        await LocalPasskeys.ListAsync(native, new ResetKey("12345678","Synthetic (5.4.3)"), "ci-only");
+        throw new Exception("Absent target accepted.");
+    }
+    catch (InvalidOperationException ex) when (ex.Message.Contains("missing or changed"))
+    { Console.WriteLine("PASS: actual ykman loads the bundled local passkey helper and refuses an absent USB key before PIN verification."); }
     Console.WriteLine("PASS: native ykman version, empty USB inventory and serial-targeted reset help; no reset executed.");
     return 0;
 }
@@ -415,9 +428,16 @@ Check(!screen.Text.Contains("do-not-copy"), "Terminal ignores clipboard control 
 screen.Clear(); Check(screen.Text.Length == 0, "Terminal buffers clear after dismissal");
 Check(WindowsCommandLine.Quote("name with spaces") == "\"name with spaces\"", "Native process argument quoting preserves spaces");
 Check(WindowsCommandLine.Quote("x\"y") == "\"x\\\"y\"", "Native process argument quoting escapes quotes");
-var registrations = RegisteredCredentials.Parse("Fetching credentials...\nDisplay name  Model  ID\nDesk key  YubiKey 5 NFC  credential-1\nBackup key  Security Key  credential-2\n");
-Check(registrations.Count == 2 && registrations[0].Name == "Desk key" && registrations[1].Id == "credential-2", "Registered keys table preserves names and credential identifiers");
-Check(RegisteredCredentials.Parse("unrecognized output\nkey  model  id").Count == 0, "Unknown registration format is not guessed");
+var wanted = new RegisteredCredential("Desk key", "YubiKey 5 Series", "-credential-1");
+foreach (var model in new[] { "YubiKey 5 Series with NFC", "YubiKey 5Ci", "YubiKey Bio Series - FIDO Edition",
+    "Security Key by Yubico with NFC", "Security Key NFC by Yubico - Enterprise Edition" })
+    Check((wanted with { Name = "Phone", Model = model }).IsYubicoHardware, "A renamed Yubico hardware registration is still recognized: " + model);
+foreach (var model in new[] { "Microsoft Authenticator - Android", "Windows Hello", "Google Password Manager",
+    "Unknown", "Security Key", "Feitian BioPass FIDO2 Authenticator" })
+{
+    var unrelated = wanted with { Name = "YubiKey 5C NFC", Model = model };
+    Check(!unrelated.IsYubicoHardware, "A display name cannot substitute for a recognized Yubico model: " + model);
+}
 var failure = InteractiveFailure.Describe("ERROR: 405 Method Not Allowed\nrequest-id: 11111111-2222-3333-4444-555555555555\nPIN: secret-marker\naccess_token: secret-token");
 Check(failure.Contains("405") && failure.Contains("11111111-2222-3333-4444-555555555555") && !failure.Contains("secret") && !failure.Contains("PIN"), "Interactive diagnostic extraction keeps codes and excludes PINs and tokens");
 Check(new ResetKey("12345678", "YubiKey 5C (5.7.1)").RegistrationName == "YubiKey 5C (12345678)", "Suggested registration name omits firmware and includes serial");
@@ -452,8 +472,11 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0,
     EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 RegistrationJournalTests.Run(Check);
+await ManagementGraphTests.Run(Check);
 Workflow055Tests.Run(Check);
 Workflow056Tests.Run(Check);
+EnrollmentBatchTests.Run(Check);
+await NfcTests.Run(Check);
 Console.WriteLine($"{tests} checks passed.");
 return 0;
 

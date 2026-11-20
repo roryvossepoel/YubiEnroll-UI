@@ -23,6 +23,7 @@ public partial class MainWindow
     private bool _choosingTarget = true;
     private string _suggestedName = "";
     private System.Windows.Threading.DispatcherTimer? _deviceRefresh;
+    private NfcPresenceMonitor? _nfcPresence;
     private string _lastInteractiveFailure = "";
 
     private void ResizePreparation()
@@ -34,16 +35,16 @@ public partial class MainWindow
         BrandTitle.FontSize = compact ? 13 : 19;
         BrandSubtitle.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         var stackedCards = ActualWidth < 1100;
-        HomeTasks.Columns = stackedCards ? 1 : 3;
-        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeResetCard };
-        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeResetLayout };
-        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeResetIcon };
-        var labels = new[] { HomeSetupText, HomeAdditionText, HomeResetText };
-        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeResetArrow };
+        HomeTasks.Columns = stackedCards ? 1 : 2;
+        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeLocalCard, HomeManageCard, HomeResetCard };
+        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeLocalLayout, HomeManageLayout, HomeResetLayout };
+        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeLocalIcon, HomeManageIcon, HomeResetIcon };
+        var labels = new[] { HomeSetupText, HomeAdditionText, HomeLocalText, HomeManageText, HomeResetText };
+        var arrows = new[] { HomeSetupArrow, HomeAdditionArrow, HomeLocalArrow, HomeManageArrow, HomeResetArrow };
         for (var i = 0; i < cards.Length; i++)
         {
             cards[i].Padding = new Thickness(stackedCards ? 16 : 24);
-            cards[i].Margin = stackedCards ? new Thickness(0, 0, 0, 12) : new Thickness(i == 0 ? 0 : 6, 0, i == 2 ? 0 : 6, 0);
+            cards[i].Margin = stackedCards ? new Thickness(0, 0, 0, 12) : new Thickness(i % 2 == 0 ? 0 : 6, 0, i % 2 == 0 ? 6 : 0, 12);
             layouts[i].ColumnDefinitions[0].Width = stackedCards ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
             layouts[i].ColumnDefinitions[1].Width = stackedCards ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
             layouts[i].ColumnDefinitions[2].Width = stackedCards ? GridLength.Auto : new GridLength(0);
@@ -71,19 +72,23 @@ public partial class MainWindow
     private void ShowPage(FrameworkElement page)
     {
         if (_busy) return;
-        if ((page == OverviewPage || page == PreparePage || page == ResetPage) && RequirementsBlockTasks) page = StartupPage;
+        if ((page == OverviewPage || page == PreparePage || page == ResetPage || page == BatchPage) && RequirementsBlockTasks) page = StartupPage;
+        if (page == LocalPage && (!_smokeTest || _startupChecksComplete) &&
+            (_requirements?.Administrator != true || !_requirements.Manager.Ready)) page = StartupPage;
+        if (LocalPage.Visibility == Visibility.Visible && page != LocalPage) ResetLocalPage();
+        if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage) LeaveHostedPage();
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, HostedPage, StartupPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, BatchPage, ResetPage, LocalPage, ManagePage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, SettingsButton })
+        foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, LocalButton, ManageButton, SettingsButton })
         {
-            var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage && !_addPasskey ||
+            var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && (page == PreparePage || page == BatchPage) && !_addPasskey ||
                 button == AddPasskeyButton && page == PreparePage && _addPasskey ||
-                button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
+                button == LocalButton && page == LocalPage || button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
             button.Tag = active ? "active" : null;
         }
         // A clean Home has no technical footer. Errors/requirements remain discoverable in Settings.
-        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage ? Visibility.Collapsed : Visibility.Visible;
+        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage || page == ManagePage || page == LocalPage ? Visibility.Collapsed : Visibility.Visible;
         RenderWizard();
     }
     private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);
@@ -92,35 +97,35 @@ public partial class MainWindow
         if (_busy) return;
         if (_addPasskey) { _addPasskey = false; BeginNextKey(); }
         ShowPage(PreparePage);
-        if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
     }
     private async void AddPasskey_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
         if (!_addPasskey) { _addPasskey = true; BeginNextKey(); }
         ShowPage(PreparePage);
-        if (!RequirementsBlockTasks && !_inventoryLoaded) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty)) await RefreshOverviewAsync();
     }
     private async void ResetPage_Click(object sender, RoutedEventArgs e)
     {
         ShowPage(ResetPage);
-        if (!RequirementsBlockTasks && !_inventoryLoaded && !_busy) await RefreshOverviewAsync();
+        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
     }
-    private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(5);
-    private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(2);
-    private void About_Click(object sender, RoutedEventArgs e) => OpenSettings(4);
+    private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.ActivityTab);
+    private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.PrerequisitesTab);
+    private void About_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.AboutTab);
     private void Host(Window window)
     {
         LeaveHostedPage(); _hostedWindow = window; window.Owner = this; window.ShowInTaskbar = false;
         var content = window.Content; window.Content = null; HostedPage.Content = content;
         ShowPage(HostedPage);
     }
-    private void OpenSettings(int tab = 0)
+    private void OpenSettings(Func<SettingsWindow, TabItem>? initialTab = null)
     {
         if (_busy) return;
         LeaveHostedPage();
         var settings = new SettingsWindow(_configPath, _exePath, _versionText, _registrationJournal) { EmbeddedTerminal = EmbeddedTerminal };
-        settings.SettingsTabs.SelectedIndex = tab; settings.ActivityHost.Content = _activityView;
+        settings.SettingsTabs.SelectedItem = initialTab?.Invoke(settings) ?? settings.TenantsTab; settings.ActivityHost.Content = _activityView;
         settings.PrerequisitesOpened += async () =>
         {
             if (!_smokeTest && _startupChecksComplete && !_busy) await CheckRequirementsAsync();
@@ -145,7 +150,7 @@ public partial class MainWindow
                 return;
             }
             var runner = new CliRunner(path);
-            var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException());
+            var service = new KeyResetService(a => runner.CaptureAsync(a), _ => throw new InvalidOperationException(), () => NfcDiscovery.ReadAsync(runner));
             try
             {
                 await service.CheckVersionAsync();
@@ -159,7 +164,7 @@ public partial class MainWindow
                     if (IsAdministrator()) try { capabilities = await FidoCapabilityProbe.ReadAsync(runner, key); } catch { }
                     entries.Add(new(key, pin, capabilities));
                 }
-                TryApplyInventory(entries, inventory.Unavailable, generation);
+                TryApplyInventory(entries, inventory.Unavailable, generation, inventory.ReaderStates);
             }
             catch
             {
@@ -171,7 +176,8 @@ public partial class MainWindow
     }
     private void SetInventoryMessage(string text)
     {
-        KeyInfo.Text = ResetInventoryInfo.Text = text;
+        KeyInfo.Text = ResetInventoryInfo.Text = LocalInventoryHint.Text = text;
+        KeyInfo.Visibility = ResetInventoryInfo.Visibility = Visible(!string.IsNullOrWhiteSpace(text));
     }
     private void SetSelectedKey(KeyStatus? key)
     {
@@ -181,14 +187,14 @@ public partial class MainWindow
         SuggestRegistrationName(); UpdateSummary();
         if (changed) Record(key == null ? "Selected key is unavailable." : $"Key selected · serial {key.Key.Serial} · {key.PinLabel}");
     }
-    private bool TryApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, int generation)
+    private bool TryApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, int generation, IReadOnlyList<NfcReaderStatus>? readers = null)
     {
         // A USB event during discovery makes that snapshot stale. The scheduled refresh will retry once idle.
         if (generation != _deviceGeneration) return false;
-        ApplyInventory(entries, unavailable);
+        ApplyInventory(entries, unavailable, readers);
         return true;
     }
-    private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable)
+    private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, IReadOnlyList<NfcReaderStatus>? readers = null)
     {
         var previousTarget = _selectedKey?.Key ?? _lastKnownKey;
         var targetMissing = previousTarget != null && !entries.Any(x => x.Key == previousTarget);
@@ -211,8 +217,15 @@ public partial class MainWindow
             OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = entries.FirstOrDefault(x => x.Key == candidate);
         }
         finally { _readingKeys = false; }
-        SetInventoryMessage(unavailable > 0 ? "Some devices could not be identified. Check device access and FIDO support." :
-            entries.Count == 0 ? "No supported key detected. Connect a key; the list updates automatically." : "");
+        var reviewed = (BatchKeys.SelectedItem as KeyStatus)?.Key;
+        BatchKeys.ItemsSource = entries;
+        BatchKeys.SelectedItem = entries.FirstOrDefault(k => k.Key == reviewed);
+        LocalKeys.ItemsSource = entries;
+        RenderReaderInventory(readers ?? Array.Empty<NfcReaderStatus>());
+        SetInventoryMessage(unavailable > 0 ? "Some USB devices could not be identified. Check device access and FIDO support." :
+            entries.Count == 0 ? (EnrollmentReaderStatus.Visibility == Visibility.Visible
+                ? "Connect a YubiKey by USB or place it on the NFC reader."
+                : "No key connected. Connect a YubiKey by USB.") : "");
         SetSelectedKey(entries.FirstOrDefault(x => x.Key == _lastKnownKey));
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)
@@ -250,7 +263,7 @@ public partial class MainWindow
     private void UpdateEnrollmentGuidance()
     {
         if (EnrollmentTargetNotice == null) return;
-        var message = _inventoryDirty ? "Checking connected keys…" :
+        var message = _inventoryDirty ? "" :
             EnrollmentTargetGuard.Explain(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys, IsConnected);
         EnrollmentTargetNotice.Text = ReviewTargetNotice.Text = message;
         RenderWizard();
@@ -258,10 +271,12 @@ public partial class MainWindow
     private void InvalidateDeviceInventory()
     {
         _inventoryDirty = true;
+        ResetLocalPage();
         EnrollButton.IsEnabled = ResetTargetButton.IsEnabled = EnrollNext.IsEnabled = ResetNext.IsEnabled = false;
         // A USB change invalidates a destructive acknowledgment even if the same key returns.
         ResetAcknowledged.IsChecked = false;
-        SetInventoryMessage("Checking connected keys…"); UpdateEnrollmentGuidance();
+        // Keep the last inventory visible, but gate every action until the new snapshot arrives.
+        UpdateEnrollmentGuidance();
     }
     private void SuggestRegistrationName()
     {
@@ -274,12 +289,14 @@ public partial class MainWindow
     {
         base.OnSourceInitialized(e); TaskbarIdentity.Apply(this);
         if (_smokeTest) return;
+        _nfcPresence = new(() => Dispatcher.BeginInvoke(() => { if (IsLoaded) ScheduleDeviceRefresh(); }));
+        Closed += (_, _) => { _nfcPresence?.Dispose(); _deviceRefresh?.Stop(); };
         _deviceRefresh = new() { Interval = TimeSpan.FromSeconds(1) };
         _deviceRefresh.Tick += async (_, _) =>
         {
             if (_busy || _checkingRequirements) return;
             _deviceRefresh.Stop();
-            if (_inventoryLoaded) await RefreshOverviewAsync();
+            if (_inventoryLoaded && ManagePage.Visibility != Visibility.Visible) await RefreshOverviewAsync();
         };
         System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(DeviceMessage);
     }
@@ -299,7 +316,7 @@ public partial class MainWindow
     private bool _closeAfterLogin;
     private bool _captureGeneratedPin;
     private string? _generatedPin;
-    private async Task<int> RunInteractiveAsync(string executable, string[] args)
+    private async Task<int> RunInteractiveAsync(string executable, string[] args, ResetKey? explicitTarget = null, Action? nativeFinished = null)
     {
         _lastInteractiveFailure = "";
         if (args.SequenceEqual(new[] { "login" }))
@@ -315,8 +332,10 @@ public partial class MainWindow
         if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a key · serial ") + _selectedKey?.Key.Serial : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null);
+        var terminalTarget = explicitTarget ?? _selectedKey?.Key;
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
+        terminal.NativeFinished = nativeFinished;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
     }

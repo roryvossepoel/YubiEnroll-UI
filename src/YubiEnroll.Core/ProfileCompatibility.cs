@@ -5,8 +5,10 @@ namespace YubiEnroll.Core;
 
 public sealed record FidoCapabilities(string Serial, string Firmware, bool ClientPin, bool ResidentKey,
     bool PinPolicy, bool AlwaysUvSupported, bool AlwaysUvEnabled, bool EnterpriseAttestation,
-    int MinimumPinLength, int MaximumPinLength, bool ResetBlocked, bool ResetOverUsb, bool AlwaysUvLocked, bool ForcePinChange = false)
+    int MinimumPinLength, int MaximumPinLength, bool ResetBlocked, bool ResetOverUsb, bool AlwaysUvLocked, bool ForcePinChange = false, bool IsNfc = false, bool ResetOverNfc = false)
 {
+    public bool ResetAllowed => !ResetBlocked && (IsNfc ? ResetOverNfc : ResetOverUsb);
+
     public static FidoCapabilities Parse(string json, ResetKey target)
     {
         try
@@ -23,6 +25,8 @@ public sealed record FidoCapabilities(string Serial, string Firmware, bool Clien
             Unique(root);
             if (root.GetProperty("schema").GetInt32() != 1 || root.GetProperty("serial").GetString() != target.Serial)
                 throw new InvalidDataException();
+            if (target.IsNfc && (!root.TryGetProperty("reader", out var reader) || reader.GetString() != target.Reader))
+                throw new InvalidDataException();
             var firmware = root.GetProperty("firmware").GetString() ?? "";
             var expected = Regex.Match(target.Model, @"\((\d+\.\d+\.\d+)\)$");
             if (!Version.TryParse(firmware, out _) || !expected.Success || expected.Groups[1].Value != firmware)
@@ -38,7 +42,8 @@ public sealed record FidoCapabilities(string Serial, string Firmware, bool Clien
             return new(target.Serial, firmware, Present("clientPin"), Enabled("rk"),
                 Enabled("authnrCfg") && Enabled("setMinPINLength"), Present("alwaysUv"), Enabled("alwaysUv"),
                 Present("ep"), minimum, maximum, root.GetProperty("resetBlocked").GetBoolean(),
-                root.GetProperty("resetOverUsb").GetBoolean(), root.GetProperty("alwaysUvLocked").GetBoolean(), root.GetProperty("forcePinChange").GetBoolean());
+                root.GetProperty("resetOverUsb").GetBoolean(), root.GetProperty("alwaysUvLocked").GetBoolean(), root.GetProperty("forcePinChange").GetBoolean(), target.IsNfc,
+                root.TryGetProperty("resetOverNfc", out var nfcReset) && nfcReset.GetBoolean());
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or InvalidDataException or FormatException or OverflowException)
         {
@@ -93,7 +98,7 @@ public static class ProfileCompatibility
         if (p.RequireAlwaysUv == true && !c.AlwaysUvSupported) issues.Add("Always UV is not supported.");
         if (p.RequireAlwaysUv == false && c.AlwaysUvLocked) issues.Add("Always UV cannot be disabled on this key. Enable it in a suitable profile.");
         if (p.RequireEa == true && !c.EnterpriseAttestation) issues.Add("This key is not provisioned for enterprise attestation.");
-        if (p.Reset == true && (c.ResetBlocked || !c.ResetOverUsb)) issues.Add("FIDO reset is unavailable over USB or blocked by this key's configuration. No broader factory reset will be attempted.");
+        if (p.Reset == true && !c.ResetAllowed) issues.Add("FIDO reset is unavailable over this connection or blocked by this key's configuration. No broader factory reset will be attempted.");
         if (p.Reset == false && pin == FidoPinState.Blocked) issues.Add("The FIDO PIN is blocked. A FIDO reset is required before enrollment.");
         // The current floor is deliberately conservative even if reset is requested: no reset is performed just to discover a factory limit.
         if (p.MinPinLength is int min && (min < c.MinimumPinLength || min > c.MaximumPinLength))
@@ -121,11 +126,11 @@ public static class FidoCapabilityProbe
     public static async Task<FidoCapabilities> ReadAsync(CliRunner runner, ResetKey target)
     {
         // Validate the serial with the existing strict validator; never use a shell or substitute the first key.
-        _ = KeyResetService.ResetArguments(target.Serial);
+        _ = KeyResetService.Selector(target);
         // --force suppresses only ykman's script prompt for this fixed read-only resource.
         // It is never passed to enrollment, reset or any configuration operation.
         var result = await runner.CaptureWithInputAsync(TimeSpan.FromSeconds(15), Script,
-            "script", "--force", "-", target.Serial);
+            "script", "--force", "-", target.Serial, target.Reader ?? "");
         if (result.ExitCode != 0) throw new InvalidOperationException("Could not read FIDO capabilities for the selected key. Reconnect it, close other key tools and Refresh.");
         return FidoCapabilities.Parse(result.Output, target);
     }

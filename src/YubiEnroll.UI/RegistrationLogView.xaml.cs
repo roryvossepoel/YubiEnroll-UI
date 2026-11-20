@@ -15,33 +15,13 @@ public partial class RegistrationLogView : UserControl
     private readonly RegistrationJournal _journal;
     private IReadOnlyList<RegistrationRecord> _records = [];
     private bool _loading;
+    public event Action? OpenAppSettings;
     public RegistrationLogView(RegistrationJournal journal)
     {
         _journal = journal;
         InitializeComponent();
-        EnabledChoice.IsChecked = journal.Preferences.Enabled;
-        SavePinChoice.IsChecked = journal.Preferences.SaveGeneratedPin;
-        FolderPath.Text = journal.Preferences.Directory;
-        FolderPath.ToolTip = FolderPath.Text;
-        LoggingPreferences.IsExpanded = !journal.Preferences.Enabled || journal.SettingsError != null;
-        RefreshRecords();
     }
-    private void SavePreference_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            _journal.Configure(EnabledChoice.IsChecked == true, FolderPath.Text, SavePinChoice.IsChecked == true);
-            LoggingPreferences.IsExpanded = false;
-            RefreshRecords();
-        }
-        catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
-        { Feedback.Text = _journal.PendingCount > 0 ? "Save the pending results before changing folders. Restore access to the original folder and retry saving." : "Could not save your preference. Choose a writable folder and try again. Your previous setting is unchanged."; }
-    }
-    private void Browse_Click(object sender, RoutedEventArgs e)
-    {
-        var picker = new OpenFolderDialog { Title = "Choose the registration log folder", Multiselect = false };
-        if (picker.ShowDialog(Window.GetWindow(this)) == true) { FolderPath.Text = picker.FolderName; FolderPath.ToolTip = picker.FolderName; }
-    }
+    private void AppSettings_Click(object sender, RoutedEventArgs e) => OpenAppSettings?.Invoke();
     internal void RefreshRecords()
     {
         _loading = true;

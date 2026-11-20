@@ -38,6 +38,12 @@ public partial class MainWindow
     private bool EnrollmentReady => TargetReady && IsConnected && _cliReady && Users.SelectedItem != null && (_addPasskey || Profiles.SelectedItem != null) &&
         EnrollmentTargetGuard.CanStart(_selectedKey?.Key, _knownKeys.Select(k => k.Key).ToArray(), _unavailableKeys);
 
+    private void SetBackAction(Button button, string? stepLabel, string homeLabel = "Back to Home")
+    {
+        button.Content = stepLabel ?? homeLabel;
+        button.ContentTemplate = stepLabel == null ? null : (DataTemplate)FindResource("BackContent");
+    }
+
     private void RenderProgress(UniformGrid panel, string[] labels, int step)
     {
         panel.Columns = labels.Length;
@@ -72,11 +78,14 @@ public partial class MainWindow
     private void RenderWizard()
     {
         if (ResetHeading == null || EnrollHeading == null || ResetAcknowledged == null) return;
+        BatchEntry.Visibility = Visible(!_addPasskey && _enrollStep == 0);
+        BatchEntry.Content = _batch == null ? "Set up multiple YubiKeys" : "Return to batch";
+        RenderBatch();
         RenderRegistrationLogStatus();
         ReadReviewWarning();
         RenderProgress(EnrollProgress, _addPasskey ? ["Key", "Tenant", "User", "Review"] : ["Key", "Profile", "Tenant", "User", "Review"], Math.Min(_enrollStep, ReviewStep));
         RenderProgress(ResetProgress, ["Key", "Confirm", "Result"], _resetStep);
-        EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A KEY";
+        EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A YUBIKEY";
         EnrollHeading.Text = _enrollStep == 0 ? (_addPasskey ? "Choose your existing key" : "Choose the key to set up") :
             _enrollStep == TenantStepIndex ? "Connect to a tenant" : _enrollStep == UserStepIndex ? "Choose the user" :
             _enrollStep == ReviewStep ? (_addPasskey ? "Review and add passkey" : "Review and enroll") :
@@ -97,32 +106,40 @@ public partial class MainWindow
         EnrollButton.Visibility = Visible(_enrollStep == ReviewStep);
         EnrollButton.IsEnabled = !_busy && _enrollStep == ReviewStep && EnrollmentReady && _reviewValid;
         EnrollNext.Visibility = Visible(_enrollStep != ReviewStep);
-        EnrollNext.Content = _enrollStep == 0 ? (_addPasskey ? "Continue to tenant  →" : "Continue to profile  →") :
-            !_addPasskey && _enrollStep == 1 ? "Continue to tenant  →" : _enrollStep == TenantStepIndex ? "Continue to user  →" :
-            _enrollStep == EnrollmentResultStep ? (_addPasskey ? "Add another passkey" : "Set up another key") : "Review registration  →";
+        EnrollNext.Content = _enrollStep == 0 ? (_addPasskey ? "Continue to tenant" : "Continue to profile") :
+            !_addPasskey && _enrollStep == 1 ? "Continue to tenant" : _enrollStep == TenantStepIndex ? "Continue to user" :
+            _enrollStep == EnrollmentResultStep ? (_addPasskey ? "Add another passkey" : "Set up another key") : "Review registration";
+        EnrollNext.ContentTemplate = _enrollStep == EnrollmentResultStep ? null : (DataTemplate)FindResource("ForwardContent");
         EnrollNext.IsEnabled = !_busy && (_enrollStep == 0 ? CandidateReady && (!_addPasskey || AdditionCandidateReady) :
             !_addPasskey && _enrollStep == 1 ? TargetReady && _reviewValid :
             _enrollStep == TenantStepIndex ? TargetReady && IsConnected :
             _enrollStep == UserStepIndex ? TargetReady && IsConnected && Users.SelectedItem != null && _reviewValid :
             _enrollStep == EnrollmentResultStep);
-        EnrollBack.Content = _enrollStep == 0 || _enrollStep == EnrollmentResultStep ? "Back to Home" : "←  Back";
-        FooterInstruction.Text = _enrollStep >= EnrollmentResultStep ? "" : _inventoryDirty ? "Checking connected keys…" :
+        SetBackAction(EnrollBack, _enrollStep == 0 || _enrollStep == EnrollmentResultStep ? null : "Back");
+        EnrollmentInventoryProgress.Visibility = ResetInventoryProgress.Visibility = Visible(_inventoryDirty);
+        FooterInstruction.Text = _enrollStep >= EnrollmentResultStep ? "" : _inventoryDirty ? (_enrollStep == 0 ? "" : "Checking connected keys…") :
             _enrollStep == 0 && _addPasskey && CandidateReady && !AdditionCandidateReady ? string.Join(" ", PasskeyAddition.Evaluate((EnrollmentKeys.SelectedItem as KeyStatus)?.Capabilities, (EnrollmentKeys.SelectedItem as KeyStatus)?.Pin ?? FidoPinState.Unknown).Issues) :
             _enrollStep > 0 && !TargetReady ? "The target is unavailable. Select or reconnect it." :
             _enrollStep == ReviewStep && !_reviewValid ? ProfileCompatibilityText.Text : "";
+        FooterInstruction.Visibility = Visible(!string.IsNullOrWhiteSpace(FooterInstruction.Text));
         ResetHeading.Text = new[] { "Choose the key to reset", "Review the FIDO reset", "Reset result" }[_resetStep];
         ResetDescription.Text = new[] { "This removes the key’s FIDO passkeys and PIN.", "Confirm the physical key before erasing its FIDO credentials.", "Check the reported outcome and the target’s PIN status." }[_resetStep];
         OverviewChooser.Visibility = Visible(_resetStep == 0); ResetReview.Visibility = Visible(_resetStep == 1); ResetResult.Visibility = Visible(_resetStep == 2);
         ResetNext.Visibility = Visible(_resetStep != 1); ResetTargetButton.Visibility = Visible(_resetStep == 1);
-        ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset  →";
+        ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset";
+        ResetNext.ContentTemplate = _resetStep == 2 ? null : (DataTemplate)FindResource("ForwardContent");
         ResetNext.IsEnabled = !_busy && (_resetStep == 2 || CandidateReady);
-        ResetBack.Content = _resetStep == 1 ? "←  Back" : "Back to Home";
+        SetBackAction(ResetBack, _resetStep == 1 ? "Back" : null);
         ResetTargetText.Text = _resetReviewTarget?.Label ?? "No target selected";
         KeyPinStatus.Text = _selectedKey is { } currentKey && currentKey.Key == _resetReviewTarget ? currentKey.PinLabel : "Target unavailable";
+        ResetConnectionHelp.Text = _resetReviewTarget?.IsNfc == true
+            ? "Keep this key on the NFC reader. Remove and place the same key back only when the native tool asks."
+            : "Follow the native prompts to unplug, reinsert and touch this same key.";
         ResetAvailability.Text = !IsAdministrator() ? "Restart as administrator from the startup requirements screen to reset this key." :
-            !TargetReady || _selectedKey?.Key != _resetReviewTarget ? "The reviewed target is unavailable. Go back, reconnect it and Refresh." : "";
+            !TargetReady || _selectedKey?.Key != _resetReviewTarget ? "The reviewed target is unavailable. Go back, reconnect it and Refresh." :
+            _selectedKey?.Key.IsNfc == true && _selectedKey.Capabilities?.ResetAllowed != true ? "FIDO reset over NFC is unavailable or could not be verified for this key. Connect it by USB and select it again." : "";
         ResetAcknowledged.IsEnabled = !_busy && TargetReady && _selectedKey?.Key == _resetReviewTarget;
-        ResetTargetButton.IsEnabled = !_busy && _resetStep == 1 && TargetReady && _selectedKey?.Key == _resetReviewTarget && IsAdministrator() && ResetAcknowledged.IsChecked == true;
+        ResetTargetButton.IsEnabled = !_busy && _resetStep == 1 && TargetReady && _selectedKey?.Key == _resetReviewTarget && IsAdministrator() && (_selectedKey?.Key.IsNfc != true || _selectedKey?.Capabilities?.ResetAllowed == true) && ResetAcknowledged.IsChecked == true;
     }
     private bool AdditionCandidateReady => EnrollmentKeys.SelectedItem is KeyStatus k && PasskeyAddition.Evaluate(k.Capabilities, k.Pin).Compatible;
     private void ReadReviewWarning()
@@ -176,6 +193,7 @@ public partial class MainWindow
         }
         var user = Users.SelectedItem as UserCandidate;
         Row("Key", _selectedKey?.Key.Model ?? "Unavailable"); Row("Serial number", _selectedKey?.Key.Serial ?? "—");
+        Row("Connection", _selectedKey?.Key.ConnectionLabel ?? "—");
         Row("Tenant", (Tenants.SelectedItem as Provider)?.Name ?? "—");
         Row("User", !string.IsNullOrWhiteSpace(user?.DisplayName) ? user.DisplayName : user?.Label ?? "—");
         if (!string.IsNullOrWhiteSpace(user?.UserPrincipalName)) Row("Sign-in name", user.UserPrincipalName);

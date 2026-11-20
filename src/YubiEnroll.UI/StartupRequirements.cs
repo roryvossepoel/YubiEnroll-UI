@@ -24,7 +24,7 @@ public partial class MainWindow
         if (_smokeTest || !_startupChecksComplete || _busy || _checkingRequirements) return;
         // Returning from a browser/installer refreshes requirements, not keys, configuration or tenant login.
         if (StartupPage.Visibility == Visibility.Visible ||
-            _hostedWindow is SettingsWindow { SettingsTabs.SelectedIndex: 2 })
+            _hostedWindow is SettingsWindow { PrerequisitesTab.IsSelected: true })
             await CheckRequirementsAsync();
     }
 
