@@ -507,6 +507,7 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0,
     EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 RegistrationJournalTests.Run(Check);
+await RegistrationDateTests.Run(Check);
 Workflow055Tests.Run(Check);
 Workflow056Tests.Run(Check);
 await NfcTests.Run(Check);

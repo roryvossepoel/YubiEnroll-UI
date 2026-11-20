@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -11,6 +13,9 @@ public partial class MainWindow
     private int _manageStep;
     private sealed record RegistrationList(Provider Tenant, UserCandidate User, IReadOnlyList<RegisteredCredential> Rows);
     private RegistrationList? _managedList;
+    private CancellationTokenSource? _dateRequest;
+    private RegistrationDateSession? _dateSession;
+    private Provider? _dateProvider;
     private void Manage_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
@@ -20,6 +25,7 @@ public partial class MainWindow
     private void ResetManagement()
     {
         if (ManageBack == null) return;
+        _dateSession = null; _dateProvider = null;
         _manageStep = 0;
         ManageQuery.Clear(); ManageUsers.ItemsSource = null;
         ManageSearchHint.Text = "";
@@ -29,6 +35,8 @@ public partial class MainWindow
     private void ClearManagedList()
     {
         _managedList = null;
+        _dateRequest?.Cancel(); _dateRequest = null;
+        ManageDateNotice.Visibility = Visibility.Collapsed;
         ManageRows.ItemsSource = null;
         ManageFeedback.Text = "";
     }
@@ -104,18 +112,77 @@ public partial class MainWindow
             var rows = await service.ListAsync(Guid.Parse(user.Id));
             SetManagedList(provider, user, rows);
         }, provider, user, "Read passkey registrations");
+        if (_managedList is { Rows.Count: > 0 } list && MatchesManagementContext(provider, user))
+            await LoadRegistrationDatesAsync(list, interactive: true);
     }
     private void SetManagedList(Provider provider, UserCandidate user, IReadOnlyList<RegisteredCredential> rows)
     {
         if (!MatchesManagementContext(provider, user)) throw new InvalidOperationException("The selected tenant or user changed.");
         var hardware = rows.Where(row => row.IsYubicoHardware).ToArray();
         _managedList = new(provider, user, hardware);
-        ManageRows.ItemsSource = hardware;
+        ManageRows.ItemsSource = hardware.Select(x => new RegistrationCard(x, null)).ToArray();
         ManageFeedback.Text = hardware.Length == 0 ? "No recognized YubiKey registrations found for this user." :
             $"{hardware.Length} YubiKey {(hardware.Length == 1 ? "registration" : "registrations")} in Entra.";
     }
     private bool MatchesManagementContext(Provider provider, UserCandidate user) =>
         ManagePage.IsVisible && _manageStep == 2 && IsConnected && SelectedProvider == provider && ManageUsers.SelectedItem is UserCandidate u && u.Id == user.Id;
+
+    private bool ApplyRegistrationDates(RegistrationList list, IReadOnlyDictionary<string, RegistrationDates> dates)
+    {
+        if (!ReferenceEquals(list, _managedList) || !MatchesManagementContext(list.Tenant, list.User)) return false;
+        ManageRows.ItemsSource = list.Rows.Select(row => new RegistrationCard(row, dates.GetValueOrDefault(row.Id))).ToArray();
+        return true;
+    }
+
+    private async void DateAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (_dateRequest is { } pending) { pending.Cancel(); return; }
+        if (!_busy && _managedList is { } list) await LoadRegistrationDatesAsync(list, interactive: true);
+    }
+
+    private async Task LoadRegistrationDatesAsync(RegistrationList list, bool interactive)
+    {
+        if (_dateRequest != null || !ReferenceEquals(_managedList, list) || !MatchesManagementContext(list.Tenant, list.User)) return;
+        using var request = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        _dateRequest = request;
+        bool Current() => ReferenceEquals(_dateRequest, request) && ReferenceEquals(_managedList, list)
+            && MatchesManagementContext(list.Tenant, list.User);
+        ManageDateNotice.Visibility = Visibility.Visible;
+        ManageDateMessage.Text = "Loading registration dates…"; ManageDateAction.Content = "Cancel";
+        try
+        {
+            var snapshot = File.ReadAllText(_configPath);
+            ConfigReader.EnsureUnchanged(ConfigReader.Parse(snapshot), list.Tenant, null);
+            if (_dateSession == null || _dateProvider != list.Tenant)
+            {
+                var tenant = TenantConfigWriter.Read(snapshot, list.Tenant.Name).Validate();
+                _dateSession = new RegistrationDateSession(tenant); _dateProvider = list.Tenant;
+            }
+            var dates = await _dateSession.ReadAsync(Guid.Parse(list.User.Id), interactive, () =>
+            {
+                if (Current()) ManageDateMessage.Text = "Sign in in your browser to read registration dates.";
+            }, request.Token);
+            if (!request.IsCancellationRequested && Current() && ApplyRegistrationDates(list, dates))
+                ManageDateNotice.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            if (Current())
+                ManageDateMessage.Text = ex switch
+                {
+                    _ when request.IsCancellationRequested => "Loading dates was cancelled or timed out.",
+                    HttpRequestException { StatusCode: HttpStatusCode.Forbidden } => "Graph did not grant access to registration dates.",
+                    _ => "Registration dates are unavailable. Check your sign-in and connection."
+                };
+        }
+        finally
+        {
+            if (ReferenceEquals(_dateRequest, request))
+            {
+                _dateRequest = null; ManageDateAction.Content = "Load dates";
+            }
+        }
+    }
 
     private async Task ManageOperationAsync(Func<PasskeyRegistrationService, Task> action, Provider provider, UserCandidate user, string operation)
     {
@@ -142,9 +209,10 @@ public partial class MainWindow
 
     private async void ManageRemove_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || sender is not Button { DataContext: RegisteredCredential row } || _managedList is not { } list ||
-            !list.Rows.Contains(row) || !MatchesManagementContext(list.Tenant, list.User)) return;
-        if (new RemoveRegistrationWindow(this, list.Tenant, list.User, row).ShowDialog() != true) return;
+        if (_busy || sender is not Button { DataContext: RegistrationCard card } || _managedList is not { } list ||
+            !list.Rows.Contains(card.Credential) || !MatchesManagementContext(list.Tenant, list.User)) return;
+        var row = card.Credential;
+        if (new RemoveRegistrationWindow(this, list.Tenant, list.User, row, card.DateLine).ShowDialog() != true) return;
         if (_busy || !ReferenceEquals(_managedList, list) || !MatchesManagementContext(list.Tenant, list.User)) return;
         ClearManagedList(); ManageFeedback.Text = "Checking and removing the selected registration…";
         await ManageOperationAsync(async service =>
@@ -154,5 +222,7 @@ public partial class MainWindow
             ManageFeedback.Text = $"Removed “{row.Name}” from Entra. " + ManageFeedback.Text;
             Record($"Passkey registration removed from Entra · tenant {list.Tenant.Name} · user {list.User.Id}.");
         }, list.Tenant, list.User, "Remove passkey registration");
+        if (_managedList is { Rows.Count: > 0 } remaining && MatchesManagementContext(list.Tenant, list.User))
+            await LoadRegistrationDatesAsync(remaining, interactive: false);
     }
 }

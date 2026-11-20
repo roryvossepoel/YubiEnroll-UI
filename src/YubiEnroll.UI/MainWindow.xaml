@@ -124,6 +124,10 @@
      <StackPanel x:Name="ManageListStep" Visibility="Collapsed">
       <DockPanel><Button DockPanel.Dock="Right" Content="Refresh" Click="ManageView_Click" Style="{StaticResource QuietButton}" ContentTemplate="{StaticResource RefreshContent}"/><TextBlock Text="YubiKey registrations" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/></DockPanel>
       <TextBlock x:Name="ManageFeedback" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,12"/>
+      <DockPanel x:Name="ManageDateNotice" Visibility="Collapsed" Margin="0,0,0,8">
+       <Button DockPanel.Dock="Right" x:Name="ManageDateAction" Content="Load dates" Click="DateAction_Click" Style="{StaticResource QuietButton}"/>
+       <TextBlock x:Name="ManageDateMessage" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+      </DockPanel>
       <ItemsControl x:Name="ManageRows"><ItemsControl.ItemTemplate><DataTemplate>
        <Border Style="{StaticResource Card}" Margin="0,0,0,10"><DockPanel>
         <Button Click="ManageRemove_Click" Foreground="#A21C2B" BorderBrush="#A21C2B" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="12,0,0,0"
@@ -131,6 +135,7 @@
          <TextBlock Text="Remove" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
         </Button>
         <StackPanel><TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding Model}" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
+         <TextBlock Text="{Binding DateLine}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,5,0,0"/>
          <Expander Header="Registration ID" Margin="0,8,0,0"><TextBox Text="{Binding Id, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"/></Expander>
         </StackPanel></DockPanel></Border>
       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>

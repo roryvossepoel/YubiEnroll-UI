@@ -12,7 +12,8 @@
    <StackPanel>
     <TextBlock Text="Remove this registration from Entra?" Style="{StaticResource SettingsTitle}"/>
     <TextBlock x:Name="KeyName" TextWrapping="Wrap" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,2"/>
-    <TextBlock x:Name="KeyModel" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>
+    <TextBlock x:Name="KeyModel" TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+    <TextBlock x:Name="DatesLabel" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,4,0,12"/>
     <Grid>
      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

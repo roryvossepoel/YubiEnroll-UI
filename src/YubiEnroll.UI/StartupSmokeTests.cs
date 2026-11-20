@@ -22,6 +22,7 @@ public partial class MainWindow
             await TestEmbeddedTerminalAsync(mockExecutable);
             await TestExternalOutcomeAsync(mockExecutable);
             await TestLoginCancellationAsync(mockExecutable);
+            await TestDateCallbackAsync();
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -183,8 +184,14 @@ public partial class MainWindow
                 new("Backup", "YubiKey Bio Series - FIDO Edition", "backup-id")]);
             Assert(ManageRows.Items.Count == 2 && _managedList!.Rows.All(row => row.Id != "phone-id") &&
                 ManageFeedback.Text.StartsWith("2 YubiKey registrations"), "Only recognized hardware registrations are shown, counted and actionable");
+            var displayedList = _managedList!;
+            var sampleDates = new Dictionary<string, RegistrationDates>(StringComparer.Ordinal)
+                { ["office-id"] = new(new DateTimeOffset(2026, 4, 18, 12, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 11, 19, 9, 0, 0, TimeSpan.Zero)) };
+            Assert(ApplyRegistrationDates(displayedList, sampleDates) && ManageRows.Items[0] is RegistrationCard { Dates.LastUsed: not null } &&
+                ManageRows.Items[1] is RegistrationCard { Dates: null }, "Registration cards show dates only for matching IDs; unmatched keys stay visible");
             CaptureWindow(this, "manage-user-passkeys.png");
-            var removalReview = new RemoveRegistrationWindow(this, SelectedProvider, managedUser, _managedList!.Rows[0]);
+            var office = (RegistrationCard)ManageRows.Items[0];
+            var removalReview = new RemoveRegistrationWindow(this, SelectedProvider, managedUser, office.Credential, office.DateLine);
             var inspectReview = removalReview.Dispatcher.InvokeAsync(() =>
             {
                 try
@@ -202,7 +209,7 @@ public partial class MainWindow
             Assert(removalReview.ShowDialog() != true, "Closing the removal review does not confirm");
             await inspectReview.Task;
             ManageBack_Click(this, new RoutedEventArgs());
-            Assert(_managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
+            Assert(!ApplyRegistrationDates(displayedList, sampleDates) && _managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
                 "Changing management user clears registrations and the removal target");
             ManageUsers.SelectedIndex = 0; _manageStep = 2;
             SetManagedList(SelectedProvider, managedUser, [new("Demo", "Key", "other-id")]);
@@ -671,6 +678,23 @@ public partial class MainWindow
             if (child is T match) yield return match;
             foreach (var descendant in VisualDescendants<T>(child)) yield return descendant;
         }
+    }
+
+    private static async Task TestDateCallbackAsync()
+    {
+        // Verify the exact existing Entra callback path against the same Windows HTTP listener prefix MSAL uses.
+        var redirect = RegistrationDateSession.LoopbackAddress("http://localhost/yubienroll-redirect");
+        using var listener = new System.Net.HttpListener();
+        listener.Prefixes.Add(redirect.AbsoluteUri + "/"); listener.Start();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var browser = new System.Net.Http.HttpClient(new System.Net.Http.HttpClientHandler { UseProxy = false });
+        var pending = listener.GetContextAsync().WaitAsync(timeout.Token);
+        var post = browser.PostAsync(redirect, new System.Net.Http.StringContent("synthetic"), timeout.Token);
+        var context = await pending;
+        context.Response.Close();
+        using var accepted = await post;
+        Assert(accepted.IsSuccessStatusCode && context.Request.Url?.AbsolutePath == "/yubienroll-redirect",
+            "The Windows date sign-in listener accepts the configured redirect path without a trailing slash");
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)

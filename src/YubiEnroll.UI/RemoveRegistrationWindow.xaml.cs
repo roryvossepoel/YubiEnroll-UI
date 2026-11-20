@@ -5,7 +5,7 @@ namespace YubiEnroll.UI;
 
 public partial class RemoveRegistrationWindow : Window
 {
-    public RemoveRegistrationWindow(Window owner, Provider tenant, UserCandidate user, RegisteredCredential registration)
+    public RemoveRegistrationWindow(Window owner, Provider tenant, UserCandidate user, RegisteredCredential registration, string dateLine)
     {
         InitializeComponent();
         Owner = owner;
@@ -13,6 +13,7 @@ public partial class RemoveRegistrationWindow : Window
         MaxHeight = SystemParameters.WorkArea.Height;
         KeyName.Text = registration.Name;
         KeyModel.Text = registration.Model;
+        DatesLabel.Text = dateLine;
         TenantLabel.Text = tenant.Name;
         UserLabel.Text = string.IsNullOrWhiteSpace(user.Label) ? user.Id : user.Label;
         UserId.Text = user.Id;
