@@ -17,7 +17,10 @@ try:
 except (ListReadersException, EstablishContextException):
     devices = []
     unavailable = 1
-readers = [d for d in devices if d.transport == TRANSPORT.NFC]
+# Software-backed PC/SC endpoints are not physical contactless readers.
+virtual_reader = re.compile(r"\b(?:Windows Hello|Microsoft Passport|virtual|TPM)\b", re.I)
+readers = [d for d in devices if d.transport == TRANSPORT.NFC
+           and not virtual_reader.search(d.fingerprint)]
 for device in readers:
     name = device.fingerprint
     # ykman treats every non-Yubico PC/SC reader as potentially NFC, including
@@ -37,8 +40,11 @@ for device in readers:
                 state["nfc"] = False
                 state["state"] = "contact"
                 continue
-            state["nfc"] = True
+            # Connection.transport is also only a heuristic for third-party readers.
+            # Do not remember it as NFC until YubiKey identity has actually been read.
             info = read_info(connection, device.pid)
+            if info.serial and TRANSPORT.NFC in info.config.enabled_capabilities:
+                state["nfc"] = True
         if not info.serial or not (info.config.enabled_capabilities.get(TRANSPORT.NFC, 0) & CAPABILITY.FIDO2):
             state["state"] = "unsupported"
             unavailable += 1

@@ -215,7 +215,9 @@ public partial class MainWindow
         finally { _readingKeys = false; }
         RenderReaderInventory(readers ?? Array.Empty<NfcReaderStatus>());
         SetInventoryMessage(unavailable > 0 ? "Some USB devices could not be identified. Check device access and FIDO support." :
-            entries.Count == 0 && EnrollmentReaderStatus.Visibility != Visibility.Visible ? "No key connected. Connect a YubiKey by USB." : "");
+            entries.Count == 0 ? (EnrollmentReaderStatus.Visibility == Visibility.Visible
+                ? "Connect a YubiKey by USB or place it on the NFC reader."
+                : "No key connected. Connect a YubiKey by USB.") : "");
         SetSelectedKey(entries.FirstOrDefault(x => x.Key == _lastKnownKey));
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)
@@ -253,7 +255,7 @@ public partial class MainWindow
     private void UpdateEnrollmentGuidance()
     {
         if (EnrollmentTargetNotice == null) return;
-        var message = _inventoryDirty ? "Checking connected keys…" :
+        var message = _inventoryDirty ? "" :
             EnrollmentTargetGuard.Explain(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys, IsConnected);
         EnrollmentTargetNotice.Text = ReviewTargetNotice.Text = message;
         RenderWizard();
@@ -264,7 +266,8 @@ public partial class MainWindow
         EnrollButton.IsEnabled = ResetTargetButton.IsEnabled = EnrollNext.IsEnabled = ResetNext.IsEnabled = false;
         // A USB change invalidates a destructive acknowledgment even if the same key returns.
         ResetAcknowledged.IsChecked = false;
-        SetInventoryMessage("Checking connected keys…"); UpdateEnrollmentGuidance();
+        // Keep the last inventory visible, but gate every action until the new snapshot arrives.
+        UpdateEnrollmentGuidance();
     }
     private void SuggestRegistrationName()
     {

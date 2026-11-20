@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.6.1</Version>
+    <Version>0.6.2</Version>
     <Product>YubiEnroll UI</Product>
     <Company>Rory Vossepoel</Company>
   </PropertyGroup>

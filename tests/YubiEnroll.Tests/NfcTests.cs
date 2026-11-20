@@ -44,6 +44,11 @@ internal static class NfcTests
             "Verified contact transport overrides a reader-name hint");
         check(catalog.Visible([emptyReader, new(reader + " second", true, "unavailable")]).Count == 2,
             "Reader failures are scoped to their named reader");
+        check(catalog.Visible([new("Windows Hello for Business 1", true, "unavailable"),
+            new("Virtual NFC reader", true, "ready"), emptyReader]).Single() == emptyReader,
+            "Software readers are hidden even if a probe incorrectly reports NFC transport");
+        check(emptyReader.Message.Length == 0 && readyReader.Message.Length == 0,
+            "Normal reader status does not duplicate empty-key guidance or key detection");
         var capsJson = """
         {"schema":1,"forcePinChange":false,"serial":"12345678","firmware":"5.7.1","reader":"HID Global OMNIKEY 5022 Smart Card Reader 0","options":{"clientPin":true,"rk":true,"authnrCfg":true,"setMinPINLength":true},"minimumPinLength":4,"maximumPinLength":63,"resetBlocked":false,"resetOverUsb":true,"resetOverNfc":false,"alwaysUvLocked":false}
         """;

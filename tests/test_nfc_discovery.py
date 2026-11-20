@@ -32,6 +32,7 @@ class DiscoveryTests(unittest.TestCase):
             if reader_error: raise (ContextError() if reader_error == "context" else ReaderError())
             return [Device(*c) for c in cards]
         def read_info(conn, pid):
+            if conn.serial == "unreadable": raise RuntimeError("Not a YubiKey")
             return types.SimpleNamespace(serial=conn.serial, version="5.7.1", config=types.SimpleNamespace(enabled_capabilities={"nfc": conn.fido}))
         modules = {}
         for name, members in {
@@ -64,6 +65,25 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(data["readerStates"], [
             {"name": "Internal contact reader", "nfc": False, "state": "unavailable"},
             {"name": "OMNIKEY 5022 0", "nfc": True, "state": "ready"}])
+
+    def test_software_readers_are_never_opened_or_offered(self):
+        data, opened = self.run_probe([
+            ("Windows Hello for Business 1", "unreadable"),
+            ("Microsoft Passport 0", 111), ("Virtual NFC Reader 0", 222),
+            ("TPM Smart Card 0", 333), ("OMNIKEY 5022 0", "empty")])
+        self.assertEqual(opened, [])
+        self.assertEqual(data["readers"], 1)
+        self.assertEqual(data["unavailable"], 0)
+        self.assertEqual(data["readerStates"][0]["name"], "OMNIKEY 5022 0")
+
+    def test_connection_transport_alone_is_not_nfc_proof(self):
+        data, opened = self.run_probe([("Unknown smart card reader", "unreadable")])
+        self.assertEqual(opened, ["Unknown smart card reader"])
+        self.assertEqual(data["readerStates"], [
+            {"name": "Unknown smart card reader", "nfc": False, "state": "unavailable"}])
+        data, _ = self.run_probe([("Unknown smart card reader", 222)])
+        self.assertEqual(data["readerStates"][0]["nfc"], True)
+        self.assertEqual(data["keys"][0]["serial"], "222")
 
     def test_unknown_empty_reader_is_not_assumed_nfc(self):
         data, _ = self.run_probe([("Internal reader", "empty")])

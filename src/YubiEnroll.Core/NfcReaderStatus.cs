@@ -1,11 +1,12 @@
+using System.Text.RegularExpressions;
+
 namespace YubiEnroll.Core;
 
 public sealed record NfcReaderStatus(string Name, bool IsNfc, string State)
 {
     public string Message => State switch
     {
-        "ready" => "YubiKey detected",
-        "empty" => "Place a YubiKey on the reader, or connect one by USB.",
+        "ready" or "empty" => "",
         "unsupported" => "The card does not expose supported FIDO2 and a readable serial number.",
         "ambiguous" => "Reader name matches multiple readers. Disconnect duplicate readers and Refresh.",
         _ => "Could not read the card. Reposition it, close other key tools and Refresh."
@@ -19,7 +20,8 @@ public sealed class NfcReaderCatalog
     private readonly HashSet<string> _verified = new(StringComparer.Ordinal);
     public IReadOnlyList<NfcReaderStatus> Visible(IEnumerable<NfcReaderStatus> readers)
     {
-        var all = readers.ToArray();
+        var all = readers.Where(r => !Regex.IsMatch(r.Name,
+            @"\b(?:Windows Hello|Microsoft Passport|virtual|TPM)\b", RegexOptions.IgnoreCase)).ToArray();
         foreach (var r in all)
         {
             if (r.State == "contact") _verified.Remove(r.Name);

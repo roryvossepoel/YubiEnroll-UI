@@ -1,6 +1,6 @@
-# NFC preview (0.6.1)
+# NFC preview (0.6.2)
 
-Connect a PC/SC contactless reader such as the HID OMNIKEY 5022 and place a supported YubiKey on it. The existing Set up a key, Add a passkey and Reset FIDO flows list USB and NFC endpoints together. Each card shows the connection and, for NFC, the full reader name. The OMNIKEY 5022 and readers explicitly named NFC/contactless/PICC are recognized without a card. Other PC/SC readers become visible as NFC after a real contactless connection has been verified, and remain recognized for the session when empty. Contact-only and unknown failing readers do not generate an unrelated NFC warning. Each visible reader has its own empty, detected or error state. Unplugging the reader removes its status block; USB remains available.
+Connect a PC/SC contactless reader such as the HID OMNIKEY 5022 and place a supported YubiKey on it. The existing Set up a key, Add a passkey and Reset FIDO flows list USB and NFC endpoints together. Each card shows the connection and, for NFC, the full reader name. The OMNIKEY 5022 and readers explicitly named NFC/contactless/PICC are recognized without a card. Other PC/SC readers become visible as NFC after a YubiKey with NFC capabilities has been successfully read, and remain recognized for the session when empty. Contact-only and unknown failing readers do not generate an unrelated NFC warning. Each visible reader has a compact presence line with errors only when relevant. Windows Hello and known virtual/TPM smartcard endpoints are excluded. Unplugging the reader removes its status line; USB remains available.
 
 Select the intended endpoint explicitly; moving a key from USB to NFC requires a new selection.
 
@@ -32,4 +32,4 @@ Viewing/deleting credentials stored on a key is outside this change; the existin
 
 ## Hardware feedback
 
-On 20 November 2026, the operator confirmed detection of a YubiKey 5C NFC (5.4.3) through the HID OMNIKEY 5022. Physical enrollment/addition/reset acceptance is still pending. Preview 0.6.1 separates named reader status from key discovery and removes the misleading aggregate NFC warning reported during that test.
+On 20 November 2026, the operator confirmed detection of a YubiKey 5C NFC (5.4.3) through the HID OMNIKEY 5022. Physical enrollment/addition/reset acceptance is still pending. Preview 0.6.2 shows a compact reader line, excludes known Windows Hello/virtual PC/SC endpoints and requires successful YubiKey identity before learning an unknown reader as NFC. Merely opening a PC/SC connection is not evidence of NFC support. Refresh keeps the current inventory visible with actions disabled and one progress message beside Refresh. These changes address the physical feedback on 0.6.1; physical acceptance of 0.6.2 remains pending.

@@ -1,4 +1,6 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Controls;
 using System.Runtime.InteropServices;
 using YubiEnroll.Core;
 
@@ -480,19 +482,32 @@ public partial class MainWindow
         var emptyReader = new NfcReaderStatus(nfc.Key.Reader!, true, "empty");
         ApplyInventory([], 0, [emptyReader]);
         Assert(EnrollmentReaderStatus.IsVisible && ResetReaderStatus.Children.Count == 1 && EnrollmentKeys.Items.Count == 0 &&
-            !EnrollNext.IsEnabled && KeyInfo.Visibility == System.Windows.Visibility.Collapsed,
-            "Empty connected NFC reader has a named status, no key choice and no general error");
+            !EnrollNext.IsEnabled && KeyInfo.Text == "Connect a YubiKey by USB or place it on the NFC reader.",
+            "Empty connected NFC reader has a named status and one USB/NFC instruction");
         CaptureWindow(this, "nfc-reader-empty.png");
-        ApplyInventory([nfc], 0, [emptyReader with { State = "ready" }, new("Internal contact reader", false, "unavailable")]);
+        ApplyInventory([nfc], 0, [emptyReader with { State = "ready" }, new("Internal contact reader", false, "unavailable"),
+            new("Windows Hello for Business 1", true, "unavailable")]);
         Assert(EnrollmentReaderStatus.Children.Count == 1 && KeyInfo.Visibility == System.Windows.Visibility.Collapsed,
             "Unrelated reader failure does not warn about a successfully discovered NFC key");
+        Assert(EnrollmentReaderStatus.ActualHeight < 50 &&
+            !VisualDescendants<TextBlock>(EnrollmentReaderStatus).Any(t => t.Text.Contains("Windows Hello") || t.Text == "YubiKey detected"),
+            "Reader presence is compact and excludes Windows Hello and redundant detection text");
         CaptureWindow(this, "nfc-reader-ready.png");
+        EnrollmentKeys.SelectedIndex = 0;
+        InvalidateDeviceInventory(); UpdateLayout();
+        Assert(EnrollmentKeys.Items.Count == 1 && EnrollmentReaderStatus.Children.Count == 1 &&
+            !EnrollNext.IsEnabled && !ResetNext.IsEnabled && !EnrollButton.IsEnabled &&
+            KeyInfo.Visibility == Visibility.Collapsed && FooterInstruction.Visibility == Visibility.Collapsed &&
+            VisualDescendants<TextBlock>(this).Count(t => t.IsVisible && t.Text == "Checking connected keys…") == 1,
+            "Refreshing preserves inventory, gates actions and shows one progress message beside Refresh");
+        CaptureWindow(this, "nfc-reader-refreshing.png");
         ApplyInventory([existing], 0, []); EnrollmentKeys.SelectedIndex = 0;
         Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && ResetReaderStatus.Visibility == System.Windows.Visibility.Collapsed && EnrollNext.IsEnabled,
             "USB remains selectable with no NFC block when the reader is disconnected");
         CaptureWindow(this, "usb-without-nfc-reader.png");
-        ApplyInventory([], 0, []);
-        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && !KeyInfo.Text.Contains("NFC"),
+        ApplyInventory([], 0, [new("Windows Hello for Business 1", true, "unavailable")]);
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && !KeyInfo.Text.Contains("NFC") &&
+            !EnrollNext.IsEnabled && EnrollmentInventoryProgress.Visibility == Visibility.Collapsed,
             "No reader and no key has simple USB guidance without NFC text");
         CaptureWindow(this, "no-reader-no-key.png");
 

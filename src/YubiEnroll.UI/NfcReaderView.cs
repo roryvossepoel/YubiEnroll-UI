@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using YubiEnroll.Core;
 
 namespace YubiEnroll.UI;
@@ -17,16 +18,17 @@ public partial class MainWindow
             host.Visibility = Visible(visible.Count > 0);
             foreach (var reader in visible)
             {
-                var body = new StackPanel();
-                body.Children.Add(new TextBlock { Text = "NFC reader connected", FontWeight = FontWeights.SemiBold,
-                    Foreground = (Brush)FindResource("Heading") });
-                body.Children.Add(new TextBlock { Text = reader.Name, TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 4, 0, 0), Foreground = (Brush)FindResource("Muted") });
-                body.Children.Add(new TextBlock { Text = reader.Message, TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 6, 0, 0), Foreground = reader.HasWarning
-                        ? new SolidColorBrush(Color.FromRgb(133, 64, 24)) : (Brush)FindResource("Muted") });
-                host.Children.Add(new Border { Child = body, CornerRadius = new CornerRadius(8), Padding = new Thickness(16, 12, 16, 12),
-                    Margin = new Thickness(0, 0, 0, 12), Background = new SolidColorBrush(Color.FromRgb(245, 248, 240)) });
+                var body = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+                var line = new DockPanel();
+                line.Children.Add(new Ellipse { Width = 7, Height = 7, Fill = (Brush)FindResource("Accent"),
+                    Margin = new Thickness(0, 6, 8, 0), VerticalAlignment = VerticalAlignment.Top });
+                line.Children.Add(new TextBlock { Text = "NFC reader connected · " + reader.Name,
+                    TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("Muted") });
+                body.Children.Add(line);
+                if (reader.HasWarning)
+                    body.Children.Add(new TextBlock { Text = reader.Message, TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(15, 4, 0, 0), Foreground = new SolidColorBrush(Color.FromRgb(133, 64, 24)) });
+                host.Children.Add(body);
             }
         }
     }
