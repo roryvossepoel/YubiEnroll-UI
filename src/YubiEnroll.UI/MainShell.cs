@@ -160,10 +160,7 @@ public partial class MainWindow
                     if (IsAdministrator()) try { capabilities = await FidoCapabilityProbe.ReadAsync(runner, key); } catch { }
                     entries.Add(new(key, pin, capabilities));
                 }
-                if (TryApplyInventory(entries, inventory.Unavailable, generation) && inventory.NfcUnavailable > 0)
-                    SetInventoryMessage("An NFC reader or key could not be read. Place the key flat on the reader, close other key tools and Refresh. USB keys remain available.");
-                else if (entries.Count == 0 && inventory.NfcReaders > 0)
-                    SetInventoryMessage("Place a YubiKey on the NFC reader or connect it by USB. The list updates automatically.");
+                TryApplyInventory(entries, inventory.Unavailable, generation, inventory.ReaderStates);
             }
             catch
             {
@@ -176,6 +173,7 @@ public partial class MainWindow
     private void SetInventoryMessage(string text)
     {
         KeyInfo.Text = ResetInventoryInfo.Text = text;
+        KeyInfo.Visibility = ResetInventoryInfo.Visibility = Visible(!string.IsNullOrWhiteSpace(text));
     }
     private void SetSelectedKey(KeyStatus? key)
     {
@@ -185,14 +183,14 @@ public partial class MainWindow
         SuggestRegistrationName(); UpdateSummary();
         if (changed) Record(key == null ? "Selected key is unavailable." : $"Key selected · serial {key.Key.Serial} · {key.PinLabel}");
     }
-    private bool TryApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, int generation)
+    private bool TryApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, int generation, IReadOnlyList<NfcReaderStatus>? readers = null)
     {
         // A USB event during discovery makes that snapshot stale. The scheduled refresh will retry once idle.
         if (generation != _deviceGeneration) return false;
-        ApplyInventory(entries, unavailable);
+        ApplyInventory(entries, unavailable, readers);
         return true;
     }
-    private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable)
+    private void ApplyInventory(IReadOnlyList<KeyStatus> entries, int unavailable, IReadOnlyList<NfcReaderStatus>? readers = null)
     {
         var previousTarget = _selectedKey?.Key ?? _lastKnownKey;
         var targetMissing = previousTarget != null && !entries.Any(x => x.Key == previousTarget);
@@ -215,8 +213,9 @@ public partial class MainWindow
             OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = entries.FirstOrDefault(x => x.Key == candidate);
         }
         finally { _readingKeys = false; }
-        SetInventoryMessage(unavailable > 0 ? "Some devices could not be identified. Check device access and FIDO support." :
-            entries.Count == 0 ? "No supported key detected. Connect a key by USB or place it on an NFC reader; the list updates automatically." : "");
+        RenderReaderInventory(readers ?? Array.Empty<NfcReaderStatus>());
+        SetInventoryMessage(unavailable > 0 ? "Some USB devices could not be identified. Check device access and FIDO support." :
+            entries.Count == 0 && EnrollmentReaderStatus.Visibility != Visibility.Visible ? "No key connected. Connect a YubiKey by USB." : "");
         SetSelectedKey(entries.FirstOrDefault(x => x.Key == _lastKnownKey));
     }
     private void OverviewKey_Changed(object sender, SelectionChangedEventArgs e)

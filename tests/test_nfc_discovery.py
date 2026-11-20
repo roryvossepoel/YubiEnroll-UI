@@ -52,11 +52,24 @@ class DiscoveryTests(unittest.TestCase):
     def test_empty_reader_is_not_a_key(self):
         data, _ = self.run_probe([("OMNIKEY 5022 0", "empty")])
         self.assertEqual((data["readers"], data["unavailable"], data["keys"]), (1, 0, []))
+        self.assertEqual(data["readerStates"], [{"name": "OMNIKEY 5022 0", "nfc": True, "state": "empty"}])
 
     def test_usb_ignored_and_exact_nfc_identity_returned(self):
         data, opened = self.run_probe([("Yubico YubiKey CCID 0", 111, "usb"), ("OMNIKEY 5022 0", 222)])
         self.assertEqual(opened, ["OMNIKEY 5022 0"])
         self.assertEqual(data["keys"], [{"serial": "222", "model": "YubiKey 5C NFC (5.7.1)", "reader": "OMNIKEY 5022 0"}])
+
+    def test_unrelated_failure_does_not_taint_working_reader(self):
+        data, _ = self.run_probe([("Internal contact reader", "busy"), ("OMNIKEY 5022 0", 222)])
+        self.assertEqual(data["readerStates"], [
+            {"name": "Internal contact reader", "nfc": False, "state": "unavailable"},
+            {"name": "OMNIKEY 5022 0", "nfc": True, "state": "ready"}])
+
+    def test_unknown_empty_reader_is_not_assumed_nfc(self):
+        data, _ = self.run_probe([("Internal reader", "empty")])
+        self.assertEqual(data["readerStates"][0], {"name": "Internal reader", "nfc": False, "state": "empty"})
+        data, _ = self.run_probe()
+        self.assertEqual(data["readerStates"], [])
 
     def test_busy_missing_serial_disabled_fido_excluded(self):
         data, _ = self.run_probe([("Reader A", "busy"), ("Reader B", None), ("Reader C", 3, "nfc", 0)])

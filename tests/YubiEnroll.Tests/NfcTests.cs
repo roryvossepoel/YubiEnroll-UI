@@ -18,15 +18,32 @@ internal static class NfcTests
         check(command.TakeLast(2).SequenceEqual(new[] { "--reader", reader }) && !command.Contains("--device") && !command.Contains("--force"), "Enrollment passes the full reader as one argument with native confirmation");
         check(KeyResetService.Selector(nfc).SequenceEqual(new[] { "--reader", reader }), "NFC and USB selectors are never combined");
         var json = """
-        {"schema":1,"keys":[{"serial":"12345678","model":"YubiKey 5C NFC (5.7.1)","reader":"HID Global OMNIKEY 5022 Smart Card Reader 0"}],"unavailable":0,"readers":1}
+        {"schema":2,"keys":[{"serial":"12345678","model":"YubiKey 5C NFC (5.7.1)","reader":"HID Global OMNIKEY 5022 Smart Card Reader 0"}],"unavailable":0,"readers":1,"readerStates":[{"name":"HID Global OMNIKEY 5022 Smart Card Reader 0","nfc":true,"state":"ready"}]}
         """;
         check(NfcDiscovery.Parse(json).Keys.Single() == nfc, "NFC inventory preserves model, serial and reader");
-        foreach (var invalid in new[] { json.Replace("12345678", "0"), json.Replace("\"schema\":1", "\"schema\":1,\"schema\":1"), json.Replace(reader, ""), json.Replace("\"readers\":1", "\"readers\":0") })
+        foreach (var invalid in new[] { json.Replace("12345678", "0"), json.Replace("\"schema\":2", "\"schema\":2,\"schema\":2"), json.Replace(reader, ""), json.Replace("\"readers\":1", "\"readers\":0") })
         {
             var rejected = false;
             try { NfcDiscovery.Parse(invalid); } catch { rejected = true; }
             check(rejected, "Malformed NFC identity is rejected");
         }
+        var catalog = new NfcReaderCatalog();
+        var emptyReader = new NfcReaderStatus(reader, true, "empty");
+        check(catalog.Visible([emptyReader]).Single().Name == reader && !emptyReader.HasWarning,
+            "Connected empty OMNIKEY is a named reader, not a key or error");
+        check(catalog.Visible([]).Count == 0, "Unplugged NFC reader disappears despite session history");
+        check(catalog.Visible([new("Internal contact reader", false, "unavailable")]).Count == 0,
+            "An unrelated failing smartcard reader does not produce an NFC warning");
+        var readyReader = emptyReader with { State = "ready" };
+        check(catalog.Visible([readyReader, new("Internal contact reader", false, "unavailable")]).Single().State == "ready",
+            "Working NFC target is not labelled unreadable because another reader fails");
+        check(catalog.Visible([new("Custom reader", true, "ready")]).Count == 1 &&
+            catalog.Visible([new("Custom reader", false, "empty")]).Count == 1,
+            "Verified NFC reader remains visible after the key is lifted");
+        check(catalog.Visible([new("Custom reader", false, "contact")]).Count == 0,
+            "Verified contact transport overrides a reader-name hint");
+        check(catalog.Visible([emptyReader, new(reader + " second", true, "unavailable")]).Count == 2,
+            "Reader failures are scoped to their named reader");
         var capsJson = """
         {"schema":1,"forcePinChange":false,"serial":"12345678","firmware":"5.7.1","reader":"HID Global OMNIKEY 5022 Smart Card Reader 0","options":{"clientPin":true,"rk":true,"authnrCfg":true,"setMinPINLength":true},"minimumPinLength":4,"maximumPinLength":63,"resetBlocked":false,"resetOverUsb":true,"resetOverNfc":false,"alwaysUvLocked":false}
         """;

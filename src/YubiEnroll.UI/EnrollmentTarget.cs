@@ -22,7 +22,7 @@ public partial class MainWindow
             EnrollmentTargetGuard.Require(target, inventory);
             var pin = await service.ReadPinStateAsync(target);
             var capabilities = await FidoCapabilityProbe.ReadAsync(runner, target);
-            if (!TryApplyInventory(inventory.Keys.Select(k => k == target ? new KeyStatus(k, pin, capabilities) : new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation))
+            if (!TryApplyInventory(inventory.Keys.Select(k => k == target ? new KeyStatus(k, pin, capabilities) : new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation, inventory.ReaderStates))
                 throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
             var compatibility = _addPasskey ? PasskeyAddition.Evaluate(capabilities, pin) : ProfileCompatibility.Evaluate(profile, capabilities, pin);
             if (_addPasskey && profile != PasskeyAddition.Settings(capabilities))

@@ -27,7 +27,7 @@ public sealed record KeyStatus(ResetKey Key, FidoPinState Pin, FidoCapabilities?
     });
 }
 
-public sealed record KeyInventory(IReadOnlyList<ResetKey> Keys, int Unavailable, int NfcUnavailable = 0, int NfcReaders = 0);
+public sealed record KeyInventory(IReadOnlyList<ResetKey> Keys, int Unavailable, int NfcUnavailable = 0, int NfcReaders = 0, IReadOnlyList<NfcReaderStatus>? ReaderStates = null);
 
 // USB serial or explicit NFC reader plus verified serial. Never targets the first device.
 public sealed class KeyResetService(
@@ -80,7 +80,7 @@ public sealed class KeyResetService(
         var usb = ParseKeys(await ReadAsync(["list"]));
         if (discoverNfc == null) return usb;
         var nfc = await discoverNfc();
-        return new(usb.Keys.Concat(nfc.Keys).ToArray(), usb.Unavailable, nfc.NfcUnavailable, nfc.NfcReaders);
+        return new(usb.Keys.Concat(nfc.Keys).ToArray(), usb.Unavailable, nfc.NfcUnavailable, nfc.NfcReaders, nfc.ReaderStates);
     }
 
     public static string[] Selector(ResetKey key)

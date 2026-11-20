@@ -476,6 +476,26 @@ public partial class MainWindow
         ApplyInventory([nfc with { Key = nfc.Key with { Serial = "11112222" } }], 0);
         Assert(_selectedKey == null && !EnrollButton.IsEnabled, "Replacing a card on the same reader requires explicit selection");
         Assert(NfcPresenceMonitor.Snapshot().Length > 0, "Windows PC/SC presence probe handles readers or absent service without opening a card");
+        BeginNextKey(); ShowPage(PreparePage);
+        var emptyReader = new NfcReaderStatus(nfc.Key.Reader!, true, "empty");
+        ApplyInventory([], 0, [emptyReader]);
+        Assert(EnrollmentReaderStatus.IsVisible && ResetReaderStatus.Children.Count == 1 && EnrollmentKeys.Items.Count == 0 &&
+            !EnrollNext.IsEnabled && KeyInfo.Visibility == System.Windows.Visibility.Collapsed,
+            "Empty connected NFC reader has a named status, no key choice and no general error");
+        CaptureWindow(this, "nfc-reader-empty.png");
+        ApplyInventory([nfc], 0, [emptyReader with { State = "ready" }, new("Internal contact reader", false, "unavailable")]);
+        Assert(EnrollmentReaderStatus.Children.Count == 1 && KeyInfo.Visibility == System.Windows.Visibility.Collapsed,
+            "Unrelated reader failure does not warn about a successfully discovered NFC key");
+        CaptureWindow(this, "nfc-reader-ready.png");
+        ApplyInventory([existing], 0, []); EnrollmentKeys.SelectedIndex = 0;
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && ResetReaderStatus.Visibility == System.Windows.Visibility.Collapsed && EnrollNext.IsEnabled,
+            "USB remains selectable with no NFC block when the reader is disconnected");
+        CaptureWindow(this, "usb-without-nfc-reader.png");
+        ApplyInventory([], 0, []);
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && !KeyInfo.Text.Contains("NFC"),
+            "No reader and no key has simple USB guidance without NFC text");
+        CaptureWindow(this, "no-reader-no-key.png");
+
         ShowPage(OverviewPage);
 
     }
