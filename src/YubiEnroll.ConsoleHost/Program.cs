@@ -13,7 +13,7 @@ string? resultFile = null;
 if (args.Length >= 4 && args[0] == "--result-file") { resultFile = args[1]; args = args[2..]; }
 if (args.Length < 2 || !File.Exists(args[0])) return 125;
 var code = 125;
-Console.Title = "YubiEnroll UI - interactive operation";
+Console.Title = "YubiKey Desk - interactive operation";
 Console.WriteLine("Complete the Yubico tool steps below. Keep this window open until the command finishes.");
 try
 {

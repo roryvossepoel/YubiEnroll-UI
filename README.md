@@ -1,6 +1,8 @@
-# YubiEnroll UI
+# YubiKey Desk
 
-## Preview 0.8.1
+YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
+
+## Preview 0.8.2
 
 NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
@@ -21,7 +23,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.8.1 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.8.2 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
@@ -201,7 +203,7 @@ If UAC uses a different Windows administrator account, the new process sees that
 
 ## Build from source
 
-The product is **YubiEnroll UI**, published by **Rory Vossepoel**. For optional self-signed internal builds, see [internal code signing](docs/SIGNING.md). Standard GitHub preview downloads remain unsigned.
+The app is **YubiKey Desk**, published by **Rory Vossepoel**. For deployment compatibility, the executable is still `YubiEnroll.UI.exe` and its Windows product metadata still reads `YubiEnroll UI`. For optional self-signed internal builds, see [internal code signing](docs/SIGNING.md). Standard GitHub preview downloads remain unsigned.
 
 On Windows, install the .NET 10 SDK, then run:
 
