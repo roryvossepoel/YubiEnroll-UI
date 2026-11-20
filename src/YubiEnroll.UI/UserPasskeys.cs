@@ -4,76 +4,107 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Identity.Client;
 using YubiEnroll.Core;
 
 namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
+    private sealed record RegistrationList(Provider Tenant, UserCandidate User, IReadOnlyList<RegistrationCard> Rows);
+    private sealed record ManagementConnection(Provider Tenant, ManagementGraph Graph);
     private int _manageStep;
-    private sealed record RegistrationList(Provider Tenant, UserCandidate User, IReadOnlyList<RegisteredCredential> Rows);
     private RegistrationList? _managedList;
-    private CancellationTokenSource? _dateRequest;
-    private RegistrationDateSession? _dateSession;
-    private Provider? _dateProvider;
+    private ManagementConnection? _management;
+    private CancellationTokenSource? _managementLogin;
+
     private void Manage_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy) return;
-        ShowPage(ManagePage);
-        ResetManagement();
+        if (_busy || ManagePage.IsVisible) return;
+        ShowPage(ManagePage); ResetManagement();
     }
+
     private void ResetManagement()
     {
         if (ManageBack == null) return;
-        _dateSession = null; _dateProvider = null;
+        var pending = _managementLogin; _managementLogin = null; pending?.Cancel();
+        _management = null;
         _manageStep = 0;
-        ManageQuery.Clear(); ManageUsers.ItemsSource = null;
-        ManageSearchHint.Text = "";
-        ClearManagedList();
-        RenderManagement();
+        ManageQuery.Clear(); ManageUsers.ItemsSource = null; ManageSearchHint.Text = "";
+        ClearManagedList(); RenderManagement();
     }
+
     private void ClearManagedList()
     {
-        _managedList = null;
-        _dateRequest?.Cancel(); _dateRequest = null;
-        ManageDateNotice.Visibility = Visibility.Collapsed;
-        ManageRows.ItemsSource = null;
-        ManageFeedback.Text = "";
+        _managedList = null; ManageRows.ItemsSource = null; ManageFeedback.Text = "";
     }
+
     private void RenderManagement()
     {
         if (ManageBack == null || ManagePage.Visibility != Visibility.Visible) return;
+        var connected = _management != null && Equals(_management.Tenant, Tenants.SelectedItem);
         RenderProgress(ManageProgress, ["Tenant", "User", "Passkeys"], _manageStep);
         ManageTenantStep.Visibility = Visible(_manageStep == 0);
         ManageUserStep.Visibility = Visible(_manageStep == 1);
         ManageListStep.Visibility = Visible(_manageStep == 2);
         ManageContext.Text = _manageStep == 0 ? "View or remove a user’s YubiKey registrations in Microsoft Entra. No connected key is required." :
-            _manageStep == 1 ? $"Tenant · {SelectedProvider.Name}" :
-            $"{SelectedProvider.Name}  ·  {(ManageUsers.SelectedItem as UserCandidate)?.Label}";
+            _manageStep == 1 ? $"Tenant · {_management?.Tenant.Name}" :
+            $"{_management?.Tenant.Name}  ·  {(ManageUsers.SelectedItem as UserCandidate)?.Label}";
         ManageTenantHint.Text = Tenants.Items.Count == 0 ? "Add a tenant in Settings → Tenants." :
-            IsConnected ? $"Connected to {SelectedProvider.Name}" : "Sign in with an administrator account for this tenant.";
-        ManageConnect.IsEnabled = _cliReady && Tenants.SelectedItem is Provider;
-        ManageConnect.Content = IsConnected ? "Continue to user" : "Connect";
-        ManageView.IsEnabled = IsConnected && ManageUsers.SelectedItem is UserCandidate;
+            _managementLogin != null ? "Complete sign-in in your browser." :
+            connected ? $"Connected to {SelectedProvider.Name}" : "Sign in with an administrator account for this tenant.";
+        ManageConnect.IsEnabled = Tenants.SelectedItem is Provider;
+        ManageConnect.Content = _managementLogin != null ? "Cancel sign-in" : connected ? "Continue to user" : "Connect";
+        ManageView.IsEnabled = connected && ManageUsers.SelectedItem is UserCandidate;
         ManageBack.Content = _manageStep switch { 2 => "←  Choose another user", 1 => "←  Choose tenant", _ => "Back to Home" };
     }
-    private async void ManageConnect_Click(object sender, RoutedEventArgs e)
+
+    private async void ManageConnect_Click(object sender, RoutedEventArgs e) => await ConnectManagementAsync(ManagementSignIn.ConnectAsync);
+
+    private async Task ConnectManagementAsync(Func<TenantSetup, CancellationToken, Task<ManagementGraph>> signIn)
     {
-        if (_busy || _manageStep != 0 || Tenants.SelectedItem is not Provider) return;
-        if (!IsConnected) await LoginAsync();
-        if (IsConnected && ManagePage.IsVisible)
-        { _manageStep = 1; RenderManagement(); ManageQuery.Focus(); }
-        else ManageTenantHint.Text = StatusText.Text;
+        if (_busy || !ManagePage.IsVisible || _manageStep != 0 || Tenants.SelectedItem is not Provider provider) return;
+        if (_managementLogin is { } pending) { pending.Cancel(); return; }
+        using var request = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        _managementLogin = request; RenderManagement();
+        string? failure = null;
+        try
+        {
+            var snapshot = File.ReadAllText(_configPath);
+            ConfigReader.EnsureUnchanged(ConfigReader.Parse(snapshot), provider, null);
+            if (_management?.Tenant != provider)
+            {
+                var graph = await signIn(TenantConfigWriter.Read(snapshot, provider.Name, requirePublicCloud: true).Validate(), request.Token);
+                request.Token.ThrowIfCancellationRequested();
+                if (!ReferenceEquals(request, _managementLogin) || !ManagePage.IsVisible || !Equals(Tenants.SelectedItem, provider)) return;
+                ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, null);
+                _management = new(provider, graph);
+            }
+            _manageStep = 1;
+        }
+        catch (Exception ex) { failure = ManagementError(ex); }
+        finally
+        {
+            if (ReferenceEquals(request, _managementLogin))
+            {
+                _managementLogin = null;
+                if (failure != null) _management = null;
+                RenderManagement();
+                if (failure != null) ManageTenantHint.Text = failure;
+                else ManageQuery.Focus();
+            }
+        }
     }
+
     private void ManageBack_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
         if (_manageStep == 0) { ShowPage(OverviewPage); return; }
-        if (_manageStep == 1) { ResetManagement(); return; }
-        ClearManagedList();
-        ManageUsers.SelectedItem = null;
-        _manageStep = 1; RenderManagement();
+        if (_manageStep == 1) { ManageQuery.Clear(); ManageUsers.ItemsSource = null; ManageSearchHint.Text = ""; }
+        ClearManagedList(); ManageUsers.SelectedItem = null;
+        --_manageStep; RenderManagement();
     }
+
     private void ManageQuery_Changed(object sender, TextChangedEventArgs e)
     {
         if (ManageBack == null) return;
@@ -89,140 +120,102 @@ public partial class MainWindow
     {
         if (e.Key == Key.Enter) { e.Handled = true; await SearchManagedUsersAsync(); }
     }
+
     private async Task SearchManagedUsersAsync()
     {
-        if (_busy || !ManagePage.IsVisible || _manageStep != 1) return;
+        if (_busy || !ManagePage.IsVisible || _manageStep != 1 || _management is not { } session) return;
         ManageUsers.ItemsSource = null; ManageSearchHint.Text = "Searching…";
-        var ok = await RunWithResultAsync(async () =>
+        var query = ManageQuery.Text.Trim();
+        await ManagementOperationAsync(session, "Search tenant users", ManageSearchHint, async ct =>
         {
-            var users = await FindUsersAsync(ManageQuery.Text.Trim());
+            var users = await session.Graph.SearchAsync(query, ct);
+            if (!Current(session) || _manageStep != 1 || query != ManageQuery.Text.Trim()) return;
             ManageUsers.ItemsSource = users;
-            ManageSearchHint.Text = users.Count == 0 ? "No matching users found." : "Select a user to view their passkeys.";
-        }, "Search tenant users", false);
-        if (!ok) ManageSearchHint.Text = StatusText.Text;
+            ManageSearchHint.Text = users.Count == 0 ? "No matching users found." : users.Count == ManagementGraph.SearchLimit ?
+                $"Showing the first {users.Count} users. Refine your search if needed." : "Select a user to view their passkeys.";
+        });
     }
-    private async void ManageView_Click(object sender, RoutedEventArgs e)
+
+    private async void ManageView_Click(object sender, RoutedEventArgs e) => await ReadManagedListAsync();
+    private async Task ReadManagedListAsync()
     {
-        if (_busy || !ManagePage.IsVisible || !IsConnected || ManageUsers.SelectedItem is not UserCandidate user) return;
-        var provider = SelectedProvider;
-        _manageStep = 2;
-        ClearManagedList(); RenderManagement(); ManageFeedback.Text = "Loading registrations…";
-        await ManageOperationAsync(async service =>
+        if (_busy || _manageStep is not (1 or 2) || _management is not { } session || !Current(session) ||
+            ManageUsers.SelectedItem is not UserCandidate user) return;
+        _manageStep = 2; ClearManagedList(); RenderManagement(); ManageFeedback.Text = "Loading registrations…";
+        await ManagementOperationAsync(session, "Read passkey registrations", ManageFeedback, async ct =>
         {
-            var rows = await service.ListAsync(Guid.Parse(user.Id));
-            SetManagedList(provider, user, rows);
-        }, provider, user, "Read passkey registrations");
-        if (_managedList is { Rows.Count: > 0 } list && MatchesManagementContext(provider, user))
-            await LoadRegistrationDatesAsync(list, interactive: true);
+            var cards = await session.Graph.ListAsync(Guid.Parse(user.Id), ct);
+            SetManagedList(session, user, cards);
+        });
     }
-    private void SetManagedList(Provider provider, UserCandidate user, IReadOnlyList<RegisteredCredential> rows)
+
+    private bool Current(ManagementConnection session) => ReferenceEquals(_management, session) &&
+        Equals(Tenants.SelectedItem, session.Tenant) && ManagePage.IsVisible;
+    private bool Current(ManagementConnection session, UserCandidate user) => Current(session) &&
+        _manageStep == 2 && ManageUsers.SelectedItem is UserCandidate selected && selected.Id == user.Id;
+
+    private void SetManagedList(ManagementConnection session, UserCandidate user, IReadOnlyList<RegistrationCard> cards)
     {
-        if (!MatchesManagementContext(provider, user)) throw new InvalidOperationException("The selected tenant or user changed.");
-        var hardware = rows.Where(row => row.IsYubicoHardware).ToArray();
-        _managedList = new(provider, user, hardware);
-        ManageRows.ItemsSource = hardware.Select(x => new RegistrationCard(x, null)).ToArray();
+        if (!Current(session, user)) return;
+        var hardware = cards.Where(c => c.Credential.IsYubicoHardware).ToArray();
+        _managedList = new(session.Tenant, user, hardware);
+        ManageRows.ItemsSource = hardware;
         ManageFeedback.Text = hardware.Length == 0 ? "No recognized YubiKey registrations found for this user." :
             $"{hardware.Length} YubiKey {(hardware.Length == 1 ? "registration" : "registrations")} in Entra.";
     }
-    private bool MatchesManagementContext(Provider provider, UserCandidate user) =>
-        ManagePage.IsVisible && _manageStep == 2 && IsConnected && SelectedProvider == provider && ManageUsers.SelectedItem is UserCandidate u && u.Id == user.Id;
 
-    private bool ApplyRegistrationDates(RegistrationList list, IReadOnlyDictionary<string, RegistrationDates> dates)
+    private async Task ManagementOperationAsync(ManagementConnection session, string operation, TextBlock feedback, Func<CancellationToken, Task> action)
     {
-        if (!ReferenceEquals(list, _managedList) || !MatchesManagementContext(list.Tenant, list.User)) return false;
-        ManageRows.ItemsSource = list.Rows.Select(row => new RegistrationCard(row, dates.GetValueOrDefault(row.Id))).ToArray();
-        return true;
-    }
-
-    private async void DateAction_Click(object sender, RoutedEventArgs e)
-    {
-        if (_dateRequest is { } pending) { pending.Cancel(); return; }
-        if (!_busy && _managedList is { } list) await LoadRegistrationDatesAsync(list, interactive: true);
-    }
-
-    private async Task LoadRegistrationDatesAsync(RegistrationList list, bool interactive)
-    {
-        if (_dateRequest != null || !ReferenceEquals(_managedList, list) || !MatchesManagementContext(list.Tenant, list.User)) return;
-        using var request = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        _dateRequest = request;
-        bool Current() => ReferenceEquals(_dateRequest, request) && ReferenceEquals(_managedList, list)
-            && MatchesManagementContext(list.Tenant, list.User);
-        ManageDateNotice.Visibility = Visibility.Visible;
-        ManageDateMessage.Text = "Loading registration dates…"; ManageDateAction.Content = "Cancel";
-        try
-        {
-            var snapshot = File.ReadAllText(_configPath);
-            ConfigReader.EnsureUnchanged(ConfigReader.Parse(snapshot), list.Tenant, null);
-            if (_dateSession == null || _dateProvider != list.Tenant)
-            {
-                var tenant = TenantConfigWriter.Read(snapshot, list.Tenant.Name).Validate();
-                _dateSession = new RegistrationDateSession(tenant); _dateProvider = list.Tenant;
-            }
-            var dates = await _dateSession.ReadAsync(Guid.Parse(list.User.Id), interactive, () =>
-            {
-                if (Current()) ManageDateMessage.Text = "Sign in in your browser to read registration dates.";
-            }, request.Token);
-            if (!request.IsCancellationRequested && Current() && ApplyRegistrationDates(list, dates))
-                ManageDateNotice.Visibility = Visibility.Collapsed;
-        }
-        catch (Exception ex)
-        {
-            if (Current())
-                ManageDateMessage.Text = ex switch
-                {
-                    _ when request.IsCancellationRequested => "Loading dates was cancelled or timed out.",
-                    HttpRequestException { StatusCode: HttpStatusCode.Forbidden } => "Graph did not grant access to registration dates.",
-                    _ => "Registration dates are unavailable. Check your sign-in and connection."
-                };
-        }
-        finally
-        {
-            if (ReferenceEquals(_dateRequest, request))
-            {
-                _dateRequest = null; ManageDateAction.Content = "Load dates";
-            }
-        }
-    }
-
-    private async Task ManageOperationAsync(Func<PasskeyRegistrationService, Task> action, Provider provider, UserCandidate user, string operation)
-    {
-        string failure = "";
+        string? failure = null;
+        bool reconnect = false;
         var ok = await RunWithResultAsync(async () =>
         {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(1));
             try
             {
-                if (!MatchesManagementContext(provider, user)) throw new InvalidOperationException("Select the tenant and user again.");
-                await ActivateAsync(provider);
-                // Keep the CLI's actual config readable but not writable or replaceable on Windows
-                // until this sequence completes; reject a provider change between activation and opening it.
-                using var lease = File.Open(_configPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                var config = ConfigReader.Read(_configPath);
-                ConfigReader.EnsureUnchanged(config, provider, null);
-                if (config.ActiveProvider != provider.Name || !MatchesManagementContext(provider, user))
-                    throw new InvalidOperationException("The active tenant changed. Reconnect and select the user again.");
-                await action(new PasskeyRegistrationService(args => Runner.CaptureAsync(args)));
+                if (!Current(session)) throw new InvalidOperationException("The selected tenant changed. Connect again.");
+                ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), session.Tenant, null);
+                await action(timeout.Token);
             }
-            catch (Exception ex) { failure = ex is InvalidDataException or InvalidOperationException ? ex.Message : "Could not verify the operation. Refresh before trying again."; throw; }
+            catch (Exception ex)
+            {
+                reconnect = ex is MsalUiRequiredException or HttpRequestException { StatusCode: HttpStatusCode.Unauthorized };
+                failure = ManagementError(ex);
+                throw new InvalidOperationException(failure);
+            }
         }, operation, false);
-        if (!ok) { ClearManagedList(); ManageFeedback.Text = failure.Length == 0 ? "Refresh and try again." : failure; }
+        if (!ok && Current(session))
+        {
+            if (reconnect) { ResetManagement(); ManageTenantHint.Text = failure; }
+            else { ClearManagedList(); feedback.Text = failure ?? "Refresh and try again."; }
+        }
     }
+
+    private static string ManagementError(Exception ex) => ex switch
+    {
+        MsalUiRequiredException or HttpRequestException { StatusCode: HttpStatusCode.Unauthorized } => "Your session requires a new sign-in. Connect again.",
+        HttpRequestException { StatusCode: HttpStatusCode.Forbidden } => "Access denied. Check the delegated Graph permissions and your active Entra role.",
+        MsalException { ErrorCode: "authentication_canceled" } => "Sign-in cancelled. Select Connect to try again.",
+        OperationCanceledException => "The request was cancelled or timed out.",
+        MsalException auth => $"Microsoft sign-in did not complete ({auth.ErrorCode}). Check the sign-in result in your browser.",
+        InvalidOperationException or InvalidDataException or ArgumentException => ex.Message,
+        _ => "Could not read the selected configuration or reach Microsoft Graph. Check your connection and try again."
+    };
 
     private async void ManageRemove_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || sender is not Button { DataContext: RegistrationCard card } || _managedList is not { } list ||
-            !list.Rows.Contains(card.Credential) || !MatchesManagementContext(list.Tenant, list.User)) return;
-        var row = card.Credential;
-        if (new RemoveRegistrationWindow(this, list.Tenant, list.User, row, card.DateLine).ShowDialog() != true) return;
-        if (_busy || !ReferenceEquals(_managedList, list) || !MatchesManagementContext(list.Tenant, list.User)) return;
+        if (_busy || sender is not Button { DataContext: RegistrationCard card } || _management is not { } session ||
+            _managedList is not { } list || !list.Rows.Contains(card) || !Current(session, list.User)) return;
+        if (new RemoveRegistrationWindow(this, list.Tenant, list.User, card.Credential, card.DateLine).ShowDialog() != true) return;
+        if (_busy || !ReferenceEquals(_managedList, list) || !Current(session, list.User)) return;
         ClearManagedList(); ManageFeedback.Text = "Checking and removing the selected registration…";
-        await ManageOperationAsync(async service =>
+        await ManagementOperationAsync(session, "Remove passkey registration", ManageFeedback, async ct =>
         {
-            var updated = await service.RemoveAsync(Guid.Parse(list.User.Id), row);
-            SetManagedList(list.Tenant, list.User, updated);
-            ManageFeedback.Text = $"Removed “{row.Name}” from Entra. " + ManageFeedback.Text;
+            var updated = await session.Graph.RemoveAsync(Guid.Parse(list.User.Id), card.Credential, ct);
+            if (!Current(session, list.User)) return;
+            SetManagedList(session, list.User, updated);
+            ManageFeedback.Text = $"Removed “{card.Name}” from Entra. " + ManageFeedback.Text;
             Record($"Passkey registration removed from Entra · tenant {list.Tenant.Name} · user {list.User.Id}.");
-        }, list.Tenant, list.User, "Remove passkey registration");
-        if (_managedList is { Rows.Count: > 0 } remaining && MatchesManagementContext(list.Tenant, list.User))
-            await LoadRegistrationDatesAsync(remaining, interactive: false);
+        });
     }
 }

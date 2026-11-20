@@ -73,7 +73,6 @@ public partial class MainWindow
     {
         if (_busy) return;
         if ((page == OverviewPage || page == PreparePage || page == ResetPage) && RequirementsBlockTasks) page = StartupPage;
-        if (page == ManagePage && !_cliReady) page = StartupPage;
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage) LeaveHostedPage();
         foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, ManagePage, HostedPage, StartupPage })

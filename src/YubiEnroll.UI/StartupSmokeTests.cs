@@ -22,7 +22,7 @@ public partial class MainWindow
             await TestEmbeddedTerminalAsync(mockExecutable);
             await TestExternalOutcomeAsync(mockExecutable);
             await TestLoginCancellationAsync(mockExecutable);
-            await TestDateCallbackAsync();
+            await TestManagementCallbackAsync();
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -170,25 +170,31 @@ public partial class MainWindow
             Assert(connectedBeforeProbe != null && ReferenceEquals(connectedBeforeProbe, _connectedProvider) &&
                 ReferenceEquals(targetBeforeProbe, _selectedKey) && ReferenceEquals(inventoryBeforeProbe, _knownKeys),
                 "Automatic software detection preserves the authenticated tenant and selected target");
-            Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
+            var previousCliReady = _cliReady;
+            _cliReady = false; _connectedProvider = null;
             Manage_Click(this, new RoutedEventArgs()); UpdateLayout();
             Assert(ManagePage.IsVisible && _manageStep == 0 && ManageConnect.IsEnabled,
-                "Manage user passkeys opens independently of target selection");
-            ManageConnect_Click(this, new RoutedEventArgs());
-            var managedUser = SelectedUser;
-            ManageUsers.ItemsSource = new[] { managedUser }; ManageUsers.SelectedIndex = 0;
-            _manageStep = 2; RenderManagement();
-            SetManagedList(SelectedProvider, managedUser, [
-                new("YubiKey 5C NFC", "Microsoft Authenticator - Android", "phone-id"),
-                new("Demo office key", "YubiKey 5 Series with NFC", "office-id"),
-                new("Backup", "YubiKey Bio Series - FIDO Edition", "backup-id")]);
+                "Cloud management does not depend on the CLI, an enrollment login, or a target key");
+            var directory = new SmokeGraphHandler();
+            using var graphHttp = new System.Net.Http.HttpClient(directory);
+            int signIns = 0;
+            Task<ManagementGraph> ConnectTestGraph(TenantSetup tenant, CancellationToken ct)
+            {
+                ++signIns;
+                return Task.FromResult(new ManagementGraph(graphHttp, _ => Task.FromResult("synthetic")));
+            }
+            await ConnectManagementAsync(ConnectTestGraph);
+            ManageQuery.Text = "Alex";
+            await SearchManagedUsersAsync();
+            ManageUsers.SelectedIndex = 0;
+            var managedUser = (UserCandidate)ManageUsers.SelectedItem;
+            await ReadManagedListAsync(); await ReadManagedListAsync();
+            Assert(!IsConnected && signIns == 1 && directory.Reads == 3 && directory.Writes == 0,
+                "Connect, search, view and refresh use one Graph session and only GET requests");
             Assert(ManageRows.Items.Count == 2 && _managedList!.Rows.All(row => row.Id != "phone-id") &&
                 ManageFeedback.Text.StartsWith("2 YubiKey registrations"), "Only recognized hardware registrations are shown, counted and actionable");
-            var displayedList = _managedList!;
-            var sampleDates = new Dictionary<string, RegistrationDates>(StringComparer.Ordinal)
-                { ["office-id"] = new(new DateTimeOffset(2026, 4, 18, 12, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 11, 19, 9, 0, 0, TimeSpan.Zero)) };
-            Assert(ApplyRegistrationDates(displayedList, sampleDates) && ManageRows.Items[0] is RegistrationCard { Dates.LastUsed: not null } &&
-                ManageRows.Items[1] is RegistrationCard { Dates: null }, "Registration cards show dates only for matching IDs; unmatched keys stay visible");
+            Assert(ManageRows.Items[0] is RegistrationCard { Dates.LastUsed: not null } &&
+                ManageRows.Items[1] is RegistrationCard { Dates.LastUsed: null }, "Cards show dates from the same Graph list; missing dates stay unknown");
             CaptureWindow(this, "manage-user-passkeys.png");
             var office = (RegistrationCard)ManageRows.Items[0];
             var removalReview = new RemoveRegistrationWindow(this, SelectedProvider, managedUser, office.Credential, office.DateLine);
@@ -208,13 +214,26 @@ public partial class MainWindow
             });
             Assert(removalReview.ShowDialog() != true, "Closing the removal review does not confirm");
             await inspectReview.Task;
+            var dismiss = Dispatcher.InvokeAsync(() =>
+            {
+                var cancel = OwnedWindows.OfType<RemoveRegistrationWindow>().Single().CancelAction;
+                var peer = new System.Windows.Automation.Peers.ButtonAutomationPeer(cancel);
+                ((System.Windows.Automation.Provider.IInvokeProvider)peer).Invoke();
+            });
+            ManageRemove_Click(new Button { DataContext = office }, new RoutedEventArgs());
+            await dismiss.Task;
+            Assert(directory.Writes == 0 && directory.Reads == 3, "Cancelling the actual Remove action sends no Graph request");
             ManageBack_Click(this, new RoutedEventArgs());
-            Assert(!ApplyRegistrationDates(displayedList, sampleDates) && _managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
+            Assert(_managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
                 "Changing management user clears registrations and the removal target");
-            ManageUsers.SelectedIndex = 0; _manageStep = 2;
-            SetManagedList(SelectedProvider, managedUser, [new("Demo", "Key", "other-id")]);
+            ManageUsers.SelectedIndex = 0;
+            directory.OnlyPhone = true; await ReadManagedListAsync();
             Assert(ManageRows.Items.Count == 0 && ManageFeedback.Text.Contains("No recognized YubiKey"),
                 "Unknown models leave the list empty without saying the user has no passkeys");
+            directory.Expired = true; await ReadManagedListAsync();
+            Assert(_manageStep == 0 && _management == null && _managedList == null && signIns == 1 &&
+                ManageTenantHint.Text.Contains("Connect again"), "An expired session offers Connect without opening a browser or replaying an action");
+            _cliReady = previousCliReady;
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);
@@ -680,10 +699,31 @@ public partial class MainWindow
         }
     }
 
-    private static async Task TestDateCallbackAsync()
+    private sealed class SmokeGraphHandler : System.Net.Http.HttpMessageHandler
+    {
+        public int Reads, Writes;
+        public bool OnlyPhone, Expired;
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage req, CancellationToken ct)
+        {
+            if (req.Method != System.Net.Http.HttpMethod.Get) { Writes++; throw new InvalidOperationException("Unexpected write"); }
+            Reads++;
+            if (Expired) return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized));
+            var json = req.RequestUri!.AbsolutePath switch
+            {
+                "/v1.0/users" => """{"value":[{"id":"11111111-2222-3333-4444-555555555555","displayName":"Alex Example","userPrincipalName":"alex@example.test"}]}""",
+                "/v1.0/users/11111111-2222-3333-4444-555555555555/authentication/fido2Methods" => OnlyPhone ?
+                    """{"value":[{"id":"phone-id","displayName":"Phone","model":"Unknown"}]}""" :
+                    """{"value":[{"id":"phone-id","displayName":"YubiKey 5C NFC","model":"Microsoft Authenticator - Android"},{"id":"office-id","displayName":"Demo office key","model":"YubiKey 5 Series with NFC","createdDateTime":"2026-04-18T12:00:00Z","lastUsedDateTime":"2026-11-19T09:00:00Z"},{"id":"backup-id","displayName":"Backup","model":"YubiKey Bio Series - FIDO Edition"}]}""",
+                _ => throw new InvalidOperationException("Unexpected Graph resource")
+            };
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        }
+    }
+
+    private static async Task TestManagementCallbackAsync()
     {
         // Verify the exact existing Entra callback path against the same Windows HTTP listener prefix MSAL uses.
-        var redirect = RegistrationDateSession.LoopbackAddress("http://localhost/yubienroll-redirect");
+        var redirect = ManagementSignIn.LoopbackAddress("http://localhost/yubienroll-redirect");
         using var listener = new System.Net.HttpListener();
         listener.Prefixes.Add(redirect.AbsoluteUri + "/"); listener.Start();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -694,7 +734,7 @@ public partial class MainWindow
         context.Response.Close();
         using var accepted = await post;
         Assert(accepted.IsSuccessStatusCode && context.Request.Url?.AbsolutePath == "/yubienroll-redirect",
-            "The Windows date sign-in listener accepts the configured redirect path without a trailing slash");
+            "The Windows management sign-in listener accepts the configured redirect path without a trailing slash");
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)

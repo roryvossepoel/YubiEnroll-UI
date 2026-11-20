@@ -421,21 +421,7 @@ Check(!screen.Text.Contains("do-not-copy"), "Terminal ignores clipboard control 
 screen.Clear(); Check(screen.Text.Length == 0, "Terminal buffers clear after dismissal");
 Check(WindowsCommandLine.Quote("name with spaces") == "\"name with spaces\"", "Native process argument quoting preserves spaces");
 Check(WindowsCommandLine.Quote("x\"y") == "\"x\\\"y\"", "Native process argument quoting escapes quotes");
-var registrations = RegisteredCredentials.Parse("Fetching credentials...\nDisplay name  Model  ID\nDesk key  YubiKey 5 NFC  credential-1\nBackup key  Security Key  credential-2\n");
-Check(registrations.Count == 2 && registrations[0].Name == "Desk key" && registrations[1].Id == "credential-2", "Registered keys table preserves names and credential identifiers");
-foreach (var malformed in new[] { "unrecognized output", "Display name  Model  ID\nDesk key  YubiKey  prefix…",
-    "Display name  Model  ID\nDesk key  YubiKey  same\nBackup  Key  same", "Display name  Model  ID\nUnexpected row" })
-{
-    bool refused = false;
-    try { RegisteredCredentials.Parse(malformed); } catch (InvalidDataException) { refused = true; }
-    Check(refused, "Unknown, truncated, partial and duplicate registrations fail closed");
-}
-var regHeader = "Display name  Model  ID\n";
-var firstRow = "Desk key  YubiKey 5 Series  -credential-1\n";
-var otherRow = "Desk key  YubiKey 5 Series  credential-2\n";
-var phoneRow = "Desk key  Microsoft Authenticator - Android  phone-3\n";
-var managedUser = Guid.Parse(id);
-var wanted = RegisteredCredentials.Parse(regHeader + firstRow).Single();
+var wanted = new RegisteredCredential("Desk key", "YubiKey 5 Series", "-credential-1");
 foreach (var model in new[] { "YubiKey 5 Series with NFC", "YubiKey 5Ci", "YubiKey Bio Series - FIDO Edition",
     "Security Key by Yubico with NFC", "Security Key NFC by Yubico - Enterprise Edition" })
     Check((wanted with { Name = "Phone", Model = model }).IsYubicoHardware, "A renamed Yubico hardware registration is still recognized: " + model);
@@ -444,34 +430,6 @@ foreach (var model in new[] { "Microsoft Authenticator - Android", "Windows Hell
 {
     var unrelated = wanted with { Name = "YubiKey 5C NFC", Model = model };
     Check(!unrelated.IsYubicoHardware, "A display name cannot substitute for a recognized Yubico model: " + model);
-    var refused = false;
-    try { await new PasskeyRegistrationService(_ => throw new Exception("Unexpected CLI call")).RemoveAsync(managedUser, unrelated); }
-    catch (InvalidOperationException) { refused = true; }
-    Check(refused, "A hidden registration cannot be removed: " + model);
-}
-foreach (var scenario in new[] { "removed", "changed", "id-prefix", "still-present", "missing-phone", "ambiguous-result", "denied", "timeout", "invalid-user" })
-{
-    var commands = new List<string[]>();
-    var service = new PasskeyRegistrationService(a =>
-    {
-        commands.Add(a);
-        if (a[1] == "delete") return scenario == "timeout" ? throw new TimeoutException() :
-            Task.FromResult(scenario == "denied" ? new CliResult(1, "", "ERROR: 403") : new CliResult(0, "", ""));
-        var output = commands.Count == 1 ? regHeader + (scenario == "changed" ? "" : firstRow) + otherRow + phoneRow +
-            (scenario == "id-prefix" ? "Prefix match  YubiKey 5 Series  -credential-10\n" : "") :
-            scenario == "ambiguous-result" ? "failed to read" : regHeader + (scenario == "still-present" ? firstRow : "") + otherRow +
-            (scenario == "missing-phone" ? "" : phoneRow);
-        return Task.FromResult(new CliResult(0, output, ""));
-    });
-    bool removed = false;
-    try { var remaining = await service.RemoveAsync(scenario == "invalid-user" ? Guid.Empty : managedUser, wanted);
-        removed = true;
-        Check(remaining.Select(r => r.Id).SequenceEqual(new[] { "credential-2", "phone-3" }), "The identically named YubiKey and phone registration both remain"); }
-    catch (Exception ex) when (ex is InvalidOperationException or ArgumentException) { }
-    var deletes = commands.Where(a => a[1] == "delete").ToArray();
-    Check(removed == (scenario == "removed") && deletes.Length == (scenario is "changed" or "id-prefix" or "invalid-user" ? 0 : 1) &&
-        deletes.All(a => a.SequenceEqual(new[]{"credentials", "delete", "--force", "--", managedUser.ToString(), "-credential-1"})),
-        "Registration removal binds one user and exact method, never retries, verifies outcome · " + scenario);
 }
 var failure = InteractiveFailure.Describe("ERROR: 405 Method Not Allowed\nrequest-id: 11111111-2222-3333-4444-555555555555\nPIN: secret-marker\naccess_token: secret-token");
 Check(failure.Contains("405") && failure.Contains("11111111-2222-3333-4444-555555555555") && !failure.Contains("secret") && !failure.Contains("PIN"), "Interactive diagnostic extraction keeps codes and excludes PINs and tokens");
@@ -507,7 +465,7 @@ Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0,
     EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey, adminKey }, 0, true).Contains($"keep target {targetKey.Serial}"), "After login guidance distinguishes admin from target serial");
 Check(EnrollmentTargetGuard.Explain(targetKey, new[] { targetKey }, 0, true).Contains("Only the target is connected"), "Single-key continuation states the connected-key requirement");
 RegistrationJournalTests.Run(Check);
-await RegistrationDateTests.Run(Check);
+await ManagementGraphTests.Run(Check);
 Workflow055Tests.Run(Check);
 Workflow056Tests.Run(Check);
 await NfcTests.Run(Check);
