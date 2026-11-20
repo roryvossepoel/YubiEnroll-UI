@@ -76,7 +76,7 @@ public partial class MainWindow
         ReadReviewWarning();
         RenderProgress(EnrollProgress, _addPasskey ? ["Key", "Tenant", "User", "Review"] : ["Key", "Profile", "Tenant", "User", "Review"], Math.Min(_enrollStep, ReviewStep));
         RenderProgress(ResetProgress, ["Key", "Confirm", "Result"], _resetStep);
-        EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A KEY";
+        EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A YUBIKEY";
         EnrollHeading.Text = _enrollStep == 0 ? (_addPasskey ? "Choose your existing key" : "Choose the key to set up") :
             _enrollStep == TenantStepIndex ? "Connect to a tenant" : _enrollStep == UserStepIndex ? "Choose the user" :
             _enrollStep == ReviewStep ? (_addPasskey ? "Review and add passkey" : "Review and enroll") :

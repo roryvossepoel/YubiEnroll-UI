@@ -1,12 +1,12 @@
 # YubiEnroll UI
 
-## Preview 0.7.3
+## Preview 0.7.4
 
-NFC readers are now supported alongside USB for Set up a key, Add a passkey and Reset FIDO. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
+NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
 
 - **Manage user passkeys** now signs in once at **Connect**. Searching, viewing dates and refreshing share that Graph session.
-- Home offers **Set up a key**, **Add a passkey**, **Reset FIDO**, and **Manage user passkeys**.
+- Home offers **Set up a YubiKey**, **Add a passkey**, **Clear passkeys & PIN**, and **Manage user passkeys**.
 - Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
 - Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
 - Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
@@ -21,19 +21,19 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.7.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.7.4 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 
 - Reads existing YubiEnroll tenants and profiles, and adds Entra tenants through an Add tenant form. Existing configuration is preserved and backed up before additions.
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
-- Starts on Home with Enroll key and Reset FIDO as separate guided tasks. Settings remains available in the same window.
+- Starts on Home with Set up a YubiKey and Clear passkeys & PIN as separate guided tasks. Settings remains available in the same window.
 - Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → Prerequisites. Opted-in generated-PIN logging uses the in-app terminal for setup.
 - Reports the enrollment outcome; cloud registrations are managed separately from enrollment.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
-- Offers **Reset FIDO** to erase a USB or NFC key independently of enrollment, using the separately installed YubiKey Manager CLI.
+- Offers **Clear passkeys & PIN** to clear FIDO credentials and the FIDO PIN on a USB or NFC key without removing Entra registrations, using the separately installed YubiKey Manager CLI.
 - Keeps a session-only activity log. Interactive output is displayed transiently (including any generated PIN), and is not persisted or added to the activity/diagnostic log.
 
 ## Preview 0.5.4: optional registration log
@@ -131,7 +131,7 @@ Configuration must belong to the Windows account running the app. Configure prov
 
 ### Add your first tenant
 
-Open **Settings → Tenants → Add tenant** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Configuration profiles are independent: choose one later in the separate Profile step of Set up a key. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forced PIN change require actual CTAP capability support (standard YubiKey 5: generally firmware 5.7+). Use Settings → Profiles → Basic FIDO2 for older keys.
+Open **Settings → Tenants → Add tenant** and enter the tenant name, Directory (tenant) ID, Application (client) ID and Redirect URI. The redirect must use `http://localhost` and exactly match the public-client Entra app registration. Configuration profiles are independent: choose one later in the separate Profile step of Set up a YubiKey. New profiles use a random PIN with the chosen length, no reset, no Always UV and no enterprise attestation; forcing a PIN change is an explicit checkbox. Minimum PIN length and forced PIN change require actual CTAP capability support (standard YubiKey 5: generally firmware 5.7+). Use Settings → Profiles → Basic FIDO2 for older keys.
 
 **Save tenant** validates the fields, creates the directory if necessary, and adds the provider. It preserves original configuration text and makes a timestamped `.bak` file before replacing an existing file. Duplicate names and configuration changes since opening the form are rejected. Cancel makes no changes. Close other YubiEnroll sessions while saving; their external writes cannot be locked by this GUI. Close Settings, select the tenant and use **Connect** to activate it and authenticate.
 
@@ -149,7 +149,7 @@ Profile saves preserve configuration values, including provider endpoints and ot
 
 ## Enroll a key
 
-1. Open **Set up a key**, choose the intended target by model and serial, and select **Continue to profile**, choose a compatible profile, then continue to the tenant. Do not select your administrator sign-in key.
+1. Open **Set up a YubiKey**, choose the intended target by model and serial, and select **Continue to profile**, choose a compatible profile, then continue to the tenant. Do not select your administrator sign-in key.
 2. Select a tenant and click **Connect**. Complete browser sign-in with your administrator key. The app verifies and confirms the native login parameters. **Open browser again** reopens the same session; **Cancel sign-in** returns to tenant selection. Sign-in times out after five minutes. Closing the app offers to cancel sign-in; enrollment/reset retain their busy guard.
 3. For USB enrollment, after sign-in **disconnect the administrator key and all other USB security keys**, leaving only the target. For NFC enrollment, keep the target on the selected reader; the USB administrator key can remain connected. The app refreshes on USB changes; **Refresh keys** is also available. User search and registered-key lookup remain available while multiple keys are connected, but enrollment is blocked.
 4. Search for and select the intended recipient, then review the suggested editable registration name.
@@ -163,7 +163,7 @@ Switching tenants or reloading configuration requires Connect again. A successfu
 
 ### Erase a key without enrollment
 
-Open **Reset FIDO**. Target verification and this reset feature require **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it blocks enrollment until target verification is available.
+Open **Clear passkeys & PIN**. Target verification and this reset feature require **[YubiKey Manager CLI](https://developers.yubico.com/yubikey-manager/) 5.9.2 or newer 5.x** installed in its standard `Program Files\Yubico\YubiKey Manager CLI` folder. The app also checks the older `YubiKey Manager` folder. Version 5.9.2 is checked against the official signed installer in CI. This CLI is separate from YubiEnroll and is not bundled; missing it blocks enrollment until target verification is available.
 
 Run the GUI as administrator, connect the key via USB or place it on an NFC reader, Refresh, and select its model/serial number. Each entry shows the FIDO PIN status read from that key (set, not set, blocked, disabled/unsupported or unknown). No tenant connection or user selection is required. Select **Review reset**, check the serial, acknowledge the erasure and select **Erase FIDO passkeys and PIN**. Then follow ykman's native confirmation, unplug/reinsert and touch prompts in the console. Press Enter when it finishes. The GUI reloads the connected keys and their PIN status, restoring the same selected key if it is still available. After exit 0 it reports whether the PIN is now unset; an unreadable status stays unknown, and a PIN still present requires inspection. This checks PIN state, not every passkey or cloud registration. A different key is never selected automatically. The GUI never passes `--force`, automatically retries, or substitutes a broader factory-reset command.
 

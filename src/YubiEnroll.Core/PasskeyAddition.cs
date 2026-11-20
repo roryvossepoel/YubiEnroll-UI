@@ -13,7 +13,7 @@ public static class PasskeyAddition
             if (key.ForcePinChange) issues.Add("This key already requires a PIN change. Complete that change before using Add a passkey.");
         }
         if (pin != FidoPinState.Set) issues.Add(pin == FidoPinState.Blocked ? "The existing FIDO PIN is blocked. Adding a passkey cannot bypass or reset it." :
-            "A working existing FIDO PIN is required. Use Set up a key for initial configuration.");
+            "A working existing FIDO PIN is required. Use Set up a YubiKey for initial configuration.");
         return new(issues);
     }
     public static ProfileSetup Settings(FidoCapabilities key) => new("Add a passkey", Reset: false,

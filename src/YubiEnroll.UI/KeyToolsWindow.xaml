@@ -9,7 +9,7 @@
    <TextBlock x:Name="StatusText" Text="Checking prerequisites…" TextWrapping="Wrap" Foreground="#526277" Margin="0,0,0,12"/>
    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
     <Button x:Name="CloseButton" Content="Close" Click="Close_Click" Visibility="Collapsed"/>
-    <Button x:Name="ResetButton" Content="Reset FIDO…" Click="Reset_Click" IsEnabled="False" Background="#A52C36" Foreground="White"/>
+    <Button x:Name="ResetButton" Content="Clear passkeys &amp; PIN…" Click="Reset_Click" IsEnabled="False" Background="#A52C36" Foreground="White"/>
    </StackPanel>
   </StackPanel>
   <ScrollViewer x:Name="BodyScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -35,7 +35,7 @@
     </Border>
     <Border Background="#FFF2F0" BorderBrush="#E8C2BE" BorderThickness="1" CornerRadius="8" Padding="18">
      <StackPanel>
-      <TextBlock Text="Reset FIDO · erase all passkeys and the FIDO PIN" FontWeight="SemiBold" Foreground="#852D32" TextWrapping="Wrap"/>
+      <TextBlock Text="Clear passkeys &amp; PIN on this YubiKey" FontWeight="SemiBold" Foreground="#852D32" TextWrapping="Wrap"/>
       <TextBlock Text="Erases all FIDO2/U2F credentials and the FIDO PIN. Existing FIDO sign-ins with this key will stop working. This cannot be undone." TextWrapping="Wrap" Margin="0,8,0,8"/>
       <TextBlock Text="Registrations in Entra and other services remain and must be removed there separately. This is not a reset of PIV, OATH, OpenPGP or OTP." TextWrapping="Wrap"/>
       <TextBlock Text="Follow the console prompts to unplug, reinsert and touch the same key. Do not close the console until it finishes." TextWrapping="Wrap" Margin="0,8,0,0"/>

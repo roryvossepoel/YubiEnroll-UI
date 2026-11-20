@@ -324,7 +324,7 @@ public partial class MainWindow
         if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a key · serial ") + _selectedKey?.Key.Serial : "Reset FIDO · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null, _selectedKey?.Key.IsNfc == true);
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + _selectedKey?.Key.Serial : "Clear passkeys & PIN · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null, _selectedKey?.Key.IsNfc == true);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
