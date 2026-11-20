@@ -38,6 +38,12 @@ public partial class MainWindow
     private bool EnrollmentReady => TargetReady && IsConnected && _cliReady && Users.SelectedItem != null && (_addPasskey || Profiles.SelectedItem != null) &&
         EnrollmentTargetGuard.CanStart(_selectedKey?.Key, _knownKeys.Select(k => k.Key).ToArray(), _unavailableKeys);
 
+    private void SetBackAction(Button button, string? stepLabel, string homeLabel = "Back to Home")
+    {
+        button.Content = stepLabel ?? homeLabel;
+        button.ContentTemplate = stepLabel == null ? null : (DataTemplate)FindResource("BackContent");
+    }
+
     private void RenderProgress(UniformGrid panel, string[] labels, int step)
     {
         panel.Columns = labels.Length;
@@ -109,7 +115,7 @@ public partial class MainWindow
             _enrollStep == TenantStepIndex ? TargetReady && IsConnected :
             _enrollStep == UserStepIndex ? TargetReady && IsConnected && Users.SelectedItem != null && _reviewValid :
             _enrollStep == EnrollmentResultStep);
-        EnrollBack.Content = _enrollStep == 0 || _enrollStep == EnrollmentResultStep ? "Back to Home" : "←  Back";
+        SetBackAction(EnrollBack, _enrollStep == 0 || _enrollStep == EnrollmentResultStep ? null : "Back");
         EnrollmentInventoryProgress.Visibility = ResetInventoryProgress.Visibility = Visible(_inventoryDirty);
         FooterInstruction.Text = _enrollStep >= EnrollmentResultStep ? "" : _inventoryDirty ? (_enrollStep == 0 ? "" : "Checking connected keys…") :
             _enrollStep == 0 && _addPasskey && CandidateReady && !AdditionCandidateReady ? string.Join(" ", PasskeyAddition.Evaluate((EnrollmentKeys.SelectedItem as KeyStatus)?.Capabilities, (EnrollmentKeys.SelectedItem as KeyStatus)?.Pin ?? FidoPinState.Unknown).Issues) :
@@ -123,7 +129,7 @@ public partial class MainWindow
         ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset";
         ResetNext.ContentTemplate = _resetStep == 2 ? null : (DataTemplate)FindResource("ForwardContent");
         ResetNext.IsEnabled = !_busy && (_resetStep == 2 || CandidateReady);
-        ResetBack.Content = _resetStep == 1 ? "←  Back" : "Back to Home";
+        SetBackAction(ResetBack, _resetStep == 1 ? "Back" : null);
         ResetTargetText.Text = _resetReviewTarget?.Label ?? "No target selected";
         KeyPinStatus.Text = _selectedKey is { } currentKey && currentKey.Key == _resetReviewTarget ? currentKey.PinLabel : "Target unavailable";
         ResetConnectionHelp.Text = _resetReviewTarget?.IsNfc == true

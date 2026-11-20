@@ -257,8 +257,8 @@ public partial class MainWindow
         BatchConnect.Content = BatchSignedIn ? "Reconnect" : "Connect";
         BatchToUsers.IsEnabled = !_busy && BatchSignedIn && _batchPolicy != null;
         BatchCheck.IsEnabled = !_busy && BatchSignedIn && !string.IsNullOrWhiteSpace(BatchText.Text);
-        BatchBack.Content = stage == BatchStage.Issue ? "Pause and return to Home" :
-            stage is BatchStage.Setup or BatchStage.Results ? "Back to Home" : "←  Back";
+        SetBackAction(BatchBack, stage is BatchStage.Users or BatchStage.Review ? "Back" : null,
+            stage == BatchStage.Issue ? "Pause and return to Home" : "Back to Home");
         BatchFinish.Visibility = Visible(stage == BatchStage.Issue);
         BatchResumeConnect.Visibility = Visible(stage == BatchStage.Issue && !BatchSignedIn);
         if (_batch is not { } batch) return;

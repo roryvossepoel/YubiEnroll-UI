@@ -34,7 +34,7 @@ public partial class MainWindow
         LocalIntro.Text = _localList?.Key.Label ?? "Choose a connected YubiKey to view its stored passkeys with its FIDO PIN. No tenant sign-in is required.";
         LocalView.IsEnabled = !_inventoryDirty && key != null && _knownKeys.Contains(key) &&
             key.Pin is FidoPinState.Set or FidoPinState.Unknown;
-        LocalBack.Content = _localList == null ? "Back to Home" : "←  Choose another YubiKey";
+        SetBackAction(LocalBack, _localList == null ? null : "Choose another YubiKey");
     }
 
     private void LocalBack_Click(object sender, RoutedEventArgs e)

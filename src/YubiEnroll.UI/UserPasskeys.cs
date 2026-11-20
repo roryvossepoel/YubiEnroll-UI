@@ -61,7 +61,7 @@ public partial class MainWindow
         ManageConnect.IsEnabled = Tenants.SelectedItem is Provider;
         ManageConnect.Content = _managementLogin != null ? "Cancel sign-in" : connected ? "Continue to user" : "Connect";
         ManageView.IsEnabled = connected && ManageUsers.SelectedItem is UserCandidate;
-        ManageBack.Content = _manageStep switch { 2 => "←  Choose another user", 1 => "←  Choose tenant", _ => "Back to Home" };
+        SetBackAction(ManageBack, _manageStep switch { 2 => "Choose another user", 1 => "Choose tenant", _ => null });
     }
 
     private async void ManageConnect_Click(object sender, RoutedEventArgs e) => await ConnectManagementAsync(ManagementSignIn.ConnectAsync);
