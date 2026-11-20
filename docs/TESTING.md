@@ -1,5 +1,10 @@
 ## Local YubiKey passkeys (preview 0.8.0)
 
+## Batch issuance — physical acceptance
+
+Use two disposable new YubiKeys and two test users in one tenant. Include a duplicate and a nonexistent UPN first; neither should allow starting. Correct the list, review both UPNs and start. Register the first user over USB with an eligible profile (reset off); verify the new Entra registration and test sign-in. Leave the key connected, choose Next user and confirm its serial cannot be used again. Then select the second key on the OMNIKEY 5022, register the second user and check the resulting account, serial and sign-in. Confirm the results CSV has one row per user and no PINs. Separately test a skipped user, an already configured key, loss of a connection during issuance, and pausing / returning in the same app session.
+
+
 - With no tenant signed in, choose a disposable USB key by serial, unlock the list and compare its RP IDs and accounts with Yubico Authenticator. Repeat on the named OMNIKEY 5022 reader, including an empty key and an unsupported device.
 - With another USB key attached, open Remove for one exact test credential. Cancel: neither key nor Entra changes. Swap or lift the selected key during review: the old action must be invalid. A wrong PIN is attempted once only; stop before exhausting retries.
 - Only on a disposable credential: confirm removal, verify the other local IDs in Authenticator and verify the Entra registration is unchanged. Check navigation and reconnect clear the list, and that activity/diagnostic logs contain no local PIN or credential inventory.

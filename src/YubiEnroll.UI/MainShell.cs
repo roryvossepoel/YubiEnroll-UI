@@ -72,17 +72,17 @@ public partial class MainWindow
     private void ShowPage(FrameworkElement page)
     {
         if (_busy) return;
-        if ((page == OverviewPage || page == PreparePage || page == ResetPage) && RequirementsBlockTasks) page = StartupPage;
+        if ((page == OverviewPage || page == PreparePage || page == ResetPage || page == BatchPage) && RequirementsBlockTasks) page = StartupPage;
         if (page == LocalPage && (!_smokeTest || _startupChecksComplete) &&
             (_requirements?.Administrator != true || !_requirements.Manager.Ready)) page = StartupPage;
         if (LocalPage.Visibility == Visibility.Visible && page != LocalPage) ResetLocalPage();
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage) LeaveHostedPage();
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, ResetPage, LocalPage, ManagePage, HostedPage, StartupPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, BatchPage, ResetPage, LocalPage, ManagePage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
         foreach (var button in new[] { OverviewButton, PrepareButton, AddPasskeyButton, ResetButton, LocalButton, ManageButton, SettingsButton })
         {
-            var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage && !_addPasskey ||
+            var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && (page == PreparePage || page == BatchPage) && !_addPasskey ||
                 button == AddPasskeyButton && page == PreparePage && _addPasskey ||
                 button == LocalButton && page == LocalPage || button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
             button.Tag = active ? "active" : null;
@@ -217,6 +217,9 @@ public partial class MainWindow
             OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = entries.FirstOrDefault(x => x.Key == candidate);
         }
         finally { _readingKeys = false; }
+        var reviewed = (BatchKeys.SelectedItem as KeyStatus)?.Key;
+        BatchKeys.ItemsSource = entries;
+        BatchKeys.SelectedItem = entries.FirstOrDefault(k => k.Key == reviewed);
         LocalKeys.ItemsSource = entries;
         RenderReaderInventory(readers ?? Array.Empty<NfcReaderStatus>());
         SetInventoryMessage(unavailable > 0 ? "Some USB devices could not be identified. Check device access and FIDO support." :
@@ -313,7 +316,7 @@ public partial class MainWindow
     private bool _closeAfterLogin;
     private bool _captureGeneratedPin;
     private string? _generatedPin;
-    private async Task<int> RunInteractiveAsync(string executable, string[] args)
+    private async Task<int> RunInteractiveAsync(string executable, string[] args, ResetKey? explicitTarget = null, Action? nativeFinished = null)
     {
         _lastInteractiveFailure = "";
         if (args.SequenceEqual(new[] { "login" }))
@@ -329,8 +332,10 @@ public partial class MainWindow
         if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + _selectedKey?.Key.Serial : "Clear passkeys & PIN · serial " + _selectedKey?.Key.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? _selectedKey?.Key.Serial : null, _selectedKey?.Key.IsNfc == true);
+        var terminalTarget = explicitTarget ?? _selectedKey?.Key;
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
+        terminal.NativeFinished = nativeFinished;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
     }

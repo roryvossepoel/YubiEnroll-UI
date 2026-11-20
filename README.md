@@ -2,7 +2,11 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
-## Preview 0.8.3
+## Preview 0.9.0
+
+**Set up a YubiKey → Set up multiple YubiKeys** issues one new YubiKey per recipient. Sign in to one tenant, choose a profile with reset explicitly off and paste sign-in names or import a CSV with a `UserPrincipalName` column (up to 500 recipients). Correct duplicate or unmatched rows before starting. The app requires one exact tenant user per row, checks the object ID again before issuance and accepts only a key with a verified unset FIDO PIN. Select the USB key or named NFC reader and confirm **Register YubiKey** for each user. Keep the key connected until the native command finishes; record any generated PIN in the native prompt before returning. USB uses the existing single-USB-target preflight.
+
+The handoff stays on the same user until **Next user**. Once a serial was attempted it cannot be reused in the batch, including through another connection. An interrupted or uncertain attempt is marked **Check required** and is never retried automatically. You can skip a recipient, pause and return to the batch while the app remains open, or end early and export a CSV (no PINs). The queue is held in memory; the optional registration journal keeps its existing separate settings.
 
 NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
@@ -23,7 +27,7 @@ Real hardware testing remains required, especially adding a credential while che
 
 An independent community Windows application for registering YubiKeys on behalf of Microsoft Entra ID users. Built in C# / WPF, based on Rory Vossepoel's PowerShell / WinForms enrollment workflow.
 
-**Version 0.8.3 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
+**Version 0.9.0 is a preview.** Automated tests cover configuration parsing, command arguments and process handling. Actual Entra sign-in, UAC, hardware enrollment and standalone FIDO reset require manual validation with a test user and test key. This is not an official Yubico product.
 
 ## What it does
 

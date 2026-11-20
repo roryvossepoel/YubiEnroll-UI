@@ -65,6 +65,7 @@
     <ScrollViewer x:Name="EnrollmentScroll" VerticalScrollBarVisibility="Auto"><StackPanel Margin="40,32,40,24" MaxWidth="900">
      <UniformGrid x:Name="EnrollProgress" Columns="4" Margin="0,0,0,30"/>
      <TextBlock x:Name="EnrollmentTaskLabel" Text="SET UP A YUBIKEY" Foreground="{StaticResource Heading}" Margin="0,0,0,10"/><TextBlock x:Name="EnrollHeading" Style="{StaticResource PageTitle}"/><TextBlock x:Name="EnrollDescription" Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="16" Margin="0,10,0,20"/>
+     <Button x:Name="BatchEntry" Content="Set up multiple YubiKeys" HorizontalAlignment="Left" Click="BatchOpen_Click" Margin="0,0,0,8"/>
      <TextBlock x:Name="FooterTargetText" Foreground="{StaticResource Heading}" TextWrapping="Wrap" Margin="0,0,0,16"/>
      <StackPanel x:Name="EnrollmentChooser"><DockPanel Margin="0,24,0,12"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><TextBlock x:Name="EnrollmentInventoryProgress" Text="Checking connected keys…" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed"/><Button Content="Refresh" ContentTemplate="{StaticResource RefreshContent}" Style="{StaticResource QuietButton}" Click="RefreshKeys_Click"/></StackPanel><TextBlock Text="Connected keys" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/></DockPanel>
  <StackPanel x:Name="EnrollmentReaderStatus" Visibility="Collapsed"/>
@@ -101,6 +102,55 @@
      <StackPanel x:Name="EnrollmentResult" Visibility="Collapsed"><TextBlock x:Name="EnrollmentResultText" TextWrapping="Wrap" FontSize="16" Margin="0,0,0,16"/><TextBlock x:Name="RegistrationLogStatus" TextWrapping="Wrap" Margin="0,0,0,12"/><Button x:Name="RetryRegistrationLog" Content="Retry saving registration log" Click="RetryRegistrationLog_Click" HorizontalAlignment="Left" Margin="0,0,0,12" Visibility="Collapsed"/></StackPanel>
     </StackPanel></ScrollViewer>
    </DockPanel>
+   <ScrollViewer x:Name="BatchPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel Margin="40,32,40,28" MaxWidth="900">
+    <UniformGrid x:Name="BatchProgress" Margin="0,0,0,24"/>
+    <TextBlock Text="Set up multiple YubiKeys" Style="{StaticResource PageTitle}"/>
+    <TextBlock x:Name="BatchContext" Style="{StaticResource SettingsDescription}" Margin="0,8,0,20"/>
+    <StackPanel x:Name="BatchSetup">
+     <TextBlock Text="Tenant" Margin="0,0,0,5"/><DockPanel><Button x:Name="BatchConnect" DockPanel.Dock="Right" Content="Connect" Click="BatchConnect_Click" Margin="10,0,0,0"/><ComboBox x:Name="BatchTenant" DisplayMemberPath="Name" SelectionChanged="BatchTenant_Changed" AutomationProperties.Name="Batch tenant"/></DockPanel>
+     <TextBlock x:Name="BatchConnection" Foreground="{StaticResource Muted}" Margin="0,6,0,16"/>
+     <TextBlock Text="Configuration profile" Margin="0,0,0,5"/><ComboBox x:Name="BatchProfile" DisplayMemberPath="Name" SelectionChanged="BatchProfile_Changed" AutomationProperties.Name="Batch profile"/>
+     <TextBlock x:Name="BatchPolicy" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,18"/>
+     <Button x:Name="BatchToUsers" Content="Continue to users" Click="BatchToUsers_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"/>
+    </StackPanel>
+    <StackPanel x:Name="BatchInput" Visibility="Collapsed">
+     <TextBlock Text="User principal names" Style="{StaticResource SectionTitle}"/>
+     <TextBlock Text="Paste one sign-in name per line, or import a CSV with a UserPrincipalName column." TextWrapping="Wrap" Margin="0,8,0,10"/>
+     <TextBox x:Name="BatchText" AcceptsReturn="True" Height="140" MaxLength="256000" VerticalScrollBarVisibility="Auto" TextChanged="BatchText_Changed" AutomationProperties.Name="User principal names"/>
+     <WrapPanel Margin="0,12,0,0"><Button x:Name="BatchCheck" Content="Check users" Click="BatchValidate_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Import CSV…" Click="BatchImport_Click"/></WrapPanel>
+     <TextBlock x:Name="BatchProblems" Foreground="#854018" TextWrapping="Wrap" Margin="0,12,0,0"/>
+    </StackPanel>
+    <StackPanel x:Name="BatchReview" Visibility="Collapsed">
+     <TextBlock Text="Review the recipients" Style="{StaticResource SectionTitle}"/>
+     <TextBlock x:Name="BatchReviewCount" Margin="0,8,0,12" TextWrapping="Wrap"/>
+     <ListBox x:Name="BatchReviewUsers" MaxHeight="270" AutomationProperties.Name="Verified batch recipients"><ListBox.ItemTemplate><DataTemplate><TextBlock Margin="8,4"><Run Text="{Binding DisplayName, Mode=OneWay}"/> · <Run Text="{Binding UserPrincipalName, Mode=OneWay}"/></TextBlock></DataTemplate></ListBox.ItemTemplate></ListBox>
+     <Button x:Name="BatchStart" Content="Start batch" Click="BatchStart_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+    </StackPanel>
+    <StackPanel x:Name="BatchIssue" Visibility="Collapsed">
+     <Border Style="{StaticResource Card}"><StackPanel><TextBlock x:Name="BatchNumber" Foreground="{StaticResource Muted}"/><TextBlock x:Name="BatchRecipient" Style="{StaticResource SectionTitle}" Margin="0,6,0,2"/><TextBlock x:Name="BatchUpn" TextWrapping="Wrap"/></StackPanel></Border>
+     <Button x:Name="BatchResumeConnect" Content="Reconnect to batch tenant" Click="BatchConnect_Click" HorizontalAlignment="Left" Visibility="Collapsed" Margin="0,10,0,0"/>
+     <StackPanel x:Name="BatchChoose">
+      <DockPanel Margin="0,16,0,8"><Button Content="Refresh" DockPanel.Dock="Right" Click="RefreshKeys_Click" ContentTemplate="{StaticResource RefreshContent}" Style="{StaticResource QuietButton}"/><TextBlock Text="Choose a new YubiKey" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/></DockPanel>
+      <ListBox x:Name="BatchKeys" ItemTemplate="{StaticResource KeyChoiceTemplate}" ItemContainerStyle="{StaticResource KeyChoice}" SelectionChanged="BatchKey_Changed" BorderThickness="0" MaxHeight="220" AutomationProperties.Name="Batch target key"/>
+      <TextBlock x:Name="BatchKeyHint" TextWrapping="Wrap" Margin="0,8,0,12" Foreground="{StaticResource Muted}"/>
+      <WrapPanel><Button x:Name="BatchRegister" Content="Register YubiKey" Click="BatchRegister_Click" Style="{StaticResource PrimaryButton}"/><Button Content="Skip user" Click="BatchSkip_Click" Style="{StaticResource QuietButton}"/></WrapPanel>
+     </StackPanel>
+     <StackPanel x:Name="BatchHandoff" Visibility="Collapsed" Margin="0,16,0,0">
+      <TextBlock x:Name="BatchOutcome" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock x:Name="BatchInstructions" TextWrapping="Wrap" Margin="0,8,0,12"/>
+      <Button x:Name="BatchNext" Content="Next user" Click="BatchNext_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"/>
+     </StackPanel>
+     <TextBlock x:Name="BatchLogNotice" TextWrapping="Wrap" Margin="0,10,0,0" Foreground="{StaticResource Muted}"/>
+     <Button x:Name="BatchRetryLog" Content="Retry saving registration log" Click="BatchRetryLog_Click" HorizontalAlignment="Left" Visibility="Collapsed"/>
+    </StackPanel>
+    <StackPanel x:Name="BatchResults" Visibility="Collapsed">
+     <TextBlock Text="Batch results" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="BatchTotals" TextWrapping="Wrap" Margin="0,8,0,12"/>
+     <DataGrid x:Name="BatchRows" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" MaxHeight="320" AutomationProperties.Name="Issuance results"><DataGrid.Columns>
+      <DataGridTextColumn Header="User principal name" Binding="{Binding User.UserPrincipalName}" Width="*"/><DataGridTextColumn Header="Serial" Binding="{Binding Serial}" Width="110"/><DataGridTextColumn Header="Result" Binding="{Binding StatusLabel}" Width="135"/>
+     </DataGrid.Columns></DataGrid>
+     <WrapPanel Margin="0,16,0,0"><Button Content="Export CSV…" Click="BatchExport_Click" Style="{StaticResource PrimaryButton}"/><Button Content="New batch" Click="BatchNew_Click"/></WrapPanel>
+    </StackPanel>
+    <WrapPanel Margin="0,20,0,0"><Button x:Name="BatchBack" Content="Back" Click="BatchBack_Click" Style="{StaticResource QuietButton}"/><Button x:Name="BatchFinish" Content="End batch early…" Click="BatchFinish_Click" Style="{StaticResource QuietButton}" Visibility="Collapsed"/></WrapPanel>
+   </StackPanel></ScrollViewer>
    <DockPanel x:Name="ResetPage" Visibility="Collapsed">
     <Border DockPanel.Dock="Bottom" BorderBrush="#DDE2E4" BorderThickness="0,1,0,0" Padding="28,16"><DockPanel><Button x:Name="ResetNext" DockPanel.Dock="Right" Content="Review reset" Click="ResetNext_Click" Style="{StaticResource PrimaryButton}" Margin="16,0,0,0"/><Button x:Name="ResetTargetButton" DockPanel.Dock="Right" Content="Erase FIDO passkeys and PIN" Click="ResetTarget_Click" Style="{StaticResource DangerButton}" Visibility="Collapsed" IsEnabled="False"/><Button x:Name="ResetBack" Content="Back to Home" Click="ResetBack_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left"/></DockPanel></Border>
     <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="40,32,40,24" MaxWidth="900"><UniformGrid x:Name="ResetProgress" Columns="3" Margin="0,0,0,30"/><TextBlock Text="CLEAR PASSKEYS &amp; PIN" Foreground="{StaticResource Heading}" Margin="0,0,0,10"/><TextBlock x:Name="ResetHeading" Style="{StaticResource PageTitle}"/><TextBlock x:Name="ResetDescription" Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="16" Margin="0,10,0,20"/>

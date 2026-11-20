@@ -475,6 +475,7 @@ RegistrationJournalTests.Run(Check);
 await ManagementGraphTests.Run(Check);
 Workflow055Tests.Run(Check);
 Workflow056Tests.Run(Check);
+EnrollmentBatchTests.Run(Check);
 await NfcTests.Run(Check);
 Console.WriteLine($"{tests} checks passed.");
 return 0;

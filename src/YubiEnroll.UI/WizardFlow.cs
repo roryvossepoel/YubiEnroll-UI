@@ -72,6 +72,9 @@ public partial class MainWindow
     private void RenderWizard()
     {
         if (ResetHeading == null || EnrollHeading == null || ResetAcknowledged == null) return;
+        BatchEntry.Visibility = Visible(!_addPasskey && _enrollStep == 0);
+        BatchEntry.Content = _batch == null ? "Set up multiple YubiKeys" : "Return to batch";
+        RenderBatch();
         RenderRegistrationLogStatus();
         ReadReviewWarning();
         RenderProgress(EnrollProgress, _addPasskey ? ["Key", "Tenant", "User", "Review"] : ["Key", "Profile", "Tenant", "User", "Review"], Math.Min(_enrollStep, ReviewStep));

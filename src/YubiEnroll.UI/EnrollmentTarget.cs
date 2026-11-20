@@ -4,9 +4,9 @@ namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
-    private async Task CheckEnrollmentTargetAsync(ResetKey target, ProfileSetup profile)
+    private async Task<KeyStatus> CheckEnrollmentTargetAsync(ResetKey target, ProfileSetup profile, bool newKeyOnly = false)
     {
-        if (_choosingTarget || _selectedKey?.Key != target)
+        if (!newKeyOnly && (_choosingTarget || _selectedKey?.Key != target))
             throw new InvalidOperationException("Confirm the target key before starting enrollment.");
         var executable = KeyResetService.FindExecutable();
         if (executable.Length == 0)
@@ -24,10 +24,13 @@ public partial class MainWindow
             var capabilities = await FidoCapabilityProbe.ReadAsync(runner, target);
             if (!TryApplyInventory(inventory.Keys.Select(k => k == target ? new KeyStatus(k, pin, capabilities) : new KeyStatus(k, FidoPinState.Unknown)).ToArray(), inventory.Unavailable, generation, inventory.ReaderStates))
                 throw new InvalidOperationException("Connected keys changed during verification. Wait for automatic refresh and review the target again.");
+            if (newKeyOnly && (pin != FidoPinState.NotSet || profile.Reset != false))
+                throw new InvalidOperationException("Batch issuance requires a YubiKey without a FIDO PIN and a profile with reset turned off.");
             var compatibility = _addPasskey ? PasskeyAddition.Evaluate(capabilities, pin) : ProfileCompatibility.Evaluate(profile, capabilities, pin);
             if (_addPasskey && profile != PasskeyAddition.Settings(capabilities))
                 throw new InvalidOperationException("The key settings changed. Review the key again before adding a passkey.");
             if (!compatibility.Compatible) throw new InvalidOperationException(compatibility.Message);
+            return new KeyStatus(target, pin, capabilities);
         }
         catch
         {

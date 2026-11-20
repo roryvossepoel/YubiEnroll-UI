@@ -60,6 +60,7 @@ internal sealed class TerminalPanel : Border
     }
     internal void SendInput(string text) { if (_running) _session?.Write(text); }
     internal void DismissCompleted() { if (!_running) { _screen.Clear(); Screen.Clear(); _dismissed.TrySetResult(); } }
+    internal Action? NativeFinished { get; set; }
     internal async Task<int> RunAsync(string executable, string[] args)
     {
         using var session = new PseudoConsole(); _session = session;
@@ -84,6 +85,7 @@ internal sealed class TerminalPanel : Border
             _status.Text = session.HasStarted ? "The terminal connection failed after launch. The operation's outcome is unknown. No retry was started." : "The embedded terminal could not start. Choose external console in Settings before trying again.";
         }
         finally { _running = false; _session = null; _done.IsEnabled = true; _done.Focus(); }
+        NativeFinished?.Invoke();
         CompletedExitCode = exit;
         if (_autoCloseOnSuccess && exit == 0) { _screen.Clear(); Screen.Clear(); return exit; }
         await _dismissed.Task;

@@ -1,0 +1,51 @@
+using System.Windows;
+using YubiEnroll.Core;
+
+namespace YubiEnroll.UI;
+
+public partial class MainWindow
+{
+    private async Task TestBatchPageAsync()
+    {
+        var e = new RoutedEventArgs();
+        _addPasskey = false; _enrollStep = 0;
+        ShowPage(PreparePage);
+        BatchOpen_Click(this, e);
+        BatchProfile.SelectedItem = _config!.Profiles.Single(p => p.Name == "standard");
+        Assert(!BatchToUsers.IsEnabled && BatchPolicy.Text.Contains("reset", StringComparison.OrdinalIgnoreCase), "Batch setup refuses the test profile with FIDO reset");
+        BatchProfile.SelectedItem = _config.Profiles.Single(p => p.Name == "Second profile");
+        _connectedProvider = SelectedProvider;
+        UpdateSummary(); BatchToUsers_Click(this, e);
+        var a = new UserCandidate("aaaaaaaa-1111-2222-3333-444444444444", "") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test" };
+        var b = new UserCandidate("bbbbbbbb-1111-2222-3333-444444444444", "") { DisplayName = "Robin Example", UserPrincipalName = "robin@example.test" };
+        Task<IReadOnlyList<UserCandidate>> Lookup(Provider _, string upn) => Task.FromResult<IReadOnlyList<UserCandidate>>([a, b]);
+        BatchText.Text = a.UserPrincipalName + "\n" + a.UserPrincipalName;
+        await ValidateBatchAsync((_, _) => Task.CompletedTask, Lookup);
+        Assert(_batchStage == BatchStage.Users && BatchProblems.Text.Contains("duplicate"), "Duplicate input blocks review until corrected");
+        BatchText.Text = a.UserPrincipalName + "\n" + b.UserPrincipalName;
+        await ValidateBatchAsync((_, _) => Task.CompletedTask, Lookup);
+        Assert(_batchStage == BatchStage.Review && BatchReviewUsers.Items.Count == 2, "Batch review lists exactly the two verified people");
+        BatchStart_Click(this, e);
+        var batch = _batch ?? throw new Exception("Batch did not start");
+        var key = new ResetKey("12345678", "YubiKey 5C NFC (5.7.1)");
+        var status = new KeyStatus(key, FidoPinState.NotSet, new FidoCapabilities(key.Serial, "5.7.1", true, true, true, true, false, false, 4, 63, false, true, false));
+        ApplyInventory([status], 0);
+        BatchKeys.SelectedItem = status; UpdateLayout();
+        Assert(BatchRegister.IsEnabled && BatchKeyHint.Text.Contains(a.UserPrincipalName) && BatchKeyHint.Text.Contains(key.Serial),
+            "Issuance binds the visible serial and UPN before the operator can register");
+        CaptureWindow(this, "batch-issue.png");
+        // Exercise the real queue, handoff and device-change handlers without a native write or tenant.
+        batch.Start(a, key, status.Pin, _batchPolicy!); batch.Complete(0); RenderBatch();
+        Assert(BatchHandoff.IsVisible && !BatchRegister.IsVisible && BatchOutcome.Text.Contains(key.Serial), "Handoff stays on the completed recipient");
+        BatchNext_Click(this, e); BatchKeys.SelectedItem = status;
+        Assert(!BatchRegister.IsEnabled && BatchRecipient.Text == b.DisplayName && BatchKeyHint.Text.Contains("already attempted"),
+            "Leaving the first key on the reader cannot register it for the next person");
+        BatchSkip_Click(this, e);
+        Assert(_batchStage == BatchStage.Results && BatchRows.Items.Count == 2 && BatchTotals.Text.Contains("Skipped"),
+            "Results distinguish an issued YubiKey from a skipped user");
+        CaptureWindow(this, "batch-results.png");
+        _batch = null; _verified = []; _batchStage = BatchStage.Setup; _connectedProvider = null;
+        BatchRows.ItemsSource = null; BatchReviewUsers.ItemsSource = null; BatchText.Clear();
+        ShowPage(OverviewPage); BeginNextKey();
+    }
+}
