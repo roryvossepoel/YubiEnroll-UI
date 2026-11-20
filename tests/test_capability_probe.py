@@ -19,6 +19,7 @@ class ProbeTests(unittest.TestCase):
         ctap_info = types.SimpleNamespace(options=options, min_pin_length=minimum,
                                          max_pin_length=maximum, transports_for_reset=transports, force_pin_change=False)
         class Connection:
+            transport = "nfc" if reader else "usb"
             def __init__(self, serial): self.serial = serial
             def __enter__(self): calls.append(("open", self.serial)); return self
             def __exit__(self, *args): calls.append(("close", self.serial))
@@ -40,7 +41,7 @@ class ProbeTests(unittest.TestCase):
         for name, members in {
             "ykman.device": {"list_all_devices": lambda: [(Device(s), device_info(s)) for s in serials]},
             "yubikit.core": {"TRANSPORT": types.SimpleNamespace(USB="usb", NFC="nfc")},
-            "yubikit.core.fido": {"FidoConnection": Connection},
+            "yubikit.core.fido": {"FidoConnection": Connection, "SmartCardCtapDevice": lambda conn: conn},
             "yubikit.management": {"CAPABILITY": types.SimpleNamespace(FIDO2=1, PIV=2)},
             "fido2.ctap2": {"Ctap2": ctap},
             "ykman.pcsc": {"list_devices": lambda name: [Device(serials[0], n) for n in (reader_names or [reader])] if serials else []},
