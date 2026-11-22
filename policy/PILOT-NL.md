@@ -1,10 +1,10 @@
-# Passkey Desk voor YubiKeys · Policy Preview 5
+# Passkey Desk voor YubiKeys · Policy Preview 6
 
-Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.5**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
+Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.6**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
-## Indeling van de template (revisie 1.3)
+## Indeling van de template (revisie 1.4)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test de EXE van Policy Preview 5 en de meegeleverde ADMX en ADML (revisie 1.3).
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test de EXE van Policy Preview 6 en de meegeleverde ADMX en ADML (revisie 1.4).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze tes
 | Passkey Desk app settings → Logging → Registration logging | Registraties bewaren, bewaartermijn, registratiemap en gegenereerde initiële PINs opnemen (standaard uit) | Alleen de app. Bij een leeg pad: `Documenten\YubiKey Desk\RegistrationLog`. PIN-logging geldt ook voor CSV-export van de betreffende records. |
 | Passkey Desk app settings → Terminal preference | Interne of externe terminal | Alleen de app. |
 
-**Bewaartermijn voor registraties:** stel bij *Registration logging → Keep registrations for (days)* 1–3650 dagen in (standaard 30). Met registratie-logging aan worden bij het starten, bij opslaan van de instelling en op een volgende dag bij lezen/schrijven verlopen registratiebestanden opgeruimd. De huidige UTC-dag telt mee. CSV-exports blijven staan. De machinewaarde is `RegistrationRetentionDays` (DWORD); `RetentionDays` blijft uitsluitend voor het activiteitenlog.
+**Bewaartermijn voor registraties:** stel bij *Registration logging → Keep registrations for (days)* 1–3650 dagen in (standaard 30). Met registratie-logging aan worden bij het starten, bij opslaan van de instelling en op een volgende dag bij lezen/schrijven verlopen registratiebestanden opgeruimd. De huidige UTC-dag telt mee. CSV-exports blijven staan. Beide logboeken hebben een eigen DWORD-waarde `RetentionDays` in hun eigen subsleutel.
 
 Met **Documenten** wordt de Windows-map van het uitvoerende account bedoeld, ook als die is omgeleid. Je kunt beide logpaden afzonderlijk instellen. Elke ingestelde policy vergrendelt alleen de bijbehorende groep. Alleen logging of een terminalpolicy maakt of wijzigt geen TOML en laat tenants en profielen bewerkbaar.
 
@@ -33,7 +33,17 @@ Bij het opstarten toont **Before you start → YubiEnroll CLI → Organization p
 
 ## Wat beheert een policy precies?
 
-De preview leest bij opstarten de bekende waarden in de **64-bits** registersleutel `HKLM\SOFTWARE\Policies\PasskeyDesk`. De app maakt die sleutel niet aan en schrijft er niets in. Er is geen aan/uit-policy. Een ingestelde policy, ook met waarde 0, maakt alleen het bijbehorende onderdeel in de app alleen-lezen. Verwijder je één policy, dan is na herstart alleen dat onderdeel weer vrij; andere policies blijven gelden. Een lege sleutel of onbekende waarde telt niet mee. Er is geen live omschakeling terwijl de app openstaat.
+Bij opstarten leest de app uitsluitend de bekende subsleutels van de **64-bits** registersleutel `HKLM\SOFTWARE\Policies\PasskeyDesk`. De ADMX schrijft de waarden via het beleid; de app leest ze alleen. Gebruik voor deze schone pilot de nieuwe template én EXE, configureer het beleid en synchroniseer het apparaat. Waarden direct onder `PasskeyDesk` uit een eerdere pilot worden genegeerd en niet gemigreerd. Er is geen aan/uit-policy; een lege sleutel of onbekende waarde schakelt policy mode niet in.
+
+| Subsleutel onder `PasskeyDesk` | Registerwaarden |
+| --- | --- |
+| `YubiEnroll\Tenants` | `TenantsJson` (REG_SZ), dezelfde JSON-array als voorheen |
+| `YubiEnroll\Profiles\Profile1` t/m `Profile5` | Per profiel: `Name`, `Reset`, `MinPinLength`, `AlwaysUv`, `RequireEa`, `ForcePinChange`, `RandomPin`, `RandomPinLength` |
+| `AppSettings\Logging\Activity` | `Enabled`, `Folder`, `RetentionDays` |
+| `AppSettings\Logging\Registration` | `Enabled`, `Folder`, `RetentionDays`, `SaveGeneratedPin` |
+| `AppSettings\Terminal` | `EmbeddedTerminal` (0 = externe console, 1 = interne terminal), alleen als je deze policy configureert |
+
+Op **App settings** staat naast elke beheerde sectie een pill **Policy mode: read only**. Laat **Terminal preference** op **Not configured** om operators vrij te laten kiezen, ook als beide logboeken worden beheerd. Na verwijderen van een policy wordt alleen dat onderdeel bij herstart weer bewerkbaar.
 
 | Ingesteld | Effect bij het starten |
 | --- | --- |

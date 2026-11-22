@@ -23,14 +23,14 @@ public partial class MainWindow
             {
                 await startupPolicyView.ApplyStartupPolicyAsync(null, () => throw new Exception("Unmanaged startup accessed TOML"));
                 Assert(!startupPolicyView._activityJournal.Read().Any(), "Unmanaged startup does not log policy detection");
-                var appOnly = DeskPolicy.Read(k => k == "EmbeddedTerminal" ? 0 : null, root, root);
+                var appOnly = DeskPolicy.Read(k => k == @"AppSettings\Terminal" ? new Dictionary<string,object?> { ["EmbeddedTerminal"] = 0 } : null, root, root);
                 await startupPolicyView.ApplyStartupPolicyAsync(appOnly, () => throw new Exception("App-only startup accessed TOML"));
                 Assert(startupPolicyView.StartupPolicyStep.Visibility == Visibility.Visible && startupPolicyView.StartupPolicyStatus.Text.Contains("App settings applied"),
                     "App policy is visible without touching TOML");
                 Assert(startupPolicyView._activityJournal.Read().Single() is { Level: "Info", Message: "Policy mode detected at startup. App settings applied. No TOML synchronization needed." },
                     "Preferences-only policy records one accurate startup outcome");
                 var profilePath = Path.Combine(root, "preview-policy.toml");
-                var states = new Dictionary<string, object> { ["TenantsJson"] = "[]" };
+                var states = new Dictionary<string, Dictionary<string,object?>> { [@"YubiEnroll\Tenants"] = new() { ["TenantsJson"] = "[]" } };
                 var empty = DeskPolicy.Read(k => states.GetValueOrDefault(k), root, root);
                 await startupPolicyView.ApplyStartupPolicyAsync(empty, () => profilePath);
                 Assert(!File.Exists(profilePath) && startupPolicyView.StartupPolicyStatus.Text.Contains("No TOML file needed"), "Empty managed tenants do not report a file write");
@@ -152,11 +152,13 @@ public partial class MainWindow
             });
             tenantEditor.ShowDialog();
             await tenantEditOperation.Task;
-            var scopedValues = new Dictionary<string,object> { ["EmbeddedTerminal"] = 0 };
+            var scopedValues = new Dictionary<string, Dictionary<string,object?>> { [@"AppSettings\Terminal"] = new() { ["EmbeddedTerminal"] = 0 } };
             SettingsWindow PolicySettings()
             {
-                var policy = DeskPolicy.Read(k => scopedValues.GetValueOrDefault(k), root, root);
-                return new SettingsWindow(path, mockExecutable,"Mock CLI", _registrationJournal, _activityJournal, policy:policy);
+                var policy = DeskPolicy.Read(k => scopedValues.GetValueOrDefault(k), Path.Combine(root, "activity-logs"), Path.Combine(root, "registration-logs"));
+                var registration = new RegistrationJournal(Path.Combine(root,"policy-registration.json"), root, policy?.Registration);
+                var activity = new ActivityJournal(Path.Combine(root,"policy-activity.json"), root, policy?.Activity);
+                return new SettingsWindow(path, mockExecutable,"Mock CLI", registration, activity, policy:policy);
             }
             var terminalView = PolicySettings();
             Assert(terminalView.TenantActions.Visibility == Visibility.Visible && terminalView.ProfileActions.Visibility == Visibility.Visible
@@ -165,8 +167,25 @@ public partial class MainWindow
                 && !terminalView.EmbeddedTerminal, "External terminal policy locks only the terminal controls");
             terminalView.PreviewImport(ConfigTransfer.Export(File.ReadAllText(path)));
             Assert(terminalView.ImportButton.IsEnabled, "App-only policy allows normal configuration import");
+            Assert(terminalView.TerminalPolicyBadge.Visibility == Visibility.Visible && terminalView.ActivityPolicyBadge.Visibility == Visibility.Collapsed
+                && terminalView.RegistrationPolicyBadge.Visibility == Visibility.Collapsed, "Only the explicitly managed terminal shows a policy badge");
             terminalView.Close();
-            scopedValues.Clear(); scopedValues["TenantsJson"] = "[]";
+            scopedValues.Clear();
+            scopedValues[@"AppSettings\Logging\Activity"] = new() { ["Enabled"] = 1, ["RetentionDays"] = 14 };
+            scopedValues[@"AppSettings\Logging\Registration"] = new() { ["Enabled"] = 1, ["SaveGeneratedPin"] = 0, ["RetentionDays"] = 30 };
+            var logView = PolicySettings();
+            logView.Owner = this;
+            logView.Show();
+            logView.AppSettingsTab.IsSelected = true;
+            CaptureWindow(logView, "settings-managed-logs.png");
+            Assert(!logView.ActivityControls.IsEnabled && !logView.RegistrationControls.IsEnabled && logView.ActivityPolicyBadge.Visibility == Visibility.Visible
+                && logView.RegistrationPolicyBadge.Visibility == Visibility.Visible && logView.TerminalPolicyBadge.Visibility == Visibility.Collapsed
+                && logView.EmbeddedChoice.IsEnabled && logView.ExternalChoice.IsEnabled, "Both managed logs have badges while the unconfigured terminal stays editable");
+            logView.ExternalChoice.IsChecked = true;
+            logView.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert(!logView.EmbeddedTerminal && !logView.SaveLogSettingsButton.IsEnabled, "Local external-console choice can be saved alongside enforced log settings");
+            logView.Close();
+            scopedValues.Clear(); scopedValues[@"YubiEnroll\Tenants"] = new() { ["TenantsJson"] = "[]" };
             var tenantView = PolicySettings();
             Assert(tenantView.PolicyNotice.Visibility == Visibility.Visible && tenantView.TenantActions.Visibility == Visibility.Collapsed
                 && tenantView.ProfileActions.Visibility == Visibility.Visible && tenantView.TerminalControls.IsEnabled && tenantView.ActivityControls.IsEnabled,
@@ -174,14 +193,14 @@ public partial class MainWindow
             Assert(tenantView.TenantTransfer.Visibility == Visibility.Collapsed && tenantView.TenantPolicyBadge.Visibility == Visibility.Visible
                 && tenantView.ProfileTransfer.IsEnabled && tenantView.ProfilePolicyBadge.Visibility == Visibility.Collapsed, "Tenant badge replaces only the tenant transfer action");
             tenantView.Close();
-            scopedValues.Clear(); scopedValues["Profile1Name"] = "Managed";
+            scopedValues.Clear(); scopedValues[@"YubiEnroll\Profiles\Profile1"] = new() { ["Name"] = "Managed" };
             foreach (var field in new[] { "Reset", "AlwaysUv", "RequireEa", "ForcePinChange", "RandomPin", "RandomPinLength", "MinPinLength" })
-                scopedValues["Profile1" + field] = 0;
+                scopedValues[@"YubiEnroll\Profiles\Profile1"][field] = 0;
             var profileView = PolicySettings();
             Assert(profileView.ProfilePolicyBadge.Visibility == Visibility.Visible && profileView.ProfileTransfer.Visibility == Visibility.Collapsed
                 && profileView.TenantTransfer.IsEnabled && profileView.TenantPolicyBadge.Visibility == Visibility.Collapsed, "Profile badge is independent of tenant policy");
             profileView.Close();
-            scopedValues["TenantsJson"] = "[]";
+            scopedValues[@"YubiEnroll\Tenants"] = new() { ["TenantsJson"] = "[]" };
             var bothView = PolicySettings();
             Assert(!bothView.ProfileTransfer.IsEnabled && !bothView.TenantTransfer.IsEnabled
                 && bothView.ProfilePolicyBadge.Visibility == Visibility.Visible && bothView.TenantPolicyBadge.Visibility == Visibility.Visible, "Both managed lists show only their badge");

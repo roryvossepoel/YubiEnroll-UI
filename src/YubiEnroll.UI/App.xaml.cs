@@ -20,7 +20,7 @@ public partial class App : Application
         {
             using var machine = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
             using var key = machine.OpenSubKey(YubiEnroll.Core.DeskPolicy.RegistryPath, writable: false);
-            policy = YubiEnroll.Core.DeskPolicy.Read(name => key?.GetValue(name, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames),
+            policy = YubiEnroll.Core.DeskPolicy.ReadRegistry(key,
                 YubiEnroll.Core.RegistrationJournal.LogDirectory("ActivityLog"), YubiEnroll.Core.RegistrationJournal.LogDirectory("RegistrationLog"));
             if (policy != null && (e.Args.Contains("--smoke-test") || e.Args.Contains("--terminal-check")))
                 throw new InvalidOperationException("Run diagnostics on a device outside policy mode.");

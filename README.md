@@ -2,9 +2,12 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
-## Policy Preview 5 (0.11.0-policy.5)
+## Policy Preview 6 (0.11.0-policy.6)
 
 Separate pilot based on 0.10.9. With no recognized machine policy the normal local editing and CLI configuration remain in use. Only the configured section is read-only: tenants, profiles, activity logging, registration logging or terminal preference. A managed list shows a read-only policy badge in place of its transfer action. Under partial policy, only the editable list can be imported or exported. Policies are read at startup; only the declared tenant/profile collections are reconciled into the current account’s ordinary TOML. When policy is present, the startup screen shows its status beneath YubiEnroll CLI and the Activity log records the synchronization outcome once per launch. See [pilot instructions and rollback](policy/PILOT-NL.md). The templates are optional. Both logs have their own retention in days. For registration logging, App settings and the Registration logging policy accept 1–3650 days (default 30). While logging is enabled, expired registration records are deleted from the configured folder; exported CSVs are kept.
+
+Use the bundled ADMX/ADML revision 1.4 with this build. Below `HKLM\SOFTWARE\Policies\PasskeyDesk`, CLI configuration lives under `YubiEnroll\Tenants` and `YubiEnroll\Profiles\Profile1` through `Profile5`. App settings use `AppSettings\Logging\Activity`, `AppSettings\Logging\Registration` and, if explicitly configured, `AppSettings\Terminal`. Each managed settings group shows its own read-only badge. Leaving the terminal policy unconfigured keeps the choice editable. Flat registry values from previous pilots are ignored.
+
 
 ## Features inherited from preview 0.10.9
 

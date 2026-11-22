@@ -1,3 +1,5 @@
+using Microsoft.Win32;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using Tomlyn;
 using Tomlyn.Model;
@@ -24,55 +26,78 @@ public sealed class DeskPolicy
         RegistrationLogPreferences? registration, bool? embedded) =>
         (_tenants, _profiles, Activity, Registration, EmbeddedTerminal) = (tenants, profiles, activity, registration, embedded);
 
-    public static DeskPolicy? Read(Func<string, object?> read, string defaultActivity, string defaultRegistration)
+    [SupportedOSPlatform("windows")]
+    public static DeskPolicy? ReadRegistry(RegistryKey? root, string defaultActivity, string defaultRegistration)
     {
-        var values = new Dictionary<string, object?>();
-        object? get(string key) => values.TryGetValue(key, out var v) ? v : values[key] = read(key);
-        int Number(string name, int min, int max) => get(name) is int n && n >= min && n <= max ? n :
-            throw new InvalidDataException($"Policy field {name} must be a DWORD from {min} to {max}.");
-        bool Flag(string name) => Number(name, 0, 1) == 1;
-        string Required(string name) => get(name) is string s && !string.IsNullOrWhiteSpace(s) ? s :
-            throw new InvalidDataException($"Policy field {name} must contain text.");
-        string Folder(string name, string fallback)
+        IReadOnlyDictionary<string, object?>? ReadSection(string path)
         {
-            var raw = get(name);
-            if (raw != null && raw is not string) throw new InvalidDataException($"Policy field {name} must contain a folder path.");
+            using var section = root?.OpenSubKey(path, writable: false);
+            if (section == null) return null;
+            return section.GetValueNames().ToDictionary(name => name,
+                name => section.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames),
+                StringComparer.OrdinalIgnoreCase);
+        }
+        return Read(ReadSection, defaultActivity, defaultRegistration);
+    }
+
+    private sealed class Section(string path, IReadOnlyDictionary<string, object?>? values)
+    {
+        private object? Get(string name) => values?.GetValueOrDefault(name);
+        public bool HasAny(params string[] fields) => fields.Any(name => Get(name) != null);
+        public int Number(string name, int min, int max) => Get(name) is int n && n >= min && n <= max ? n :
+            throw new InvalidDataException($@"Policy field {path}\{name} must be a DWORD from {min} to {max}.");
+        public bool Flag(string name) => Number(name, 0, 1) == 1;
+        public string Required(string name) => Get(name) is string s && !string.IsNullOrWhiteSpace(s) ? s :
+            throw new InvalidDataException($@"Policy field {path}\{name} must contain text.");
+        public string Folder(string fallback)
+        {
+            var raw = Get("Folder");
+            if (raw != null && raw is not string) throw new InvalidDataException($@"Policy field {path}\Folder must contain a folder path.");
             var folder = raw is string value && !string.IsNullOrWhiteSpace(value)
                 ? Environment.ExpandEnvironmentVariables(value.Trim()) : fallback;
             if (string.IsNullOrWhiteSpace(folder) || !Path.IsPathFullyQualified(folder) || folder.Contains('%'))
-                throw new InvalidDataException($"Policy field {name} must resolve to an absolute folder for this user.");
+                throw new InvalidDataException($@"Policy field {path}\Folder must resolve to an absolute folder for this user.");
             return Path.GetFullPath(folder);
         }
-        var tenants = get("TenantsJson") == null ? null : ParseTenants(Required("TenantsJson"));
+    }
+
+    public static DeskPolicy? Read(Func<string, IReadOnlyDictionary<string, object?>?> readSection, string defaultActivity, string defaultRegistration)
+    {
+        Section Open(string path) => new(path, readSection(path));
+        var tenantSection = Open(@"YubiEnroll\Tenants");
+        var tenants = tenantSection.HasAny("TenantsJson") ? ParseTenants(tenantSection.Required("TenantsJson")) : null;
         var profiles = new List<ProfileSetup>();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (int i = 1; i <= ProfileSlots; i++)
         {
-            var prefix = $"Profile{i}";
-            if (!ProfileFields.Any(field => get(prefix + field) != null)) continue;
+            var slot = Open($@"YubiEnroll\Profiles\Profile{i}");
+            if (!slot.HasAny(ProfileFields)) continue;
             int? PinLength(string field)
             {
-                var value = Number(prefix + field, 0, 63);
-                if (value is > 0 and < 4) throw new InvalidDataException($"{prefix}{field} must be 0 (CLI default) or 4–63.");
+                var value = slot.Number(field, 0, 63);
+                if (value is > 0 and < 4) throw new InvalidDataException($"Profile {i}: {field} must be 0 (CLI default) or 4–63.");
                 return value == 0 ? null : value;
             }
             ProfileSetup p;
             try
             {
-                p = new ProfileSetup(Required(prefix + "Name"), Flag(prefix + "Reset"), PinLength("MinPinLength"),
-                    Flag(prefix + "AlwaysUv"), Flag(prefix + "RequireEa"), Flag(prefix + "ForcePinChange"),
-                    Flag(prefix + "RandomPin"), PinLength("RandomPinLength")).Validate();
+                p = new ProfileSetup(slot.Required("Name"), slot.Flag("Reset"), PinLength("MinPinLength"),
+                    slot.Flag("AlwaysUv"), slot.Flag("RequireEa"), slot.Flag("ForcePinChange"),
+                    slot.Flag("RandomPin"), PinLength("RandomPinLength")).Validate();
             }
             catch (ArgumentException ex) { throw new InvalidDataException($"Configuration profile {i}: {ex.Message}", ex); }
             if (!names.Add(p.Name)) throw new InvalidDataException($"Configuration profile {i} has a duplicate name.");
             profiles.Add(p);
         }
-        ActivityPreferences? activity = get("ActivityLogging") != null || get("ActivityFolder") != null || get("RetentionDays") != null
-            ? new(Flag("ActivityLogging"), Folder("ActivityFolder", defaultActivity), Number("RetentionDays", 1, 3650)) : null;
-        RegistrationLogPreferences? registration = get("RegistrationLogging") != null || get("RegistrationFolder") != null || get("SaveGeneratedPin") != null || get("RegistrationRetentionDays") != null
-            ? new(Flag("RegistrationLogging"), Folder("RegistrationFolder", defaultRegistration), Flag("SaveGeneratedPin"),
-                Number("RegistrationRetentionDays", 1, RegistrationJournal.MaxRetentionDays)) : null;
-        bool? terminal = get("EmbeddedTerminal") != null ? Flag("EmbeddedTerminal") : null;
+        var activitySection = Open(@"AppSettings\Logging\Activity");
+        ActivityPreferences? activity = activitySection.HasAny("Enabled", "Folder", "RetentionDays")
+            ? new(activitySection.Flag("Enabled"), activitySection.Folder(defaultActivity), activitySection.Number("RetentionDays", 1, 3650)) : null;
+        var registrationSection = Open(@"AppSettings\Logging\Registration");
+        RegistrationLogPreferences? registration = registrationSection.HasAny("Enabled", "Folder", "SaveGeneratedPin", "RetentionDays")
+            ? new(registrationSection.Flag("Enabled"), registrationSection.Folder(defaultRegistration), registrationSection.Flag("SaveGeneratedPin"),
+                registrationSection.Number("RetentionDays", 1, RegistrationJournal.MaxRetentionDays)) : null;
+        var terminalSection = Open(@"AppSettings\Terminal");
+        bool? terminal = terminalSection.HasAny("EmbeddedTerminal") ? terminalSection.Flag("EmbeddedTerminal") : null;
         if (tenants == null && profiles.Count == 0 && activity == null && registration == null && terminal == null) return null;
         return new(tenants, profiles.Count == 0 ? null : profiles.ToArray(), activity, registration, terminal);
     }

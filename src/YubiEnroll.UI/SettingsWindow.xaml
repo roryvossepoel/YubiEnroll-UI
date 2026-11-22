@@ -47,7 +47,13 @@
       </ItemsControl></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
    </DockPanel></TabItem>
    <TabItem x:Name="AppSettingsTab" Header="App settings"><DockPanel Margin="18"><Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="#DCE3EB" Padding="0,12,0,0"><DockPanel><Button DockPanel.Dock="Right" x:Name="SaveLogSettingsButton" Content="Save changes" Click="SaveAll_Click" Style="{StaticResource PrimaryButton}"/><TextBlock x:Name="DirtyHint" VerticalAlignment="Center"/></DockPanel></Border><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel><TextBlock Text="App settings" Style="{StaticResource SettingsTitle}"/><TextBlock Text="Manage logging and terminal preferences." Style="{StaticResource SettingsDescription}"/>
-     <StackPanel x:Name="ActivityControls"><TextBlock Text="Activity logging" Style="{StaticResource SectionTitle}"/>
+     <WrapPanel>
+      <TextBlock Text="Activity logging" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+      <Border x:Name="ActivityPolicyBadge" Style="{StaticResource VersionPill}" Visibility="Collapsed" Margin="10,0,0,0" VerticalAlignment="Center" ToolTip="Activity logging is managed by your organization." AutomationProperties.HelpText="Activity logging is managed by your organization.">
+       <TextBlock Text="Policy mode: read only"/>
+      </Border>
+     </WrapPanel>
+     <StackPanel x:Name="ActivityControls">
      <CheckBox x:Name="SaveActivity" Content="Keep activity between sessions" Margin="0,12,0,5"/>
      <TextBlock Text="Activity log folder" Margin="0,6,0,4"/>
      <DockPanel IsEnabled="{Binding IsChecked, ElementName=SaveActivity}"><Button x:Name="ActivityDefault" DockPanel.Dock="Right" Content="Use default" Click="DefaultActivityFolder_Click" Style="{StaticResource QuietButton}" Margin="8,0,0,0"/><Button DockPanel.Dock="Right" Content="Change…" Click="ActivityFolder_Click" Margin="8,0,0,0"/><TextBox x:Name="ActivityFolder" IsReadOnly="True" AutomationProperties.Name="Activity log folder" VerticalContentAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/></DockPanel>
@@ -55,7 +61,13 @@
      <TextBlock Text="Only activity files in the chosen folder are pruned. Existing files are not moved when you switch folders." TextWrapping="Wrap" Margin="0,6,0,8" Foreground="{StaticResource Muted}"/>
      <TextBlock x:Name="ActivitySettingsFeedback" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
     </StackPanel><Separator Margin="0,20"/>
-     <StackPanel x:Name="RegistrationControls"><TextBlock Text="Registration logging" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/>
+     <WrapPanel Margin="0,0,0,12">
+      <TextBlock Text="Registration logging" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+      <Border x:Name="RegistrationPolicyBadge" Style="{StaticResource VersionPill}" Visibility="Collapsed" Margin="10,0,0,0" VerticalAlignment="Center" ToolTip="Registration logging is managed by your organization." AutomationProperties.HelpText="Registration logging is managed by your organization.">
+       <TextBlock Text="Policy mode: read only"/>
+      </Border>
+     </WrapPanel>
+     <StackPanel x:Name="RegistrationControls">
      <CheckBox x:Name="EnabledChoice" Content="Save enrollment records"/>
      <TextBlock Text="Record the recipient, target key, profile and registration result for future enrollments." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,6,0,16"/>
      <CheckBox x:Name="SavePinChoice" Content="Include generated PINs" IsEnabled="{Binding IsChecked, ElementName=EnabledChoice}"/>
@@ -66,7 +78,13 @@
      <TextBlock Text="Keep registrations for (days)" Margin="0,8,0,3"/><TextBox IsEnabled="{Binding IsChecked, ElementName=EnabledChoice}" x:Name="RegistrationDays" MaxLength="4" Width="85" HorizontalAlignment="Left" AutomationProperties.Name="Registration retention in days"/>
      <TextBlock Text="While logging is on, expired records are deleted from this folder. Exported CSV files are kept." TextWrapping="Wrap" Margin="0,6,0,8" Foreground="{StaticResource Muted}"/>
      <TextBlock x:Name="LogSettingsFeedback" TextWrapping="Wrap" Foreground="{StaticResource Muted}" AutomationProperties.LiveSetting="Polite"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Margin" Value="0,8,0,0"/><Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
-    </StackPanel><Separator Margin="0,20"/><StackPanel x:Name="TerminalControls"><TextBlock Text="Terminal" Style="{StaticResource SectionTitle}" Margin="0,0,0,12"/><RadioButton x:Name="EmbeddedChoice" Content="In-app terminal"/><RadioButton x:Name="ExternalChoice" Content="External console" Margin="0,8,0,12"/></StackPanel></StackPanel></ScrollViewer></DockPanel></TabItem>
+    </StackPanel><Separator Margin="0,20"/><WrapPanel Margin="0,0,0,12">
+      <TextBlock Text="Terminal" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+      <Border x:Name="TerminalPolicyBadge" Style="{StaticResource VersionPill}" Visibility="Collapsed" Margin="10,0,0,0" VerticalAlignment="Center" ToolTip="The terminal preference is managed by your organization." AutomationProperties.HelpText="The terminal preference is managed by your organization.">
+       <TextBlock Text="Policy mode: read only"/>
+      </Border>
+     </WrapPanel>
+     <StackPanel x:Name="TerminalControls"><RadioButton x:Name="EmbeddedChoice" Content="In-app terminal"/><RadioButton x:Name="ExternalChoice" Content="External console" Margin="0,8,0,12"/></StackPanel></StackPanel></ScrollViewer></DockPanel></TabItem>
       <TabItem x:Name="ActivityTab" Header="Activity log"><ContentControl x:Name="ActivityHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
    <TabItem x:Name="RegistrationTab" Header="Registration log"><ContentControl x:Name="RegistrationHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/></TabItem>
 

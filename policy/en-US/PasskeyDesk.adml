@@ -1,11 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
-<policyDefinitionResources revision="1.3" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+<policyDefinitionResources revision="1.4" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
   <displayName>Passkey Desk for YubiKeys</displayName>
   <description>Machine policy for the independent Passkey Desk application.</description>
   <resources>
     <stringTable>
-      <string id="SupportedVersion">Passkey Desk 0.11.0 Policy Preview 2 or later</string>
-      <string id="SupportedVersion5">Passkey Desk 0.11.0 Policy Preview 5 or later</string>
+      <string id="SupportedVersion">Passkey Desk 0.11.0 Policy Preview 6 or later</string>
       <string id="CategoryName">Passkey Desk for YubiKeys</string>
       <string id="CliConfigLabelCategory">YubiEnroll CLI configuration (TOML)</string>
       <string id="TenantsCategoryLabelCategory">Tenants</string>
@@ -37,27 +36,27 @@
     </stringTable>
     <presentationTable>
       <presentation id="Tenants">
-        <textBox refId="TenantsJson">
+        <textBox refId="TenantsTenantsJson">
           <label>Tenant list (single-line JSON)</label>
         </textBox>
       </presentation>
       <presentation id="Activity">
-        <dropdownList refId="ActivityLogging" defaultItem="1">Keep activity between sessions</dropdownList>
-        <decimalTextBox refId="RetentionDays" defaultValue="30">Retention (days)</decimalTextBox>
+        <dropdownList refId="ActivityEnabled" defaultItem="1">Keep activity between sessions</dropdownList>
+        <decimalTextBox refId="ActivityRetentionDays" defaultValue="30">Retention (days)</decimalTextBox>
         <textBox refId="ActivityFolder">
           <label>Activity log folder (blank = user default)</label>
         </textBox>
       </presentation>
       <presentation id="Registration">
-        <dropdownList refId="RegistrationLogging" defaultItem="0">Save enrollment records</dropdownList>
-        <dropdownList refId="SaveGeneratedPin" defaultItem="0">Include generated initial PINs</dropdownList>
+        <dropdownList refId="RegistrationEnabled" defaultItem="0">Save enrollment records</dropdownList>
+        <dropdownList refId="RegistrationSaveGeneratedPin" defaultItem="0">Include generated initial PINs</dropdownList>
         <textBox refId="RegistrationFolder">
           <label>Registration log folder (blank = user default)</label>
         </textBox>
         <decimalTextBox refId="RegistrationRetentionDays" defaultValue="30">Keep registrations for (days)</decimalTextBox>
       </presentation>
       <presentation id="Terminal">
-        <dropdownList refId="EmbeddedTerminal" defaultItem="1">Terminal</dropdownList>
+        <dropdownList refId="TerminalEmbeddedTerminal" defaultItem="1">Terminal</dropdownList>
       </presentation>
       <presentation id="Profile1">
         <textBox refId="Profile1Name">

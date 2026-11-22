@@ -138,9 +138,16 @@ public partial class SettingsWindow : Window
         var managed = new List<string>();
         if (TenantsManaged) { TenantActions.Visibility = Visibility.Collapsed; managed.Add("tenants"); }
         if (ProfilesManaged) { ProfileActions.Visibility = Visibility.Collapsed; managed.Add("configuration profiles"); }
-        if (_activity.IsManaged) { ActivityControls.IsEnabled = false; managed.Add("activity logging"); }
-        if (_journal.IsManaged) { RegistrationControls.IsEnabled = false; managed.Add("registration logging"); }
-        if (TerminalManaged) { TerminalControls.IsEnabled = false; managed.Add("terminal preference"); }
+        void MarkManaged(bool isManaged, StackPanel controls, Border badge, string section)
+        {
+            if (!isManaged) return;
+            controls.IsEnabled = false;
+            badge.Visibility = Visibility.Visible;
+            managed.Add(section);
+        }
+        MarkManaged(_activity.IsManaged, ActivityControls, ActivityPolicyBadge, "activity logging");
+        MarkManaged(_journal.IsManaged, RegistrationControls, RegistrationPolicyBadge, "registration logging");
+        MarkManaged(TerminalManaged, TerminalControls, TerminalPolicyBadge, "terminal preference");
         if (managed.Count > 0)
         {
             PolicyNotice.Text = "Managed by your organization: " + string.Join(", ", managed) + ".";

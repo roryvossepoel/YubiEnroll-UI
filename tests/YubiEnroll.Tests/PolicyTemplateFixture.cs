@@ -1,3 +1,5 @@
+using Microsoft.Win32;
+using System.Runtime.Versioning;
 using System.Xml.Linq;
 using YubiEnroll.Core;
 internal static class PolicyTemplateFixture
@@ -28,18 +30,22 @@ internal static class PolicyTemplateFixture
             }
             return false;
         }
-        var values = new Dictionary<string, object>();
+        var values = new Dictionary<string, Dictionary<string, object?>>(StringComparer.OrdinalIgnoreCase);
         var policies = defs.Descendants(ns + "policy").ToArray();
         foreach (var p in policies)
         {
-            if (A(p,"class") != "Machine" || !A(p,"key").Equals(DeskPolicy.RegistryPath,StringComparison.OrdinalIgnoreCase))
+            var prefix = DeskPolicy.RegistryPath + @"\";
+            var key = A(p,"key");
+            if (A(p,"class") != "Machine" || !key.StartsWith(prefix,StringComparison.OrdinalIgnoreCase) || key.Length == prefix.Length)
                 throw new InvalidDataException("Unexpected registry location");
+            var relativeKey = key[prefix.Length..];
             var form = forms[A(p,"presentation")[15..^1]].Elements().ToDictionary(x=>A(x,"refId"));
             var elements = p.Element(ns + "elements")!.Elements().ToArray();
             if (form.Count != elements.Length) throw new InvalidDataException("Unmatched ADML controls");
-            var scoped = new Dictionary<string,object>();
+            var scoped = new Dictionary<string,object?>();
             foreach (var f in elements)
             {
+                if (f.Attribute("key") != null) throw new InvalidDataException("Element must use its policy subkey");
                 var field = A(f,"valueName"); var input = form[A(f,"id")];
                 switch (f.Name.LocalName)
                 {
@@ -54,7 +60,7 @@ internal static class PolicyTemplateFixture
                 }
             }
             var dir = Path.GetDirectoryName(path)!;
-            var single = DeskPolicy.Read(k => scoped.GetValueOrDefault(k),dir,dir);
+            var single = DeskPolicy.Read(k => k == relativeKey ? scoped : null,dir,dir);
             check(single != null, "Template works independently: " + A(p,"name"));
             if (InCategory(p, "AppSettings"))
             {
@@ -66,13 +72,46 @@ internal static class PolicyTemplateFixture
             else
                 check(InCategory(p, "CliConfig") && single is { Activity: null, Registration: null, EmbeddedTerminal: null },
                     "CLI configuration policy does not supply app preferences: " + A(p,"name"));
-            foreach (var kv in scoped) values.Add(kv.Key,kv.Value);
+            values.Add(relativeKey,scoped);
         }
         check(policies.Length == 9, "Only concrete settings in template; no master switch");
         string target = Path.GetDirectoryName(path)!;
-        DeskPolicy.Synchronize(DeskPolicy.Read(k => values.GetValueOrDefault(k),target,target),()=>path);
+        var snapshot = OperatingSystem.IsWindows() ? CheckRegistry(values, target, check) :
+            DeskPolicy.Read(k => values.GetValueOrDefault(k),target,target);
+        DeskPolicy.Synchronize(snapshot,()=>path);
         var result = ConfigReader.Read(path);
         check(result.Providers.Single().Name == "Pilot tenant" && result.Profiles.Count == 5,
             "All template defaults and the example JSON round-trip to the standard CLI format");
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static DeskPolicy? CheckRegistry(Dictionary<string, Dictionary<string, object?>> sections, string folder, Action<bool,string> check)
+    {
+        var testPath = $@"Software\PasskeyDesk-PolicyTest-{Guid.NewGuid():N}";
+        using var hive = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
+        try
+        {
+            using var root = hive.CreateSubKey(testPath);
+            DeskPolicy? Read() => DeskPolicy.ReadRegistry(root, folder, folder);
+            root.SetValue("TenantsJson", "stale flat value");
+            using (root.CreateSubKey(@"YubiEnroll\Profiles\Profile1")) { }
+            check(Read() == null, "Flat values and empty subkeys leave the app unmanaged");
+            foreach (var (path, fields) in sections)
+            {
+                using var section = root.CreateSubKey(path);
+                foreach (var (name, value) in fields)
+                    section.SetValue(name, value!, value is int ? RegistryValueKind.DWord : RegistryValueKind.String);
+            }
+            using (var key = root.OpenSubKey(@"AppSettings\Logging\Activity", true)!) key.SetValue("RetentionDays", 12);
+            using (var key = root.OpenSubKey(@"AppSettings\Logging\Registration", true)!) key.SetValue("RetentionDays", 78);
+            var all = Read();
+            check(all is { ManagesTenants: true, ManagesProfiles: true, Activity.RetentionDays: 12, Registration.RetentionDays: 78, EmbeddedTerminal: true },
+                "Shipped ADMX values round-trip through real Windows subkeys, including identically named values in separate log sections");
+            root.DeleteSubKeyTree(@"AppSettings\Terminal");
+            check(Read() is { EmbeddedTerminal: null, Activity: not null, Registration: not null },
+                "Removing only the terminal subkey leaves both log policies active");
+            return all;
+        }
+        finally { hive.DeleteSubKeyTree(testPath, throwOnMissingSubKey: false); }
     }
 }
