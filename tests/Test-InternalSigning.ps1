@@ -16,7 +16,7 @@ try {
     foreach ($name in $names) {
         Copy-Item -LiteralPath "$root/artifacts/win-x64/app/$name" -Destination $temporary
         $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $temporary $name))
-        if ($version.ProductName -ne 'YubiKey Desk' -or $version.CompanyName -ne 'Rory Vossepoel') { throw "Incorrect product/publisher metadata: $name" }
+        if ($version.ProductName -ne 'Passkey Desk for YubiKeys' -or $version.CompanyName -ne 'Rory Vossepoel') { throw "Incorrect product/publisher metadata: $name" }
     }
     & "$root/scripts/Sign-App.ps1" -AppDirectory $temporary -CertificateThumbprint $certificate.Thumbprint
     $zip = Join-Path $temporary 'signed.zip'

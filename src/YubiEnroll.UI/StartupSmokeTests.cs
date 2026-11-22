@@ -342,14 +342,14 @@ public partial class MainWindow
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
             _activityView.Add("Synthetic summary only.", "Info", "   ");
             OpenSettings(s => s.ActivityTab); UpdateLayout();
-            var disclosures = VisualDescendants<System.Windows.Controls.Expander>(_activityView).ToArray();
-            Assert(!disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic summary only.")).IsVisible,
-                "Activity entries with empty or whitespace details have no disclosure control");
-            var diagnostic = disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic operation failed."));
-            Assert(diagnostic.IsVisible, "Activity entries with diagnostics retain a disclosure control");
-            diagnostic.IsExpanded = true; UpdateLayout();
-            Assert(VisualDescendants<System.Windows.Controls.TextBlock>(diagnostic).Any(x => x.IsVisible && x.Text == "HTTP status: 405"),
-                "Expanding an activity diagnostic shows its actual details");
+            var activityGrid = VisualDescendants<DataGrid>(_activityView).Single();
+            var diagnostic = activityGrid.Items.Cast<object>().Single(x => x.ToString()!.Contains("Synthetic operation failed."));
+            activityGrid.ScrollIntoView(diagnostic);
+            UpdateLayout();
+            var diagnosticRow = (DataGridRow)activityGrid.ItemContainerGenerator.ContainerFromItem(diagnostic);
+            Assert(diagnosticRow != null && !VisualDescendants<Expander>(diagnosticRow).Any()
+                && VisualDescendants<TextBlock>(diagnosticRow).Any(x => x.IsVisible && x.Text == "HTTP status: 405"),
+                "Activity diagnostics are visible directly in the row without expanding");
             CaptureWindow(this, "activity-log.png");
             ShowPage(OverviewPage);
             Width = 800; Height = 580;

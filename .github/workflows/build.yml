@@ -19,6 +19,28 @@ jobs:
       - name: Test and publish
         shell: pwsh
         run: ./build.ps1 -Runtime win-x64
+      - name: Verify and archive the Windows preview
+        shell: pwsh
+        run: |
+          $out = 'artifacts/win-x64/app'
+          foreach ($name in 'PasskeyDesk.exe', 'PasskeyDesk.ConsoleHost.exe') {
+            $file = Get-Item "$out/$name"
+            $info = $file.VersionInfo
+            if ($info.ProductName -ne 'Passkey Desk for YubiKeys' -or $info.ProductVersion -notlike '0.11.0-policy.3*') {
+              throw "Unexpected executable metadata for $name"
+            }
+            Write-Output "$name $($info.ProductVersion) $($file.Length) bytes"
+            Get-FileHash $file.FullName -Algorithm SHA256
+          }
+          if (!(Test-Path "$out/policy/PasskeyDesk.admx") -or !(Test-Path "$out/policy/en-US/PasskeyDesk.adml")) {
+            throw 'Policy templates missing from the preview'
+          }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: PasskeyDesk-0.11.0-policy.3-win-x64
+          path: artifacts/win-x64/app/
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify internal signing on disposable copies
         timeout-minutes: 2
         shell: pwsh
@@ -44,15 +66,6 @@ jobs:
       - name: Verify optional YubiKey Manager CLI 5.9.2
         shell: pwsh
         run: ./tests/Test-YkmanCompatibility.ps1
-      - uses: actions/upload-artifact@v7
-        with:
-          name: PasskeyDesk-for-YubiKeys-win-x64
-          path: |
-            artifacts/win-x64/app/*
-            !artifacts/win-x64/app/startup-smoke-test.txt
-            !artifacts/win-x64/app/visual-checks/**
-          if-no-files-found: error
-          retention-days: 30
       - uses: actions/upload-artifact@v7
         if: always()
         with:
