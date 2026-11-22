@@ -11,10 +11,12 @@ public partial class MainWindow
         _addPasskey = false; _enrollStep = 0;
         ShowPage(PreparePage);
         BatchOpen_Click(this, e);
+        UpdateLayout();
         Assert(BatchTenant.SelectedItem == null && !BatchConnect.IsEnabled && !BatchToProfile.IsEnabled, "New batch requires explicit tenant selection");
-        BatchTenant.SelectedItem = Tenants.SelectedItem;
+        BatchTenant.SelectedItem = _config!.Providers.Single();
         _connectedProvider = SelectedProvider; UpdateSummary(); BatchToProfile_Click(this,e);
-        Assert(_batchStage == BatchStage.Profile && BatchProfileStep.IsVisible, "Profile is a separate step after tenant connection");
+        UpdateLayout();
+        Assert(_batchStage == BatchStage.Profile && BatchProfileStep.IsVisible, $"Profile is a separate step after tenant connection (stage={_batchStage}, page={BatchPage.IsVisible}, profile={BatchProfileStep.Visibility}, signedIn={BatchSignedIn}, busy={_busy})");
         BatchProfile.SelectedItem = _config!.Profiles.Single(p => p.Name == "standard");
         Assert(BatchToUsers.IsEnabled && BatchPolicy.Text.Contains("reset", StringComparison.OrdinalIgnoreCase), "Batch setup accepts the test profile with FIDO reset before selecting a key");
         BatchProfile.SelectedItem = _config.Profiles.Single(p => p.Name == "Second profile");
