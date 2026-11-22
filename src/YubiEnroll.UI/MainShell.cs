@@ -124,11 +124,6 @@ public partial class MainWindow
         if (_hostedWindow is SettingsWindow current) { if (initialTab != null) current.SettingsTabs.SelectedItem = initialTab(current); return; }
         LeaveHostedPage();
         var settings = new SettingsWindow(_configPath, _exePath, _versionText, _registrationJournal, _activityJournal, _inventoryDirty ? null : ProfileKeyForSettings(), _policy) { EmbeddedTerminal = EmbeddedTerminal };
-        if (StartupPolicyStep.Visibility == Visibility.Visible)
-        {
-            settings.AboutPolicyStatus.Text = "Organization policy · " + StartupPolicyStatus.Text;
-            settings.AboutPolicyStatus.Visibility = Visibility.Visible;
-        }
         settings.ActivityRecorded += text => Record(text);
         settings.SettingsTabs.SelectedItem = initialTab?.Invoke(settings) ?? settings.TenantsTab; settings.ActivityHost.Content = _activityView;
         settings.PrerequisitesOpened += async () =>

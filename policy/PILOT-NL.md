@@ -1,10 +1,10 @@
-# Passkey Desk voor YubiKeys · Policy Preview 3
+# Passkey Desk voor YubiKeys · Policy Preview 4
 
-Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.3**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
+Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.4**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
 ## Indeling van de template (revisie 1.2)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor de nieuwe opstartstatus en badges de EXE van Policy Preview 3. Preview 2 ondersteunt al vergrendeling per groep. De eerdere template 1.1 werkt ook met deze nieuwe EXE. De registerwaarden zijn dezelfde als in revisie 1.0. Heb je de oude indeling al toegewezen, controleer de toewijzing en de resulterende waarden op je pilotapparaat voordat je overstapt.
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor de nieuwe opstartstatus en badges de EXE van Policy Preview 4. Preview 2 ondersteunt al vergrendeling per groep. De eerdere template 1.1 werkt ook met deze nieuwe EXE. De registerwaarden zijn dezelfde als in revisie 1.0. Heb je de oude indeling al toegewezen, controleer de toewijzing en de resulterende waarden op je pilotapparaat voordat je overstapt.
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor de nieuw
 
 Met **Documenten** wordt de Windows-map van het uitvoerende account bedoeld, ook als die is omgeleid. Je kunt beide logpaden afzonderlijk instellen. Elke ingestelde policy vergrendelt alleen de bijbehorende groep. Alleen logging of een terminalpolicy maakt of wijzigt geen TOML en laat tenants en profielen bewerkbaar.
 
-Bij het opstarten toont **Before you start → YubiEnroll CLI → Organization policy** de uitkomst: TOML aangemaakt, bijgewerkt of al actueel. Bij een lege tenantpolicy zonder bestand is geen bestand nodig. Bij alleen appbeleid staat er dat app-instellingen zijn toegepast zonder TOML-synchronisatie. Zonder bekende policy ontbreekt de substap. Na een snelle start is dezelfde uitkomst te vinden in **Settings → Help & About → System requirements**. Terugkeren naar dit scherm voert geen nieuwe synchronisatie uit.
+Bij het opstarten toont **Before you start → YubiEnroll CLI → Organization policy** de uitkomst: TOML aangemaakt, bijgewerkt of al actueel. Bij een lege tenantpolicy zonder bestand is geen bestand nodig. Bij alleen appbeleid staat er dat app-instellingen zijn toegepast zonder TOML-synchronisatie. Zonder bekende policy ontbreekt de substap. Bij gedetecteerd beleid staat de uitkomst één keer per start in **Settings → Activity log**. Staat het bewaren van activiteit uit, dan is de regel alleen tijdens die sessie zichtbaar. Terugkeren naar dit scherm voert geen nieuwe synchronisatie uit.
 
 ## Begin met één testapparaat
 

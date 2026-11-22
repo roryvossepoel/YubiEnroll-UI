@@ -19,7 +19,7 @@ public partial class MainWindow
         try { await ApplyStartupPolicyAsync(_policy, () => ConfigReader.FindPath()); }
         catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            StartupPolicyStatus.Text = "Could not apply organization policy.";
+            ReportStartupPolicy("Could not synchronize settings from policy.", "Error");
             App.StopForPolicyError(ex);
             return;
         }
@@ -35,21 +35,27 @@ public partial class MainWindow
         StartupPolicyStep.Visibility = Visibility.Visible;
         if (!policy.ManagesTenants && !policy.ManagesProfiles)
         {
-            StartupPolicyStatus.Text = "App settings applied. No TOML synchronization needed.";
+            ReportStartupPolicy("App settings applied. No TOML synchronization needed.");
             return;
         }
         StartupPolicyStatus.Text = "Policy detected. Synchronizing the YubiEnroll TOML…";
         // Allow the startup page to paint before starting file I/O; no artificial delay.
         await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
         var result = await Task.Run(() => DeskPolicy.Synchronize(policy, resolvePath));
-        StartupPolicyStatus.Text = result switch
+        ReportStartupPolicy(result switch
         {
             PolicySyncResult.TomlCreated => "YubiEnroll TOML created from policy.",
             PolicySyncResult.TomlUpdated => "YubiEnroll TOML updated from policy.",
             PolicySyncResult.TomlUnchanged => "YubiEnroll TOML already up to date.",
             PolicySyncResult.NoTomlNeeded => "Policy loaded. No TOML file needed for an empty tenant list.",
             _ => throw new InvalidOperationException("Unexpected policy synchronization result.")
-        };
+        });
+    }
+
+    private void ReportStartupPolicy(string outcome, string level = "Info")
+    {
+        StartupPolicyStatus.Text = outcome;
+        Record("Policy mode detected at startup. " + outcome, level);
     }
 
     private async void Window_Activated(object? sender, EventArgs e)

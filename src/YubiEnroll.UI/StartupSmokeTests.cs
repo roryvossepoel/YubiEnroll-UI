@@ -21,15 +21,25 @@ public partial class MainWindow
             var startupPolicyView = new MainWindow(smokeTest: true);
             try
             {
+                await startupPolicyView.ApplyStartupPolicyAsync(null, () => throw new Exception("Unmanaged startup accessed TOML"));
+                Assert(!startupPolicyView._activityJournal.Read().Any(), "Unmanaged startup does not log policy detection");
                 var appOnly = DeskPolicy.Read(k => k == "EmbeddedTerminal" ? 0 : null, root, root);
                 await startupPolicyView.ApplyStartupPolicyAsync(appOnly, () => throw new Exception("App-only startup accessed TOML"));
                 Assert(startupPolicyView.StartupPolicyStep.Visibility == Visibility.Visible && startupPolicyView.StartupPolicyStatus.Text.Contains("App settings applied"),
                     "App policy is visible without touching TOML");
+                Assert(startupPolicyView._activityJournal.Read().Single() is { Level: "Info", Message: "Policy mode detected at startup. App settings applied. No TOML synchronization needed." },
+                    "Preferences-only policy records one accurate startup outcome");
                 var profilePath = Path.Combine(root, "preview-policy.toml");
                 var states = new Dictionary<string, object> { ["TenantsJson"] = "[]" };
                 var empty = DeskPolicy.Read(k => states.GetValueOrDefault(k), root, root);
                 await startupPolicyView.ApplyStartupPolicyAsync(empty, () => profilePath);
                 Assert(!File.Exists(profilePath) && startupPolicyView.StartupPolicyStatus.Text.Contains("No TOML file needed"), "Empty managed tenants do not report a file write");
+                Directory.CreateDirectory(root);
+                File.WriteAllText(profilePath, "# Local CLI settings");
+                await startupPolicyView.ApplyStartupPolicyAsync(empty, () => profilePath);
+                var policyRecords = startupPolicyView._activityJournal.Read();
+                Assert(policyRecords.Count == 3 && policyRecords.Count(entry => entry.Level == "Info" && entry.Message == "Policy mode detected at startup. YubiEnroll TOML already up to date.") == 1,
+                    "Synchronization records a single persisted outcome without claiming an unchanged TOML was rewritten");
             }
             finally { startupPolicyView.Close(); }
             await TestKeyToolsAsync();
