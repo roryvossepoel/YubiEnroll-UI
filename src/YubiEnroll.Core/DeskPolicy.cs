@@ -114,6 +114,24 @@ public sealed class DeskPolicy
             throw new InvalidOperationException("A managed tenant references this profile. Its name must be kept.");
     }
 
+    // YubiEnroll 1.2.0 indexes both lengths even when listing profiles. Give the
+    // standalone CLI concrete defaults; Passkey Desk can use the actual key's floor.
+    private static ProfileSetup CliProfile(ProfileSetup p) => p with
+    {
+        MinPinLength = p.MinPinLength ?? 4,
+        RandomPinLength = p.RandomPinLength ?? p.MinPinLength ?? 4
+    };
+
+    public static ProfileSetup ReadProfile(string text, string name, DeskPolicy? policy)
+    {
+        var stored = ProfileConfigWriter.Read(text, name);
+        var managed = policy?._profiles?.FirstOrDefault(p => p.Name == name);
+        if (managed == null) return stored;
+        if (stored != CliProfile(managed))
+            throw new InvalidDataException("This managed profile changed since startup. Restart Passkey Desk to reapply policy.");
+        return stored with { MinPinLength = managed.MinPinLength };
+    }
+
     public static PolicySyncResult Synchronize(DeskPolicy? policy, Func<string> resolvePath)
     {
         if (policy == null) return PolicySyncResult.Unmanaged;
@@ -158,7 +176,7 @@ public sealed class DeskPolicy
                 ["client_id"] = t.ClientId, ["redirect_uri"] = t.RedirectUri });
         foreach (var p in _profiles ?? [])
         {
-            var single = Toml.ToModel(ProfileConfigWriter.Build(null, p));
+            var single = Toml.ToModel(ProfileConfigWriter.Build(null, CliProfile(p)));
             desiredProfiles.Add(p.Name, ((TomlTable)single["profiles"])[p.Name]);
         }
         static bool Same(object a, object b) =>

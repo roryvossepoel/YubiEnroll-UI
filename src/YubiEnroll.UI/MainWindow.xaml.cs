@@ -395,7 +395,7 @@ public partial class MainWindow : Window
         var current = ConfigReader.Read(_configPath);
         ConfigReader.EnsureUnchanged(current, provider, profile);
         var setup = _addPasskey ? PasskeyAddition.Settings(_selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")) :
-            ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile!.Name);
+            DeskPolicy.ReadProfile(File.ReadAllText(_configPath), profile!.Name, _policy);
         if (batch != null && setup != _batchPolicy) throw new InvalidOperationException("The reviewed profile changed. Review the batch again.");
         var reset = setup.Reset;
         await CheckEnrollmentTargetAsync(target, setup, batch);

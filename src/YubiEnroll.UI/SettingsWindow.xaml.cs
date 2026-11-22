@@ -248,7 +248,7 @@ public partial class SettingsWindow : Window
         TenantList.ItemsSource = config.Providers.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToArray();
         TenantFilter_Changed(this, null!);
         ProfileList.ItemsSource = config.Profiles.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(p => DescribeProfile(ProfileConfigWriter.Read(text, p.Name), _profileKey)).ToArray();
+            .Select(p => DescribeProfile(DeskPolicy.ReadProfile(text, p.Name, _policy), _profileKey)).ToArray();
         ProfileFilter_Changed(this,null!); Feedback.Text = "";
     }
     internal void UpdateProfileKey(KeyStatus? key)

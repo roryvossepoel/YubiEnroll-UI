@@ -168,7 +168,7 @@ public partial class MainWindow
                 {
                     if (!current.Profiles.Any(p => p.Name == choice.Profile.Name && p.Fingerprint == choice.Profile.Fingerprint))
                         throw new InvalidOperationException();
-                    result = ProfileCompatibility.Evaluate(ProfileConfigWriter.Read(File.ReadAllText(_configPath), choice.Profile.Name), TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
+                    result = ProfileCompatibility.Evaluate(DeskPolicy.ReadProfile(File.ReadAllText(_configPath), choice.Profile.Name, _policy), TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
                 }
                 catch { result = new(["Profile changed or could not be read. Reopen Settings."]); }
                 choice.Set(result);
@@ -184,7 +184,7 @@ public partial class MainWindow
             var profile = SelectedProfile;
             if (!current.Profiles.Any(p => p.Name == profile.Name && p.Fingerprint == profile.Fingerprint))
                 throw new InvalidOperationException("Profile changed. Reopen Settings.");
-            var setup = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name);
+            var setup = DeskPolicy.ReadProfile(File.ReadAllText(_configPath), profile.Name, _policy);
             var compatibility = ProfileCompatibility.Evaluate(setup, TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
             _reviewValid = compatibility.Compatible;
             ProfileCompatibilityText.Text = compatibility.Compatible ? "" : compatibility.Message;

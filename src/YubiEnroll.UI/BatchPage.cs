@@ -52,7 +52,7 @@ public partial class MainWindow
         if (BatchProfile.SelectedItem is not EnrollmentProfile profile) { BatchPolicy.Text = "Choose a profile for all keys in this batch."; return; }
         try
         {
-            var setup = ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile.Name).Validate();
+            var setup = DeskPolicy.ReadProfile(File.ReadAllText(_configPath), profile.Name, _policy).Validate();
             if (setup.Reset == null) { BatchPolicy.Text = "Choose an explicit FIDO reset setting in the profile."; return; }
             if (setup.RandomPin == null || setup.RequireAlwaysUv == null || setup.RequireEa == null || setup.ForcePinChange == null ||
                 setup.RandomPin == true && setup.RandomPinLength == null)

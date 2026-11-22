@@ -56,6 +56,19 @@ internal static class DeskPolicyTests
             Apply();
             check(ConfigReader.Read(path).Providers.Single().Name == "Pilot" && ConfigReader.Read(path).Profiles.Single().Name == "Pilot profile",
                 "Profile slot 5 alone manages profiles without removing local tenants");
+            var nativeText = File.ReadAllText(path);
+            check(ProfileConfigWriter.Read(nativeText, "Pilot profile") is { MinPinLength: 4, RandomPinLength: 6 }
+                && DeskPolicy.ReadProfile(nativeText, "Pilot profile", Read()) is { MinPinLength: null, RandomPinLength: 6 },
+                "Native CLI gets all profile fields while the app retains the key-specific PIN floor");
+            Refuse(() => DeskPolicy.ReadProfile(nativeText.Replace("min_pin_length = 4", "min_pin_length = 8"), "Pilot profile", Read()),
+                "Editing a managed profile behind the app cannot change its enrollment policy");
+            values["Profile5RandomPinLength"] = 0;
+            values["Profile5MinPinLength"] = 8;
+            Apply();
+            check(DeskPolicy.ReadProfile(File.ReadAllText(path), "Pilot profile", Read()) is { MinPinLength: 8, RandomPinLength: 8 },
+                "Default generated PIN length respects a higher configured floor");
+            values["Profile5MinPinLength"] = 0; values["Profile5RandomPinLength"] = 6;
+            Apply();
             // CLI can edit a closed app's normal TOML. An unchanged managed profile is reconciled on the next launch.
             ProfileConfigWriter.Save(ConfigSnapshot.Read(path),new ProfileSetup("CLI addition"));
             check(ConfigReader.Read(path).Profiles.Count == 2, "Standalone TOML writer remains usable");
