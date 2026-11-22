@@ -35,6 +35,7 @@ public partial class RegistrationLogView : UserControl
         try
         {
             _records = _journal.Read();
+            Feedback.Text = _journal.RetentionError ?? "";
             var tenants = new[] { new TenantChoice(null, "All tenants") }.Concat(_records.GroupBy(r => r.TenantId)
                 .Select(g => new TenantChoice(g.Key, g.First().TenantName)).OrderBy(t => t.Label)).ToList();
             // Refresh/export must not silently widen a tenant filter when its files disappear.

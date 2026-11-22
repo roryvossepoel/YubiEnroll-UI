@@ -96,16 +96,22 @@ internal static class DeskPolicyTests
             values["TenantsJson"] = "[]";
             Apply();
             check(ConfigReader.Read(path).Providers.Count == 0 && ConfigReader.Read(path).ActiveProvider == "Other", "Explicit empty array clears only Entra tenants");
-            values.Clear(); values["ActivityLogging"] = 0; values["RetentionDays"] = 15; values["RegistrationLogging"] = 1; values["SaveGeneratedPin"] = 0;
+            values.Clear(); values["ActivityLogging"] = 0; values["RetentionDays"] = 15; values["RegistrationLogging"] = 1; values["SaveGeneratedPin"] = 0; values["RegistrationRetentionDays"] = 90;
             var prefs = Read()!;
             var activityPath = Path.Combine(root,"activity.json");
             var logPath = Path.Combine(root,"registration.json");
             var aj = new ActivityJournal(activityPath, root, prefs.Activity);
             var rj = new RegistrationJournal(logPath, root, prefs.Registration);
-            check(aj.IsManaged && !aj.Preferences.Enabled && aj.Preferences.RetentionDays == 15 && rj.IsManaged && !rj.Preferences.SaveGeneratedPin, "Policy log preferences override local defaults for this session");
+            check(aj.IsManaged && !aj.Preferences.Enabled && aj.Preferences.RetentionDays == 15 && rj.IsManaged && rj.Preferences.RetentionDays == 90 && !rj.Preferences.SaveGeneratedPin, "Policy log preferences override local defaults for this session");
             Refuse(() => aj.Configure(true,root,30),"Managed activity settings cannot be saved");
             Refuse(() => rj.Configure(true,root,true),"Managed registration preferences cannot be saved");
             check(!File.Exists(activityPath) && !File.Exists(logPath), "Policy preferences did not overwrite local JSON");
+            foreach (var invalid in new object[] { 0, 3651, "90" })
+            {
+                values["RegistrationRetentionDays"] = invalid;
+                Refuse(Apply, "Out-of-range or non-DWORD registration retention rejected before TOML synchronization");
+            }
+            values["RegistrationRetentionDays"] = 90;
             values["ActivityFolder"] = "relative";
             Refuse(Apply,"Invalid log folder fails before TOML synchronization");
             values.Clear(); var local = new ActivityJournal(activityPath, root);

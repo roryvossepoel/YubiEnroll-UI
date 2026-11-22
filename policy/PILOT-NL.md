@@ -1,18 +1,20 @@
-# Passkey Desk voor YubiKeys · Policy Preview 4
+# Passkey Desk voor YubiKeys · Policy Preview 5
 
-Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.4**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
+Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.5**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
-## Indeling van de template (revisie 1.2)
+## Indeling van de template (revisie 1.3)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor de nieuwe opstartstatus en badges de EXE van Policy Preview 4. Preview 2 ondersteunt al vergrendeling per groep. De eerdere template 1.1 werkt ook met deze nieuwe EXE. De registerwaarden zijn dezelfde als in revisie 1.0. Heb je de oude indeling al toegewezen, controleer de toewijzing en de resulterende waarden op je pilotapparaat voordat je overstapt.
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test de EXE van Policy Preview 5 en de meegeleverde ADMX en ADML (revisie 1.3).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
 | YubiEnroll CLI configuration (TOML) → Tenants | Entra-tenants via JSON | De providers in de TOML van het uitvoerende account. |
 | YubiEnroll CLI configuration (TOML) → Configuration profiles | Vijf mogelijke profielslots, inclusief PIN genereren en wijzigen bij eerste gebruik | De profielen in diezelfde TOML; de zelfstandige CLI kan ze gebruiken. |
 | Passkey Desk app settings → Logging → Activity logging | Activiteit bewaren, bewaartermijn en logmap | Alleen de app. Bij een leeg pad: `Documenten\YubiKey Desk\ActivityLog`. |
-| Passkey Desk app settings → Logging → Registration logging | Registraties bewaren, registratiemap en gegenereerde initiële PINs opnemen (standaard uit) | Alleen de app. Bij een leeg pad: `Documenten\YubiKey Desk\RegistrationLog`. PIN-logging geldt ook voor CSV-export van de betreffende records. |
+| Passkey Desk app settings → Logging → Registration logging | Registraties bewaren, bewaartermijn, registratiemap en gegenereerde initiële PINs opnemen (standaard uit) | Alleen de app. Bij een leeg pad: `Documenten\YubiKey Desk\RegistrationLog`. PIN-logging geldt ook voor CSV-export van de betreffende records. |
 | Passkey Desk app settings → Terminal preference | Interne of externe terminal | Alleen de app. |
+
+**Bewaartermijn voor registraties:** stel bij *Registration logging → Keep registrations for (days)* 1–3650 dagen in (standaard 30). Met registratie-logging aan worden bij het starten, bij opslaan van de instelling en op een volgende dag bij lezen/schrijven verlopen registratiebestanden opgeruimd. De huidige UTC-dag telt mee. CSV-exports blijven staan. De machinewaarde is `RegistrationRetentionDays` (DWORD); `RetentionDays` blijft uitsluitend voor het activiteitenlog.
 
 Met **Documenten** wordt de Windows-map van het uitvoerende account bedoeld, ook als die is omgeleid. Je kunt beide logpaden afzonderlijk instellen. Elke ingestelde policy vergrendelt alleen de bijbehorende groep. Alleen logging of een terminalpolicy maakt of wijzigt geen TOML en laat tenants en profielen bewerkbaar.
 

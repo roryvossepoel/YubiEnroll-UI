@@ -20,6 +20,35 @@ internal static class RegistrationJournalTests
             check(journal.Preferences.Directory == Path.Combine(documents, "YubiKey Desk", "RegistrationLog") && !journal.Preferences.SaveGeneratedPin,
                 "A fresh account uses its Documents folder without opting into PIN storage");
             check(!journal.Preferences.Enabled && journal.Begin(record) == null && !Directory.Exists(root), "Logging is opt-in and writes no user data when disabled");
+            var retainFolder = Path.Combine(root, "retention");
+            var retainSettings = Path.Combine(root, "retention-settings.json");
+            var retain = new RegistrationJournal(retainSettings, documents);
+            retain.Configure(true, retainFolder, retentionDays: 30);
+            var utc = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
+            string WriteDated(int age, int? completionAge = null)
+            {
+                var old = record with { AttemptId = Guid.NewGuid(), StartedAt = utc.AddDays(-age),
+                    CompletedAt = completionAge is int offset ? utc.AddDays(-offset) : null };
+                var path = Path.Combine(retainFolder, old.AttemptId.ToString("N") + ".json");
+                File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(old, new System.Text.Json.JsonSerializerOptions
+                    { IgnoreReadOnlyProperties = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }));
+                return path;
+            }
+            var expired = WriteDated(40, 30);
+            var kept = WriteDated(40, 29);
+            var recent = WriteDated(2);
+            var export = Path.Combine(retainFolder, "export.csv");
+            var unrelated = Path.Combine(retainFolder, "settings.json");
+            var invalidFile = Path.Combine(retainFolder, Guid.NewGuid().ToString("N") + ".json");
+            foreach (var other in new[] { export, unrelated, invalidFile }) File.WriteAllText(other, "unrelated");
+            retain = new RegistrationJournal(retainSettings, documents);
+            check(!File.Exists(expired) && File.Exists(kept) && File.Exists(recent) && File.Exists(unrelated) && File.Exists(export) && File.Exists(invalidFile),
+                "Startup prunes validated records at the UTC retention boundary using the completion date and leaves unrelated files intact");
+            retain.Configure(false, retainFolder, retentionDays: 1);
+            check(File.Exists(kept) && File.Exists(recent), "Disabling registration logging does not erase existing history");
+            retain.Configure(true, retainFolder, retentionDays: 14);
+            check(!File.Exists(kept) && File.Exists(recent) && new RegistrationJournal(retainSettings, documents).Preferences.RetentionDays == 14,
+                "Saving a shorter retention period takes effect immediately and persists");
             journal.Configure(true, folder);
             check(new RegistrationJournal(preferences).Preferences == journal.Preferences, "Logging preference and chosen folder persist across restarts");
             var attempt = journal.Begin(record)!;

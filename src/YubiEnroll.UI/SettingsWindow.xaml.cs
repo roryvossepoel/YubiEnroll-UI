@@ -79,7 +79,7 @@ public partial class SettingsWindow : Window
         DefaultFolderButton.Visibility = FolderPath.Text == _journal.DefaultLogDirectory ? Visibility.Collapsed : Visibility.Visible;
         ActivityDefault.Visibility = ActivityFolder.Text == _activity.DefaultDirectory ? Visibility.Collapsed : Visibility.Visible;
     }
-    private bool RegDirty => !_journal.IsManaged && (EnabledChoice.IsChecked != _journal.Preferences.Enabled || SavePinChoice.IsChecked != _journal.Preferences.SaveGeneratedPin || FolderPath.Text != _journal.Preferences.Directory);
+    private bool RegDirty => !_journal.IsManaged && (EnabledChoice.IsChecked != _journal.Preferences.Enabled || SavePinChoice.IsChecked != _journal.Preferences.SaveGeneratedPin || FolderPath.Text != _journal.Preferences.Directory || RegistrationDays.Text != _journal.Preferences.RetentionDays.ToString());
     private bool ActivityDirty => !_activity.IsManaged && (SaveActivity.IsChecked != _activity.Preferences.Enabled || ActivityFolder.Text != _activity.Preferences.Directory || ActivityDays.Text != _activity.Preferences.RetentionDays.ToString());
     internal bool ConfirmLeavePreferences()
     {
@@ -92,7 +92,7 @@ public partial class SettingsWindow : Window
     }
     private void RestorePreferences()
     {
-        EnabledChoice.IsChecked = _journal.Preferences.Enabled; SavePinChoice.IsChecked = _journal.Preferences.SaveGeneratedPin; FolderPath.Text = _journal.Preferences.Directory;
+        EnabledChoice.IsChecked = _journal.Preferences.Enabled; SavePinChoice.IsChecked = _journal.Preferences.SaveGeneratedPin; FolderPath.Text = _journal.Preferences.Directory; RegistrationDays.Text = _journal.Preferences.RetentionDays.ToString();
         SaveActivity.IsChecked = _activity.Preferences.Enabled; ActivityFolder.Text = _activity.Preferences.Directory; ActivityDays.Text = _activity.Preferences.RetentionDays.ToString();
         EmbeddedTerminal = _terminal; LogSettingsFeedback.Text = ActivitySettingsFeedback.Text = ""; RefreshDirty();
     }
@@ -115,15 +115,16 @@ public partial class SettingsWindow : Window
         _policy = policy;
         _path = path; _profileKey = profileKey; _activity = activity ?? new ActivityJournal(policy: policy?.Activity);
         InitializeComponent();
+        AppVersionLine.Text = $"Passkey Desk for YubiKeys · {CurrentVersion}";
         _journal = registrationJournal ?? new RegistrationJournal(RegistrationJournal.DefaultSettingsPath, policy: policy?.Registration);
         SaveActivity.IsChecked = _activity.Preferences.Enabled; ActivityFolder.Text = _activity.Preferences.Directory;
         ActivityDays.Text = _activity.Preferences.RetentionDays.ToString(); ActivitySettingsFeedback.Text = _activity.Error ?? "";
         EnabledChoice.IsChecked = _journal.Preferences.Enabled;
         SavePinChoice.IsChecked = _journal.Preferences.SaveGeneratedPin;
-        FolderPath.Text = _journal.Preferences.Directory;
+        FolderPath.Text = _journal.Preferences.Directory; RegistrationDays.Text = _journal.Preferences.RetentionDays.ToString();
         DefaultFolderButton.IsEnabled = _journal.DefaultLogDirectory.Length > 0;
         DefaultFolderButton.ToolTip = _journal.DefaultLogDirectory;
-        LogSettingsFeedback.Text = _journal.SettingsError ?? "";
+        LogSettingsFeedback.Text = _journal.SettingsError ?? _journal.RetentionError ?? "";
         var log = new RegistrationLogView(_journal);
 
         RegistrationHost.Content = log;
@@ -132,7 +133,7 @@ public partial class SettingsWindow : Window
         RuntimeVersion.Text = Environment.Version.ToString();
         Attempt(RefreshLists);
         foreach (var box in new System.Windows.Controls.Primitives.ToggleButton[] { SaveActivity, EnabledChoice, SavePinChoice, EmbeddedChoice, ExternalChoice }) { box.Checked += (_,_) => RefreshDirty(); box.Unchecked += (_,_) => RefreshDirty(); }
-        foreach (var field in new[] { ActivityFolder, FolderPath, ActivityDays }) field.TextChanged += (_,_) => RefreshDirty();
+        foreach (var field in new[] { ActivityFolder, FolderPath, ActivityDays, RegistrationDays }) field.TextChanged += (_,_) => RefreshDirty();
         EmbeddedTerminal = true;
         var managed = new List<string>();
         if (TenantsManaged) { TenantActions.Visibility = Visibility.Collapsed; managed.Add("tenants"); }
@@ -200,11 +201,13 @@ public partial class SettingsWindow : Window
     private void SaveLogSettings_Click(object sender, RoutedEventArgs e)
     {
         if (_journal.IsManaged) return;
+        if (!int.TryParse(RegistrationDays.Text, out int days) || days is < 1 or > RegistrationJournal.MaxRetentionDays)
+        { LogSettingsFeedback.Text = "Choose a retention period of 1–3650 days."; return; }
         try
         {
-            _journal.Configure(EnabledChoice.IsChecked == true, FolderPath.Text, SavePinChoice.IsChecked == true);
-            FolderPath.Text = _journal.Preferences.Directory;
-            LogSettingsFeedback.Text = "Logging settings saved."; ActivityRecorded?.Invoke("Registration logging settings changed.");
+            _journal.Configure(EnabledChoice.IsChecked == true, FolderPath.Text, SavePinChoice.IsChecked == true, days);
+            FolderPath.Text = _journal.Preferences.Directory; RegistrationDays.Text = _journal.Preferences.RetentionDays.ToString();
+            LogSettingsFeedback.Text = _journal.RetentionError ?? "Logging settings saved."; ActivityRecorded?.Invoke("Registration logging settings changed.");
         }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
         {

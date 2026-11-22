@@ -1,10 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
-<policyDefinitionResources revision="1.2" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+<policyDefinitionResources revision="1.3" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
   <displayName>Passkey Desk for YubiKeys</displayName>
   <description>Machine policy for the independent Passkey Desk application.</description>
   <resources>
     <stringTable>
       <string id="SupportedVersion">Passkey Desk 0.11.0 Policy Preview 2 or later</string>
+      <string id="SupportedVersion5">Passkey Desk 0.11.0 Policy Preview 5 or later</string>
       <string id="CategoryName">Passkey Desk for YubiKeys</string>
       <string id="CliConfigLabelCategory">YubiEnroll CLI configuration (TOML)</string>
       <string id="TenantsCategoryLabelCategory">Tenants</string>
@@ -20,7 +21,7 @@
       <string id="ActivityLabel">Activity logging</string>
       <string id="ActivityHelp">App setting only; does not change yubienroll.toml. Choose whether to keep activity, the retention in days and the log folder. Leave the folder blank to use YubiKey Desk\ActivityLog under the current user's Documents folder, including redirected Documents. Paths may contain environment variables.</string>
       <string id="RegistrationLabel">Registration logging</string>
-      <string id="RegistrationHelp">App setting only; does not change yubienroll.toml. Choose whether to save registration records and whether those records and CSV exports include newly generated initial PINs (off by default). Existing PINs are never captured. A blank folder uses YubiKey Desk\RegistrationLog under the current user's Documents folder.</string>
+      <string id="RegistrationHelp">App setting only; does not change yubienroll.toml. Choose whether to save registration records and whether those records and CSV exports include newly generated initial PINs (off by default). Existing PINs are never captured. While logging is on, expired records are deleted from the selected folder after the specified number of days (1–3650, default 30). CSV exports are kept. A blank folder uses YubiKey Desk\RegistrationLog under the current user's Documents folder.</string>
       <string id="TerminalLabel">Terminal preference</string>
       <string id="TerminalHelp">App setting only; does not change yubienroll.toml. Choose the preferred terminal. Enrollment with generated PIN capture still uses the in-app terminal. Only the terminal preference becomes read-only. Other settings, tenants and profiles remain editable unless managed separately.</string>
       <string id="Profile1Label">Configuration profile 1</string>
@@ -53,6 +54,7 @@
         <textBox refId="RegistrationFolder">
           <label>Registration log folder (blank = user default)</label>
         </textBox>
+        <decimalTextBox refId="RegistrationRetentionDays" defaultValue="30">Keep registrations for (days)</decimalTextBox>
       </presentation>
       <presentation id="Terminal">
         <dropdownList refId="EmbeddedTerminal" defaultItem="1">Terminal</dropdownList>

@@ -7,11 +7,11 @@ NS = "http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
 KEY = r"Software\Policies\PasskeyDesk"
 sub = ET.SubElement
 def root(name):
-    return ET.Element(name, revision="1.2", schemaVersion="1.0", xmlns=NS)
+    return ET.Element(name, revision="1.3", schemaVersion="1.0", xmlns=NS)
 
 admx = root("policyDefinitions")
 sub(sub(admx, "policyNamespaces"), "target", prefix="pdesk", namespace="PasskeyDesk.Policies")
-sub(admx, "resources", minRequiredRevision="1.2")
+sub(admx, "resources", minRequiredRevision="1.3")
 support = sub(sub(admx, "supportedOn"), "definitions")
 cats = sub(admx, "categories")
 policies = sub(admx, "policies")
@@ -25,6 +25,7 @@ def string(id_, value):
     sub(strings, "string", id=id_).text = value
     return "$(string." + id_ + ")"
 sub(support, "definition", name="PolicyPreview", displayName=string("SupportedVersion", "Passkey Desk 0.11.0 Policy Preview 2 or later"))
+sub(support, "definition", name="PolicyPreview5", displayName=string("SupportedVersion5", "Passkey Desk 0.11.0 Policy Preview 5 or later"))
 sub(cats, "category", name="PasskeyDesk", displayName=string("CategoryName", "Passkey Desk for YubiKeys"))
 for name, label, parent in [
     ("CliConfig", "YubiEnroll CLI configuration (TOML)", "PasskeyDesk"),
@@ -38,12 +39,12 @@ for name, label, parent in [
 for i in ("Off", "On", "Internal", "External"):
     string(i, {"Internal":"In-app terminal", "External":"External console"}.get(i, i))
 
-def policy(name, label, explain, fields, category):
+def policy(name, label, explain, fields, category, supported="PolicyPreview"):
     p = sub(policies, "policy", name=name, **{"class": "Machine"}, key=KEY,
             displayName=string(name + "Label", label), explainText=string(name + "Help", explain),
             presentation="$(presentation." + name + ")")
     sub(p, "parentCategory", ref=category)
-    sub(p, "supportedOn", ref="PolicyPreview")
+    sub(p, "supportedOn", ref=supported)
     els = sub(p, "elements")
     form = sub(presentations, "presentation", id=name)
     for field, caption, kind, opts in fields:
@@ -71,9 +72,10 @@ policy("Activity", "Activity logging",
        [("ActivityLogging", "Keep activity between sessions", "flag", 1), ("RetentionDays", "Retention (days)", "number", (1, 3650, 30)),
         ("ActivityFolder", "Activity log folder (blank = user default)", "folder", 32767)], "Logging")
 policy("Registration", "Registration logging",
-       "App setting only; does not change yubienroll.toml. Choose whether to save registration records and whether those records and CSV exports include newly generated initial PINs (off by default). Existing PINs are never captured. A blank folder uses YubiKey Desk\\RegistrationLog under the current user's Documents folder.",
+       "App setting only; does not change yubienroll.toml. Choose whether to save registration records and whether those records and CSV exports include newly generated initial PINs (off by default). Existing PINs are never captured. While logging is on, expired records are deleted from the selected folder after the specified number of days (1–3650, default 30). CSV exports are kept. A blank folder uses YubiKey Desk\\RegistrationLog under the current user's Documents folder.",
        [("RegistrationLogging", "Save enrollment records", "flag", 0), ("SaveGeneratedPin", "Include generated initial PINs", "flag", 0),
-        ("RegistrationFolder", "Registration log folder (blank = user default)", "folder", 32767)], "Logging")
+        ("RegistrationFolder", "Registration log folder (blank = user default)", "folder", 32767),
+        ("RegistrationRetentionDays", "Keep registrations for (days)", "number", (1, 3650, 30))], "Logging", "PolicyPreview5")
 policy("Terminal", "Terminal preference",
        "App setting only; does not change yubienroll.toml. Choose the preferred terminal. Enrollment with generated PIN capture still uses the in-app terminal. Only the terminal preference becomes read-only. Other settings, tenants and profiles remain editable unless managed separately.",
        [("EmbeddedTerminal", "Terminal", "terminal", 1)], "AppSettings")

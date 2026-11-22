@@ -21,9 +21,15 @@ public partial class MainWindow
         Assert(settings.EmbeddedChoice.IsVisible && settings.EnabledChoice.IsVisible && settings.EnabledChoice.IsChecked == false &&
             !settings.SavePinChoice.IsEnabled && settings.FolderPath.Text == _registrationJournal.Preferences.Directory,
             "App settings shows terminal and logging choices with the journal default folder");
+        Assert(!settings.RegistrationDays.IsEnabled && settings.RegistrationDays.Text == "30", "Registration retention defaults to 30 days");
         settings.EnabledChoice.IsChecked = true;
+        settings.RegistrationDays.Text = "0";
         settings.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert(_registrationJournal.Preferences.Enabled && settings.SavePinChoice.IsEnabled && !_registrationJournal.Preferences.SaveGeneratedPin,
+        Assert(!_registrationJournal.Preferences.Enabled && settings.SaveLogSettingsButton.IsEnabled && settings.LogSettingsFeedback.Text.Contains("3650"),
+            "Invalid retention keeps the edit unsaved");
+        settings.RegistrationDays.Text = "14";
+        settings.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(_registrationJournal.Preferences.Enabled && _registrationJournal.Preferences.RetentionDays == 14 && settings.SavePinChoice.IsEnabled && !_registrationJournal.Preferences.SaveGeneratedPin,
             "Enabling registration logging in App settings does not opt into PIN storage");
         CaptureWindow(settings, "settings-app-settings.png");
         var started = BeginRegistrationRecord(tenant, user, target, profile, "Office key");

@@ -46,7 +46,7 @@ public sealed record RegistrationRecord(
     };
 }
 
-public sealed record RegistrationLogPreferences(bool Enabled, string Directory, bool SaveGeneratedPin = false);
+public sealed record RegistrationLogPreferences(bool Enabled, string Directory, bool SaveGeneratedPin = false, int RetentionDays = RegistrationJournal.DefaultRetentionDays);
 public sealed record RegistrationAttempt(string Directory, RegistrationRecord Record, bool SaveGeneratedPin = false);
 
 public sealed class RegistrationJournal
@@ -56,6 +56,10 @@ public sealed class RegistrationJournal
         WriteIndented = true, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, RespectRequiredConstructorParameters = true,
         Converters = { new JsonStringEnumConverter<RegistrationOutcome>(allowIntegerValues: false) }
     };
+    public const int DefaultRetentionDays = 30;
+    public const int MaxRetentionDays = 3650;
+    private DateOnly? _lastPrune;
+    public string? RetentionError { get; private set; }
     private readonly string _settingsPath;
     private readonly Dictionary<Guid, RegistrationAttempt> _pending = new();
     public RegistrationLogPreferences Preferences { get; private set; }
@@ -79,14 +83,15 @@ public sealed class RegistrationJournal
         // If it is unavailable, the operator can still browse to an explicit location.
         DefaultLogDirectory = LogDirectory("RegistrationLog", documentsFolder);
         IsManaged = policy != null;
-        if (policy != null) { ValidateDirectory(policy.Directory); Preferences = policy; return; }
+        if (policy != null) { ValidateDirectory(policy.Directory); ValidateDays(policy.RetentionDays); Preferences = policy; PruneExpired(); return; }
         Preferences = new(false, DefaultLogDirectory);
         try
         {
             var preferences = JsonSerializer.Deserialize<RegistrationLogPreferences>(File.ReadAllText(_settingsPath), Json)
                 ?? throw new InvalidDataException();
-            ValidateDirectory(preferences.Directory);
+            ValidateDirectory(preferences.Directory); ValidateDays(preferences.RetentionDays);
             Preferences = preferences;
+            PruneExpired();
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { }
         catch (Exception ex) when (IsStorageError(ex))
@@ -95,15 +100,51 @@ public sealed class RegistrationJournal
         }
     }
 
-    public static bool IsStorageError(Exception ex) => ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or System.Security.SecurityException;
+    public static bool IsStorageError(Exception ex) => ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException or InvalidOperationException or System.Security.SecurityException;
     private static void ValidateDirectory(string directory)
     {
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory)) throw new ArgumentException("Choose an absolute log folder path.");
     }
-    public void Configure(bool enabled, string directory, bool saveGeneratedPin = false)
+    private static void ValidateDays(int days)
+    {
+        if (days is < 1 or > MaxRetentionDays) throw new ArgumentOutOfRangeException(nameof(days), "Choose a retention period of 1–3650 days.");
+    }
+
+    private static IEnumerable<string> RecordFiles(string directory) =>
+        System.IO.Directory.EnumerateFiles(directory, "*.json", new EnumerationOptions
+        {
+            RecurseSubdirectories = false, IgnoreInaccessible = false, AttributesToSkip = 0
+        }).Where(path => Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "N", out _) && new FileInfo(path).LinkTarget == null);
+
+    // The file's timestamp may change during copying or sync. Use the validated record's UTC date.
+    private void PruneExpired()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (!Preferences.Enabled || _lastPrune == today || !System.IO.Directory.Exists(Preferences.Directory)) return;
+        try
+        {
+            using var lease = new FileStream(Path.Combine(Preferences.Directory, ".journal.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            var cutoff = today.AddDays(-Preferences.RetentionDays);
+            foreach (var path in RecordFiles(Preferences.Directory))
+            {
+                RegistrationRecord record;
+                try { record = ReadRecord(path); }
+                catch (Exception ex) when (ex is JsonException or InvalidDataException) { continue; } // Never delete unverifiable files.
+                if (!_pending.ContainsKey(record.AttemptId) && DateOnly.FromDateTime(record.RecordedAt.UtcDateTime) <= cutoff) File.Delete(path);
+            }
+            RetentionError = null;
+            _lastPrune = today;
+        }
+        catch (Exception ex) when (IsStorageError(ex))
+        {
+            RetentionError = "Registration log cleanup could not finish. Check folder access; cleanup will be retried.";
+        }
+    }
+
+    public void Configure(bool enabled, string directory, bool saveGeneratedPin = false, int retentionDays = DefaultRetentionDays)
     {
         if (IsManaged) throw new InvalidOperationException("Registration logging is managed by your organization.");
-        ValidateDirectory(directory);
+        ValidateDirectory(directory); ValidateDays(retentionDays);
         directory = Path.GetFullPath(directory);
         if (PendingCount > 0 && !directory.Equals(Preferences.Directory, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Save the pending results before changing the log folder.");
@@ -113,10 +154,11 @@ public sealed class RegistrationJournal
             var probe = Path.Combine(directory, ".write-test-" + Guid.NewGuid().ToString("N"));
             using (var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose)) stream.Flush(true);
         }
-        var preferences = new RegistrationLogPreferences(enabled, directory, saveGeneratedPin);
+        var preferences = new RegistrationLogPreferences(enabled, directory, saveGeneratedPin, retentionDays);
         AtomicWrite(_settingsPath, JsonSerializer.Serialize(preferences, Json));
         Preferences = preferences;
-        SettingsError = null;
+        SettingsError = null; RetentionError = null; _lastPrune = null;
+        PruneExpired();
         Changed?.Invoke();
     }
 
@@ -125,6 +167,7 @@ public sealed class RegistrationJournal
     {
         if (SettingsError != null) throw new InvalidOperationException(SettingsError);
         if (!Preferences.Enabled) return null;
+        PruneExpired();
         var attempt = new RegistrationAttempt(Preferences.Directory, record with { GeneratedPin = null }, Preferences.SaveGeneratedPin);
         SaveRecord(attempt);
         Changed?.Invoke();
@@ -156,9 +199,10 @@ public sealed class RegistrationJournal
     public IReadOnlyList<RegistrationRecord> Read()
     {
         if (SettingsError != null) throw new InvalidOperationException(SettingsError);
+        PruneExpired();
         var records = new Dictionary<Guid, RegistrationRecord>();
         if (System.IO.Directory.Exists(Preferences.Directory))
-            foreach (var path in System.IO.Directory.EnumerateFiles(Preferences.Directory, "*.json"))
+            foreach (var path in RecordFiles(Preferences.Directory))
             {
                 var record = ReadRecord(path);
                 if (!records.TryAdd(record.AttemptId, record)) throw new InvalidDataException("Duplicate registration record.");

@@ -69,8 +69,9 @@ public sealed class DeskPolicy
         }
         ActivityPreferences? activity = get("ActivityLogging") != null || get("ActivityFolder") != null || get("RetentionDays") != null
             ? new(Flag("ActivityLogging"), Folder("ActivityFolder", defaultActivity), Number("RetentionDays", 1, 3650)) : null;
-        RegistrationLogPreferences? registration = get("RegistrationLogging") != null || get("RegistrationFolder") != null || get("SaveGeneratedPin") != null
-            ? new(Flag("RegistrationLogging"), Folder("RegistrationFolder", defaultRegistration), Flag("SaveGeneratedPin")) : null;
+        RegistrationLogPreferences? registration = get("RegistrationLogging") != null || get("RegistrationFolder") != null || get("SaveGeneratedPin") != null || get("RegistrationRetentionDays") != null
+            ? new(Flag("RegistrationLogging"), Folder("RegistrationFolder", defaultRegistration), Flag("SaveGeneratedPin"),
+                Number("RegistrationRetentionDays", 1, RegistrationJournal.MaxRetentionDays)) : null;
         bool? terminal = get("EmbeddedTerminal") != null ? Flag("EmbeddedTerminal") : null;
         if (tenants == null && profiles.Count == 0 && activity == null && registration == null && terminal == null) return null;
         return new(tenants, profiles.Count == 0 ? null : profiles.ToArray(), activity, registration, terminal);
