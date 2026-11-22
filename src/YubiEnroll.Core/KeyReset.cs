@@ -3,9 +3,11 @@ using System.Text.RegularExpressions;
 
 namespace YubiEnroll.Core;
 
-public sealed record ResetKey(string Serial, string Model)
+public sealed record ResetKey(string Serial, string Model, string? Reader = null)
 {
-    public string Label => $"{Model} · Serial {Serial}";
+    public bool IsNfc => Reader != null;
+    public string ConnectionLabel => IsNfc ? "NFC · " + Reader : "USB";
+    public string Label => $"{Model} · Serial {Serial}" + (IsNfc ? " · " + ConnectionLabel : "");
     public string RegistrationName => $"{Regex.Replace(Model, @"\s*\(\d+\.\d+\.\d+\)\s*$", "").Trim()} ({Serial})";
 }
 
@@ -13,6 +15,8 @@ public enum FidoPinState { Unknown, NotSet, Set, Blocked, Disabled, Unsupported 
 
 public sealed record KeyStatus(ResetKey Key, FidoPinState Pin, FidoCapabilities? Capabilities = null)
 {
+    public bool ListingUnsupported => Capabilities?.CanListPasskeys == false ||
+        (Capabilities?.CanListPasskeys == null && Version.TryParse(Regex.Match(Key.Model, @"\((\d+\.\d+\.\d+)\)$").Groups[1].Value, out var firmware) && firmware < new Version(5, 2, 1));
     public string Label => Key.Label;
     public string PinLabel => "FIDO PIN: " + (Pin switch
     {
@@ -25,12 +29,13 @@ public sealed record KeyStatus(ResetKey Key, FidoPinState Pin, FidoCapabilities?
     });
 }
 
-public sealed record KeyInventory(IReadOnlyList<ResetKey> Keys, int Unavailable);
+public sealed record KeyInventory(IReadOnlyList<ResetKey> Keys, int Unavailable, int NfcUnavailable = 0, int NfcReaders = 0, IReadOnlyList<NfcReaderStatus>? ReaderStates = null);
 
-// Deliberately limited to USB FIDO keys with a readable serial number. Never targets the first device.
+// USB serial or explicit NFC reader plus verified serial. Never targets the first device.
 public sealed class KeyResetService(
     Func<string[], Task<CliResult>> capture,
-    Func<string[], Task<int>> interactive)
+    Func<string[], Task<int>> interactive,
+    Func<Task<KeyInventory>>? discoverNfc = null)
 {
     public static string FindExecutable()
     {
@@ -72,7 +77,27 @@ public sealed class KeyResetService(
         return new(keys, unavailable);
     }
 
-    public async Task<KeyInventory> DiscoverAsync() => ParseKeys(await ReadAsync(["list"]));
+    public async Task<KeyInventory> DiscoverAsync()
+    {
+        var usb = ParseKeys(await ReadAsync(["list"]));
+        if (discoverNfc == null) return usb;
+        var nfc = await discoverNfc();
+        return new(usb.Keys.Concat(nfc.Keys).ToArray(), usb.Unavailable, nfc.NfcUnavailable, nfc.NfcReaders, nfc.ReaderStates);
+    }
+
+    public static string[] Selector(ResetKey key)
+    {
+        ValidateSerial(key.Serial);
+        if (!key.IsNfc) return ["--device", key.Serial];
+        ValidateReader(key.Reader!);
+        return ["--reader", key.Reader!];
+    }
+
+    public static void ValidateReader(string reader)
+    {
+        if (string.IsNullOrWhiteSpace(reader) || reader.Length > 512 || reader.Any(char.IsControl))
+            throw new ArgumentException("A valid, unambiguous NFC reader name is required.");
+    }
 
     public static FidoPinState ParsePinState(string output)
     {
@@ -95,7 +120,8 @@ public sealed class KeyResetService(
     public async Task<FidoPinState> ReadPinStateAsync(ResetKey key)
     {
         ValidateSerial(key.Serial);
-        return ParsePinState(await ReadAsync(["--device", key.Serial, "fido", "info"]));
+        if (key.IsNfc) await RequirePresentAsync(key);
+        return ParsePinState(await ReadAsync([.. Selector(key), "fido", "info"]));
     }
 
     private static void ValidateSerial(string serial)
@@ -114,11 +140,12 @@ public sealed class KeyResetService(
 
     public async Task<int?> ResetAsync(ResetKey selected, Func<ResetKey, bool> confirm)
     {
-        var arguments = ResetArguments(selected.Serial);
+        var arguments = selected.IsNfc ? new[] { "--reader", selected.Reader!, "fido", "reset" } : ResetArguments(selected.Serial);
+        _ = Selector(selected);
         await CheckVersionAsync();
         await RequirePresentAsync(selected);
         // Check FIDO access before asking for destructive confirmation. No key changes here.
-        await ReadAsync(["--device", selected.Serial, "fido", "info"]);
+        await ReadAsync([.. Selector(selected), "fido", "info"]);
         if (!confirm(selected)) return null;
         await RequirePresentAsync(selected);
         // No timeout, automatic retry, broad factory reset or cloud-credential deletion.

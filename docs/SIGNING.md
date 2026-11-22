@@ -1,8 +1,8 @@
 # Internal signing
 
-Product: **YubiEnroll UI**. Publisher: **Rory Vossepoel**. The self-signed certificate subject is `CN=Rory Vossepoel`. This is a personal community project, independent of Yubico or an employer.
+Product: **YubiKey Desk**. Publisher: **Rory Vossepoel**. The self-signed certificate subject is `CN=Rory Vossepoel`. This is a personal community project, independent of Yubico or an employer.
 
-Both `YubiEnroll.UI.exe` and `YubiEnroll.ConsoleHost.exe` must be signed after publishing and before packaging. Ordinary GitHub preview artifacts remain unsigned. CI tests signing on disposable copies with a temporary certificate; that certificate is never distributed.
+Both `PasskeyDesk.exe` and `PasskeyDesk.ConsoleHost.exe` must be signed after publishing and before packaging. Ordinary GitHub preview artifacts remain unsigned. CI tests signing on disposable copies with a temporary certificate; that certificate is never distributed.
 
 ## One-time setup on the signing PC
 
@@ -47,7 +47,7 @@ Share only the public `.cer`, preferably separately from the application and wit
 Trusting this certificate authorizes other code signed with the same key, not just this application. A self-signed signature detects modification; it provides no independent identity verification. SmartScreen or organizational application-control policies may still warn or block. Check signatures on the target device:
 
 ```powershell
-Get-AuthenticodeSignature C:\Builds\YubiEnroll-UI\YubiEnroll.UI.exe, C:\Builds\YubiEnroll-UI\YubiEnroll.ConsoleHost.exe |
+Get-AuthenticodeSignature C:\Builds\YubiEnroll-UI\PasskeyDesk.exe, C:\Builds\YubiEnroll-UI\PasskeyDesk.ConsoleHost.exe |
     Select-Object Path, Status, @{Name='Publisher'; Expression={$_.SignerCertificate.Subject}}
 ```
 

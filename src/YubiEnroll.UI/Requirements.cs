@@ -35,7 +35,7 @@ internal static class Requirements
                 if (isManager)
                 {
                     try { return new(true, "Installed · version " + KeyResetService.ParseVersion(result.Output)); }
-                    catch (InvalidOperationException) { return new(false, "Unsupported version · install 5.9.2 or newer within 5.x"); }
+                    catch (InvalidOperationException) { var detected = Regex.Match(result.Output, @"\b\d+\.\d+\.\d+\b"); return new(false, detected.Success ? $"Unsupported version {detected.Value} · requires 5.9.2 or newer within 5.x" : "Installed, but the version was not recognized"); }
                 }
                 var match = Regex.Match(result.Output.Trim(), @"\AYubiEnroll,?\s+(?:version:?\s*)?(?<version>\d+\.\d+\.\d+)(?:[-+][A-Za-z0-9.]+)?\z", RegexOptions.IgnoreCase);
                 return match.Success ? new(true, "Installed · version " + match.Groups["version"].Value) :

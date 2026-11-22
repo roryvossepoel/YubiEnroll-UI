@@ -13,7 +13,9 @@ public partial class MainWindow : Window
 {
     private readonly TextBox Diagnostics = new();
     private readonly TextBox Details = new();
-    private readonly ActivityLogView _activityView = new();
+    private ActivityLogView? _cachedActivityView;
+    private ActivityLogView _activityView => _cachedActivityView ??= new(_activityJournal);
+    private readonly ActivityJournal _activityJournal;
     private Configuration? _config;
     private bool _busy;
     private string _exePath = "";
@@ -28,6 +30,7 @@ public partial class MainWindow : Window
     }
     private bool _loading;
     private readonly bool _smokeTest;
+    private readonly DeskPolicy? _policy;
     private Provider SelectedProvider => Tenants.SelectedItem as Provider
         ?? throw new InvalidOperationException("Select an Entra tenant first.");
     private EnrollmentProfile SelectedProfile => (Profiles.SelectedItem as ProfileChoice)?.Profile
@@ -35,15 +38,26 @@ public partial class MainWindow : Window
     private UserCandidate SelectedUser => Users.SelectedItem as UserCandidate
         ?? throw new InvalidOperationException("Search and select a user first.");
     private CliRunner Runner => File.Exists(_exePath) ? new(_exePath)
-        : throw new InvalidOperationException("Install Yubico YubiEnroll in its standard location, then return to Settings → Prerequisites.");
+        : throw new InvalidOperationException("Install Yubico YubiEnroll in its standard location, then return to Settings → Help & About → Required software.");
 
-    public MainWindow(bool smokeTest = false)
+    public MainWindow(bool smokeTest = false, DeskPolicy? policy = null)
     {
         _smokeTest = smokeTest;
-        _registrationJournal = new RegistrationJournal(smokeTest
-            ? Path.Combine(Path.GetTempPath(), "YubiEnroll-log-test-" + Guid.NewGuid().ToString("N"), "preferences.json")
-            : RegistrationJournal.DefaultSettingsPath);
+        _policy = policy;
+        if (smokeTest)
+        {
+            var root = Path.Combine(Path.GetTempPath(), "YubiEnroll-log-test-" + Guid.NewGuid().ToString("N"));
+            _activityJournal = new ActivityJournal(Path.Combine(root, "activity.json"), Path.Combine(root, "Documents"));
+            _registrationJournal = new RegistrationJournal(Path.Combine(root, "preferences.json"), Path.Combine(root, "Documents"));
+        }
+        else
+        {
+            _registrationJournal = new RegistrationJournal(RegistrationJournal.DefaultSettingsPath, policy: policy?.Registration);
+            _activityJournal = new ActivityJournal(policy: policy?.Activity);
+            if (policy?.EmbeddedTerminal is bool embedded) EmbeddedTerminal = embedded;
+        }
         InitializeComponent();
+        Closed += (_, _) => EndManagementSession();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
         Width = Math.Min(Width, SystemParameters.WorkArea.Width);
         Activated += Window_Activated;
@@ -76,7 +90,7 @@ public partial class MainWindow : Window
         else
         {
             _versionText = "YubiEnroll is not installed";
-            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → Prerequisites.");
+            issues.Add("YubiEnroll prerequisite not found. Install Yubico YubiEnroll in its standard location, then open Settings → Help & About → Required software.");
         }
         // Config loading is independent of executable discovery/version probing. An error in one
         // must not hide the other or disable Settings and prerequisite recovery.
@@ -89,18 +103,22 @@ public partial class MainWindow : Window
         if (issues.Count > 0 && _config?.Providers.Count == 0) StatusText.Text += "\n" + SetupOrReadyMessage();
         if (issues.Count > 0)
         {
-            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then return to Settings → Prerequisites.";
+            StatusText.Text += "\nUse the same Windows account as your working YubiEnroll setup, then return to Settings → Help & About → Required software.";
 
         }
     }
 
-    private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() :
-        "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
+    private string EmptyTenantGuidance => _policy?.ManagesTenants == true
+        ? "No tenants available. Ask your administrator to configure a tenant."
+        : "No tenants yet. Open Settings → Tenants → Add tenant to get started.";
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.5.6" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
+
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
+        ResetManagement();
         _connectedProvider = null;
         var oldTenant = (Tenants.SelectedItem as Provider)?.Name;
         var oldProfile = (Profiles.SelectedItem as ProfileChoice)?.Profile.Name;
@@ -153,6 +171,7 @@ public partial class MainWindow : Window
     {
         if (_loading) return;
         _connectedProvider = null;
+        ResetManagement();
         ResetSelection();
         Query.Clear();
         KeyName.Clear();
@@ -173,6 +192,7 @@ public partial class MainWindow : Window
         var provider = Tenants.SelectedItem as Provider;
         var hasTenants = Tenants.Items.Count > 0;
         TenantConnectionRow.Visibility = hasTenants ? Visibility.Visible : Visibility.Collapsed;
+        EmptyTenants.Text = EmptyTenantGuidance;
         EmptyTenants.Visibility = hasTenants ? Visibility.Collapsed : Visibility.Visible;
         ContextBanner.Visibility = hasTenants ? Visibility.Visible : Visibility.Collapsed;
         ContextBanner.Text = provider == null ? "Select a tenant." :
@@ -184,10 +204,9 @@ public partial class MainWindow : Window
         PreparePanel.IsEnabled = TargetReady;
         var profile = Profiles.SelectedItem as EnrollmentProfile;
         // Wizard rendering determines which action is available at the current step.
-        CredentialsButton.IsEnabled = IsConnected && Users.SelectedItem != null;
-        CredentialsButton.Visibility = Users.SelectedItem != null ? Visibility.Visible : Visibility.Collapsed;
         SelectedUserText.Visibility = Users.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
         UpdateEnrollmentGuidance();
+        RenderManagement();
     }
 
     private void ResetSelection()
@@ -195,7 +214,6 @@ public partial class MainWindow : Window
         Users.ItemsSource = null;
         SelectedUserText.Text = "Search and select a user.";
         EnrollButton.IsEnabled = false;
-        CredentialsButton.IsEnabled = false;
         PreparePanel.IsEnabled = false;
     }
 
@@ -245,11 +263,11 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: YubiEnroll UI 0.5.6\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.3\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
-                MessageBox.Show(this, report.Summary, "YubiEnroll UI", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, report.Summary, "Passkey Desk for YubiKeys", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
         finally { WorkPanel.IsEnabled = true; Navigation.IsEnabled = true; SettingsButton.IsEnabled = true; _busy = false; UpdateSummary(); if (_closeAfterLogin) { _closeAfterLogin = false; Close(); } }
@@ -264,13 +282,14 @@ public partial class MainWindow : Window
     {
         if (_busy || _resetStep != 1 || !TargetReady || _selectedKey?.Key != _resetReviewTarget || ResetAcknowledged.IsChecked != true || !IsAdministrator()) return;
         var target = _selectedKey!.Key;
+        if (target.IsNfc && _selectedKey.Capabilities?.ResetAllowed != true) return;
         int? resetExit = null;
         var resetCompleted = await RunWithResultAsync(async () =>
         {
             var path = KeyResetService.FindExecutable();
             if (path.Length == 0) throw new InvalidOperationException("Install YubiKey Manager CLI in Prerequisites.");
             var runner = new CliRunner(path);
-            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a));
+            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a), () => NfcDiscovery.ReadAsync(runner));
             // The dedicated review page is the destructive confirmation. Native prompts remain enabled.
             var exit = resetExit = await service.ResetAsync(target, key =>
                 _resetStep == 1 && _resetReviewTarget == key && _selectedKey?.Key == key && ResetAcknowledged.IsChecked == true);
@@ -297,7 +316,8 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
 
-    private async void Login_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
+    private async void Login_Click(object sender, RoutedEventArgs e) => await LoginAsync();
+    private async Task LoginAsync() => await RunAsync(async () =>
     {
         var provider = SelectedProvider;
         _connectedProvider = null;
@@ -310,12 +330,12 @@ public partial class MainWindow : Window
         {
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, null);
             _connectedProvider = provider;
-            StatusText.Text = "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
-            _deviceRefresh?.Start();
+            StatusText.Text = ManagePage.IsVisible ? $"Signed in to {provider.Name}." : "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
+            // Sign-in does not change the inventory; hardware notifications schedule their own refresh.
         }
         else StatusText.Text = $"{_lastInteractiveFailure} Select Connect to try again.";
         UpdateSummary();
-        if (IsConnected) _ = Dispatcher.BeginInvoke(() => Query.Focus());
+        if (IsConnected && !ManagePage.IsVisible && !BatchPage.IsVisible) _ = Dispatcher.BeginInvoke(() => Query.Focus());
     }, "Connect tenant");
 
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync();
@@ -326,17 +346,9 @@ public partial class MainWindow : Window
 
     private async Task SearchAsync() => await RunAsync(async () =>
     {
-        RequireConnection();
-        var query = Query.Text.Trim();
-        if (query.Length < 2) throw new ArgumentException("Enter at least two characters to search.");
-        var provider = SelectedProvider;
         ResetSelection();
-        await ActivateAsync(provider);
         StatusText.Text = "Searching users…";
-        var result = await Runner.CaptureAsync("users", "--", query);
-        RequireSuccess(result, "User search");
-        Details.Text = result.Output;
-        var users = UserSearch.Parse(result.Output);
+        var users = await FindUsersAsync(Query.Text.Trim());
         Users.ItemsSource = users;
         SelectedUserText.Text = users.Count == 0 ? "No users found." : $"{users.Count} user(s) found. Select a user.";
         Record($"User search completed: {users.Count} user(s) found.");
@@ -344,18 +356,15 @@ public partial class MainWindow : Window
             $"Select a user from {users.Count} result(s).";
     });
 
-    private async void Credentials_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
+    private async Task<IReadOnlyList<UserCandidate>> FindUsersAsync(string query)
     {
         RequireConnection();
-        var user = SelectedUser;
+        if (query.Length < 2) throw new ArgumentException("Enter at least two characters to search.");
         await ActivateAsync(SelectedProvider);
-        var result = await Runner.CaptureAsync("credentials", "list", user.Id);
-        RequireSuccess(result, "Credential lookup");
-        Details.Text = result.Output;
-        ShowRegisteredKeys(user, SelectedProvider, result.Output);
-        Record("Registered keys retrieved.");
-        StatusText.Text = "Registered keys retrieved for the selected user.";
-    });
+        var result = await Runner.CaptureAsync("users", "--", query);
+        RequireSuccess(result, "User search");
+        return UserSearch.Parse(result.Output);
+    }
 
     private async void Enroll_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
@@ -363,40 +372,75 @@ public partial class MainWindow : Window
         var provider = SelectedProvider;
         EnrollmentProfile? profile = _addPasskey ? null : SelectedProfile;
         var user = SelectedUser;
+        var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
+        int code;
+        try { code = await ExecuteEnrollmentAsync(provider, profile, user, target, KeyName.Text); }
+        catch (EnrollmentOutcomeUnknownException)
+        {
+            ShowEnrollmentResult("The enrollment outcome is unknown. Check Manage user passkeys before retrying.");
+            throw;
+        }
+        ShowEnrollmentResult(code == 0 ? "YubiEnroll reported success. Test sign-in with the new passkey."
+            : "Enrollment failed or was interrupted. A credential may already exist. Check Manage user passkeys before retrying.");
+    });
+
+    private sealed class EnrollmentOutcomeUnknownException(Exception inner) : Exception("The enrollment outcome is unknown. Check Manage user passkeys before retrying.", inner) { }
+
+    private async Task<int> ExecuteEnrollmentAsync(Provider provider, EnrollmentProfile? profile, UserCandidate user, ResetKey target,
+        string name, EnrollmentBatch? batch = null)
+    {
         RequireConnection();
+        if (provider != SelectedProvider || (batch != null && (_addPasskey || batch.Tenant != provider || batch.Profile != profile || batch.Current?.User != user)))
+            throw new InvalidOperationException("The selected tenant, profile or recipient changed.");
         var current = ConfigReader.Read(_configPath);
         ConfigReader.EnsureUnchanged(current, provider, profile);
         var setup = _addPasskey ? PasskeyAddition.Settings(_selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")) :
             ProfileConfigWriter.Read(File.ReadAllText(_configPath), profile!.Name);
+        if (batch != null && setup != _batchPolicy) throw new InvalidOperationException("The reviewed profile changed. Review the batch again.");
         var reset = setup.Reset;
-        var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
-        await CheckEnrollmentTargetAsync(target, setup);
+        await CheckEnrollmentTargetAsync(target, setup, batch);
         // The Review step is the confirmation; never silently skip its fresh target checks.
         await ActivateAsync(provider, profile);
-        await CheckEnrollmentTargetAsync(target, setup);
+        if (batch != null)
+        {
+            var resolved = BatchRoster.Exact(user.UserPrincipalName, await LookupBatchUserAsync(provider, user.UserPrincipalName));
+            if (resolved == null || !string.Equals(resolved.Id, user.Id, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The reviewed account could not be verified. No registration was started.");
+        }
+        var fresh = await CheckEnrollmentTargetAsync(target, setup, batch);
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
-        var registration = BeginRegistrationRecord(provider, user, target, setup, KeyName.Text);
+        var registration = BeginRegistrationRecord(provider, user, target, setup, name);
         _generatedPin = null;
         _captureGeneratedPin = registration?.SaveGeneratedPin == true && !_addPasskey && setup.RandomPin == true;
-        Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · profile {setup.Name} · reset {reset}.");
+        Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · serial {target.Serial} · profile {setup.Name} · reset {reset}.");
         StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;
+        bool targetChanged = false;
         EnrollmentProfileLease? lease = null;
         try
         {
             if (_addPasskey || setup.MinPinLength == null || setup.RandomPinLength == null)
                 lease = EnrollmentProfileLease.Create(_configPath, EnrollmentProfileLease.Resolve(setup,
-                    _selectedKey?.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")));
+                    fresh.Capabilities ?? throw new InvalidOperationException("Refresh the selected key.")));
             var operationProfile = lease?.Profile ?? profile!;
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, operationProfile);
-            var arguments = EnrollmentCommand.Build(user.Id, operationProfile.Name, KeyName.Text, reset);
-            code = await RunInteractiveAsync(_exePath, arguments);
+            var arguments = EnrollmentCommand.Build(user.Id, operationProfile.Name, name, reset, target.Reader);
+            if (ConfigReader.Read(_configPath).ActiveProvider != provider.Name)
+                throw new InvalidOperationException("The active tenant changed. No registration was started.");
+            batch?.Start(user, target, fresh.Pin, setup);
+            var generation = _deviceGeneration;
+            int? finishedGeneration = null;
+            code = await RunInteractiveAsync(_exePath, arguments, target, () => finishedGeneration = _deviceGeneration);
+            targetChanged = batch != null && generation != (finishedGeneration ?? _deviceGeneration);
+            batch?.Complete(targetChanged ? null : code);
         }
-        catch
+        catch (Exception ex)
         {
+            if (batch?.Current?.Status == IssueStatus.InProgress) batch.Complete(null);
             CompleteRegistrationRecord(registration, null);
-            ShowEnrollmentResult("The enrollment outcome is unknown. Check Registered keys and Entra before retrying.");
-            throw;
+            Record($"Enrollment outcome unverified · tenant {provider.Name} · user {user.Id} · serial {target.Serial}.", "Warning");
+            if (batch?.Current?.Status == IssueStatus.Pending) throw;
+            throw new EnrollmentOutcomeUnknownException(ex);
         }
         finally
         {
@@ -406,34 +450,13 @@ public partial class MainWindow : Window
             { Record("Temporary enrollment profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
         }
         // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
-        CompleteRegistrationRecord(registration, code, _generatedPin);
+        CompleteRegistrationRecord(registration, targetChanged ? null : code, targetChanged ? null : _generatedPin);
         _generatedPin = null;
-        _deviceRefresh?.Start(); // Refresh status after enrollment, once the operation has released the key.
-        Record(code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.", code == 0 ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
-        if (code != 0)
-        {
-            ShowEnrollmentResult("Enrollment failed or was interrupted. A credential may already exist. Check Registered keys before retrying.");
-            return;
-        }
-        // Exit 0 is CLI-reported success, not an independent authentication test.
-        StatusText.Text = "YubiEnroll reported success. Retrieving registered credentials…";
-        try
-        {
-            await ActivateAsync(provider, profile);
-            var result = await Runner.CaptureAsync("credentials", "list", user.Id);
-            if (result.ExitCode != 0) throw new InvalidOperationException();
-            Details.Text = result.Output;
-            // The result page offers Registered keys without opening a second modal automatically.
-            StatusText.Text = "YubiEnroll reported success. Review the registered keys and test sign-in.";
-            Record("Post-enrollment credential list retrieved; sign-in validation is still required.");
-        }
-        catch
-        {
-            StatusText.Text = "YubiEnroll reported success, but the credential list could not be retrieved. Verify in Entra before retrying.";
-            Record("Post-enrollment lookup unavailable; enrollment was not repeated.");
-        }
-        ShowEnrollmentResult(StatusText.Text);
-    });
+        InvalidateDeviceInventory(); // Native enrollment can change PIN state without a device notification.
+        if (batch != null) _deviceRefresh?.Start();
+        Record((targetChanged ? "Key connection changed; enrollment outcome unknown." : code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.") + $" · tenant {provider.Name} · user {user.Id} · serial {target.Serial}", code == 0 && !targetChanged ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
+        return code;
+    }
 
     private static bool IsAdministrator()
     {
@@ -448,10 +471,10 @@ public partial class MainWindow : Window
         {
             // No arguments/config/tokens cross the account boundary. The new instance reloads its own config.
             var restarted = Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true, Verb = "runas" });
-            if (restarted == null) { StartupFeedback.Text = "Unable to start the elevated instance. Please try again."; return; }
+            if (restarted == null) { StartupFeedback.Text = "Unable to start the elevated instance. Please try again. "; return; }
             Close();
         }
-        catch (Win32Exception) { StartupFeedback.Text = "Administrator restart cancelled or unavailable. No changes were made. You can try again or close the app."; }
+        catch (Win32Exception) { StartupFeedback.Text = "Administrator restart cancelled or unavailable. No changes were made. You can try again or close the app. "; }
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -467,7 +490,12 @@ public partial class MainWindow : Window
             e.Cancel = true;
             MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
         }
+        else if (_batchStage == BatchStage.Issue && _batch != null)
+            e.Cancel = MessageBox.Show(this, "Closing will discard this batch queue and its in-memory results. To keep them, end the batch and export the CSV first." +
+                (_registrationJournal.PendingCount > 0 ? " Some registration log results also still need to be saved." : ""),
+                "Close during batch issuance?", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes;
         else if (_registrationJournal.PendingCount > 0)
             e.Cancel = MessageBox.Show(this, $"{_registrationJournal.PendingCount} enrollment result(s) have not been saved. Closing loses their final outcomes; the on-disk attempts will remain unknown. Close anyway?", "Unsaved enrollment records", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes;
+        if (!e.Cancel && _hostedWindow is SettingsWindow settings) e.Cancel = !settings.ConfirmLeavePreferences();
     }
 }

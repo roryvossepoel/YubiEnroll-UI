@@ -1,0 +1,453 @@
+<?xml version='1.0' encoding='utf-8'?>
+<policyDefinitions revision="1.2" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="pdesk" namespace="PasskeyDesk.Policies" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.2" />
+  <supportedOn>
+    <definitions>
+      <definition name="PolicyPreview" displayName="$(string.SupportedVersion)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="PasskeyDesk" displayName="$(string.CategoryName)" />
+    <category name="CliConfig" displayName="$(string.CliConfigLabelCategory)">
+      <parentCategory ref="PasskeyDesk" />
+    </category>
+    <category name="TenantsCategory" displayName="$(string.TenantsCategoryLabelCategory)">
+      <parentCategory ref="CliConfig" />
+    </category>
+    <category name="Profiles" displayName="$(string.ProfilesLabelCategory)">
+      <parentCategory ref="CliConfig" />
+    </category>
+    <category name="AppSettings" displayName="$(string.AppSettingsLabelCategory)">
+      <parentCategory ref="PasskeyDesk" />
+    </category>
+    <category name="Logging" displayName="$(string.LoggingLabelCategory)">
+      <parentCategory ref="AppSettings" />
+    </category>
+  </categories>
+  <policies>
+    <policy name="Tenants" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.TenantsLabel)" explainText="$(string.TenantsHelp)" presentation="$(presentation.Tenants)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="TenantsJson" valueName="TenantsJson" required="true" maxLength="1048576" />
+      </elements>
+    </policy>
+    <policy name="Activity" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.ActivityLabel)" explainText="$(string.ActivityHelp)" presentation="$(presentation.Activity)">
+      <parentCategory ref="Logging" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <enum id="ActivityLogging" valueName="ActivityLogging" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <decimal id="RetentionDays" valueName="RetentionDays" required="true" minValue="1" maxValue="3650" />
+        <text id="ActivityFolder" valueName="ActivityFolder" required="false" maxLength="32767" />
+      </elements>
+    </policy>
+    <policy name="Registration" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.RegistrationLabel)" explainText="$(string.RegistrationHelp)" presentation="$(presentation.Registration)">
+      <parentCategory ref="Logging" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <enum id="RegistrationLogging" valueName="RegistrationLogging" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="SaveGeneratedPin" valueName="SaveGeneratedPin" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <text id="RegistrationFolder" valueName="RegistrationFolder" required="false" maxLength="32767" />
+      </elements>
+    </policy>
+    <policy name="Terminal" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.TerminalLabel)" explainText="$(string.TerminalHelp)" presentation="$(presentation.Terminal)">
+      <parentCategory ref="AppSettings" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <enum id="EmbeddedTerminal" valueName="EmbeddedTerminal" required="true">
+          <item displayName="$(string.External)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.Internal)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Profile1" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.Profile1Label)" explainText="$(string.Profile1Help)" presentation="$(presentation.Profile1)">
+      <parentCategory ref="Profiles" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Profile1Name" valueName="Profile1Name" required="true" maxLength="80" />
+        <enum id="Profile1Reset" valueName="Profile1Reset" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile1RandomPin" valueName="Profile1RandomPin" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <decimal id="Profile1RandomPinLength" valueName="Profile1RandomPinLength" required="true" minValue="0" maxValue="63" />
+        <decimal id="Profile1MinPinLength" valueName="Profile1MinPinLength" required="true" minValue="0" maxValue="63" />
+        <enum id="Profile1ForcePinChange" valueName="Profile1ForcePinChange" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile1AlwaysUv" valueName="Profile1AlwaysUv" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile1RequireEa" valueName="Profile1RequireEa" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Profile2" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.Profile2Label)" explainText="$(string.Profile2Help)" presentation="$(presentation.Profile2)">
+      <parentCategory ref="Profiles" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Profile2Name" valueName="Profile2Name" required="true" maxLength="80" />
+        <enum id="Profile2Reset" valueName="Profile2Reset" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile2RandomPin" valueName="Profile2RandomPin" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <decimal id="Profile2RandomPinLength" valueName="Profile2RandomPinLength" required="true" minValue="0" maxValue="63" />
+        <decimal id="Profile2MinPinLength" valueName="Profile2MinPinLength" required="true" minValue="0" maxValue="63" />
+        <enum id="Profile2ForcePinChange" valueName="Profile2ForcePinChange" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile2AlwaysUv" valueName="Profile2AlwaysUv" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile2RequireEa" valueName="Profile2RequireEa" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Profile3" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.Profile3Label)" explainText="$(string.Profile3Help)" presentation="$(presentation.Profile3)">
+      <parentCategory ref="Profiles" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Profile3Name" valueName="Profile3Name" required="true" maxLength="80" />
+        <enum id="Profile3Reset" valueName="Profile3Reset" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile3RandomPin" valueName="Profile3RandomPin" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <decimal id="Profile3RandomPinLength" valueName="Profile3RandomPinLength" required="true" minValue="0" maxValue="63" />
+        <decimal id="Profile3MinPinLength" valueName="Profile3MinPinLength" required="true" minValue="0" maxValue="63" />
+        <enum id="Profile3ForcePinChange" valueName="Profile3ForcePinChange" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile3AlwaysUv" valueName="Profile3AlwaysUv" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile3RequireEa" valueName="Profile3RequireEa" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Profile4" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.Profile4Label)" explainText="$(string.Profile4Help)" presentation="$(presentation.Profile4)">
+      <parentCategory ref="Profiles" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Profile4Name" valueName="Profile4Name" required="true" maxLength="80" />
+        <enum id="Profile4Reset" valueName="Profile4Reset" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile4RandomPin" valueName="Profile4RandomPin" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <decimal id="Profile4RandomPinLength" valueName="Profile4RandomPinLength" required="true" minValue="0" maxValue="63" />
+        <decimal id="Profile4MinPinLength" valueName="Profile4MinPinLength" required="true" minValue="0" maxValue="63" />
+        <enum id="Profile4ForcePinChange" valueName="Profile4ForcePinChange" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile4AlwaysUv" valueName="Profile4AlwaysUv" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile4RequireEa" valueName="Profile4RequireEa" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+    <policy name="Profile5" class="Machine" key="Software\Policies\PasskeyDesk" displayName="$(string.Profile5Label)" explainText="$(string.Profile5Help)" presentation="$(presentation.Profile5)">
+      <parentCategory ref="Profiles" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Profile5Name" valueName="Profile5Name" required="true" maxLength="80" />
+        <enum id="Profile5Reset" valueName="Profile5Reset" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile5RandomPin" valueName="Profile5RandomPin" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <decimal id="Profile5RandomPinLength" valueName="Profile5RandomPinLength" required="true" minValue="0" maxValue="63" />
+        <decimal id="Profile5MinPinLength" valueName="Profile5MinPinLength" required="true" minValue="0" maxValue="63" />
+        <enum id="Profile5ForcePinChange" valueName="Profile5ForcePinChange" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile5AlwaysUv" valueName="Profile5AlwaysUv" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+        <enum id="Profile5RequireEa" valueName="Profile5RequireEa" required="true">
+          <item displayName="$(string.Off)">
+            <value>
+              <decimal value="0" />
+            </value>
+          </item>
+          <item displayName="$(string.On)">
+            <value>
+              <decimal value="1" />
+            </value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+  </policies>
+</policyDefinitions>

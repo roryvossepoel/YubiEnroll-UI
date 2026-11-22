@@ -3,10 +3,33 @@ using System.Windows;
 namespace YubiEnroll.UI;
 public partial class App : Application
 {
+    internal static void StopForPolicyError(Exception ex)
+    {
+        MessageBox.Show("Passkey Desk cannot apply the device policy. " + ex.Message +
+            "\n\nCheck the policy and the CLI configuration, then restart the app.",
+            "Passkey Desk · Policy preview", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Current.Shutdown(1);
+    }
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         TaskbarIdentity.Initialize();
         base.OnStartup(e);
+        YubiEnroll.Core.DeskPolicy? policy;
+        try
+        {
+            using var machine = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
+            using var key = machine.OpenSubKey(YubiEnroll.Core.DeskPolicy.RegistryPath, writable: false);
+            policy = YubiEnroll.Core.DeskPolicy.Read(name => key?.GetValue(name, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames),
+                YubiEnroll.Core.RegistrationJournal.LogDirectory("ActivityLog"), YubiEnroll.Core.RegistrationJournal.LogDirectory("RegistrationLog"));
+            if (policy != null && (e.Args.Contains("--smoke-test") || e.Args.Contains("--terminal-check")))
+                throw new InvalidOperationException("Run diagnostics on a device outside policy mode.");
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            StopForPolicyError(ex);
+            return;
+        }
         if (e.Args.Length == 2 && e.Args[0] == "--terminal-check")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -41,7 +64,7 @@ public partial class App : Application
             Shutdown(code);
             return;
         }
-        MainWindow = new MainWindow();
+        MainWindow = new MainWindow(policy: policy);
         MainWindow.Show();
     }
 }

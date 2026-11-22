@@ -1,0 +1,16 @@
+<!-- Generated from App.svg by tools/build_icon.py. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <DrawingImage x:Key="BrandMark">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M0 0 H64 V64 H0 Z"/>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#41898E" Geometry="F0 M12 3 H39 Q48 3 48 12 V16 H27 Q16 16 16 27 V47 H12 Q3 47 3 38 V12 Q3 3 12 3 Z"/>
+          <GeometryDrawing Brush="#0B536F" Geometry="F0 M28 18 H52 Q61 18 61 27 V52 Q61 61 52 61 H28 Q18 61 18 52 V28 Q18 18 28 18 Z"/>
+          <GeometryDrawing Brush="#A4D52A" Geometry="F0 M40 27 C44.4 27 48 30.6 48 35 C48 38.1 46.3 40.7 43.8 42 L46.1 50.2 Q46.4 51.5 45 51.5 H35 Q33.6 51.5 33.9 50.2 L36.2 42 C33.7 40.7 32 38.1 32 35 C32 30.6 35.6 27 40 27 Z"/>
+        </DrawingGroup>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+</ResourceDictionary>

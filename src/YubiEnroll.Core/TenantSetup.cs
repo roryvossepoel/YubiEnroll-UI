@@ -93,7 +93,7 @@ public static class TenantConfigWriter
         return result;
     }
 
-    public static TenantSetup Read(string text, string name)
+    public static TenantSetup Read(string text, string name, bool requirePublicCloud = false)
     {
         ConfigReader.Parse(text);
         var model = Toml.ToModel(text);
@@ -101,6 +101,14 @@ public static class TenantConfigWriter
             !providers.TryGetValue(name, out var t) || t is not TomlTable table)
             throw new InvalidOperationException("Tenant no longer exists. Reopen Settings.");
         string Value(string key) => table.TryGetValue(key, out var value) && value is string v ? v : "";
+        if (requirePublicCloud)
+        {
+            bool PublicEndpoint(string key, string expected) => !table.ContainsKey(key) ||
+                string.Equals(Value(key).TrimEnd('/'), expected, StringComparison.OrdinalIgnoreCase);
+            if (!PublicEndpoint("entra_base_url", "https://login.microsoftonline.com") ||
+                !PublicEndpoint("graph_base_url", "https://graph.microsoft.com"))
+                throw new InvalidOperationException("Passkey management supports public Microsoft Entra tenants only.");
+        }
         return new(name, Value("tenant_id"), Value("client_id"), Value("redirect_uri"), Value("profile"), false);
     }
 

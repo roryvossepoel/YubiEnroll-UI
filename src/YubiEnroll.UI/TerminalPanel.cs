@@ -21,13 +21,14 @@ internal sealed class TerminalPanel : Border
     private readonly TaskCompletionSource _dismissed = new();
     private PseudoConsole? _session;
     internal string FailureDetail { get; private set; } = "";
-    private bool _running;
+    private bool _running, _cancelRequested;
+    private readonly Button _cancel = new() { Content = "Cancel operation", Margin = new Thickness(0,0,8,0) };
     internal string? GeneratedPin { get; private set; }
     private readonly string? _captureSerial;
     private readonly bool _enrollment, _addPasskey;
     internal int? CompletedExitCode { get; private set; }
     private readonly bool _autoCloseOnSuccess;
-    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null)
+    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null, bool nfc = false)
     {
         _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
@@ -35,21 +36,30 @@ internal sealed class TerminalPanel : Border
         var layout = new DockPanel(); Child = layout;
         var heading = new TextBlock { Text = title, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(heading, Dock.Top); layout.Children.Add(heading);
-        var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+        var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : nfc ? "Follow the Yubico prompts below. Click the terminal to type. Keep the key flat on the NFC reader; remove and replace it only when prompted." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
         var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
         footer.Children.Add(_status);
         if (enrollment && !addPasskey) footer.Children.Add(new TextBlock { Text = captureSerial != null ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved." : "Record any generated PIN before returning. Terminal output is not saved to the activity log.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
-        footer.Children.Add(_done);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
+        _cancel.Click += async (_, _) =>
+        {
+            if (!_running || _session is not { HasStarted: true } session) return;
+            if (MessageBox.Show(Window.GetWindow(this), "Stop this operation? Changes already made to the key or in Entra cannot be undone.", "Cancel operation", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes || !_running) return;
+            _cancelRequested = true; _cancel.IsEnabled = false; _status.Text = "Stopping the operation…";
+            try { await session.CancelOperationAsync(); }
+            catch (System.ComponentModel.Win32Exception) { if (_running) { _cancel.IsEnabled = true; _status.Text = "Could not stop the operation. Do not touch the wrong key. Try cancelling again."; } }
+        };
         var output = new Grid(); output.Children.Add(Screen);
         var waiting = new TextBlock { Text = autoCloseOnSuccess ? "Waiting for sign-in…\nIf your browser opened, complete authentication there." : "Starting the interactive operation…", Foreground = Brushes.WhiteSmoke, Margin = new Thickness(18), TextWrapping = TextWrapping.Wrap, IsHitTestVisible = false };
         output.Children.Add(waiting); layout.Children.Add(output);
         Screen.TextChanged += (_, _) => waiting.Visibility = string.IsNullOrWhiteSpace(Screen.Text) ? Visibility.Visible : Visibility.Collapsed;
         _done.Click += (_, _) => { _screen.Clear(); Screen.Clear(); _dismissed.TrySetResult(); };
-        Screen.PreviewTextInput += (_, e) => { if (_running) _session?.Write(e.Text); e.Handled = true; };
+        Screen.PreviewTextInput += (_, e) => { if (_running && !_cancelRequested) _session?.Write(e.Text); e.Handled = true; };
         Screen.PreviewKeyDown += (_, e) =>
         {
-            if (!_running) return;
+            if (!_running || _cancelRequested) return;
             // Do not forward shortcuts that could paste secrets or accidentally interrupt a reset.
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) { e.Handled = true; return; }
             var sequence = e.Key switch { Key.Enter => "\r", Key.Back => "\x7f", Key.Tab => "\t", Key.Escape => "\x1b", Key.Up => "\x1b[A", Key.Down => "\x1b[B", Key.Right => "\x1b[C", Key.Left => "\x1b[D", Key.Home => "\x1b[H", Key.End => "\x1b[F", Key.Delete => "\x1b[3~", _ => null };
@@ -58,8 +68,9 @@ internal sealed class TerminalPanel : Border
         DataObject.AddPastingHandler(Screen, (_, e) => e.CancelCommand());
         _screen.Reply += text => _session?.Write(text);
     }
-    internal void SendInput(string text) { if (_running) _session?.Write(text); }
+    internal void SendInput(string text) { if (_running && !_cancelRequested) _session?.Write(text); }
     internal void DismissCompleted() { if (!_running) { _screen.Clear(); Screen.Clear(); _dismissed.TrySetResult(); } }
+    internal Action? NativeFinished { get; set; }
     internal async Task<int> RunAsync(string executable, string[] args)
     {
         using var session = new PseudoConsole(); _session = session;
@@ -84,6 +95,14 @@ internal sealed class TerminalPanel : Border
             _status.Text = session.HasStarted ? "The terminal connection failed after launch. The operation's outcome is unknown. No retry was started." : "The embedded terminal could not start. Choose external console in Settings before trying again.";
         }
         finally { _running = false; _session = null; _done.IsEnabled = true; _done.Focus(); }
+        _cancel.Visibility = Visibility.Collapsed;
+        if (_cancelRequested)
+        {
+            exit = 125; GeneratedPin = null;
+            FailureDetail = "Interrupted by operator. Outcome unverified.";
+            _status.Text = "Operation interrupted. Check the key and any Entra registration before retrying.";
+        }
+        NativeFinished?.Invoke();
         CompletedExitCode = exit;
         if (_autoCloseOnSuccess && exit == 0) { _screen.Clear(); Screen.Clear(); return exit; }
         await _dismissed.Task;

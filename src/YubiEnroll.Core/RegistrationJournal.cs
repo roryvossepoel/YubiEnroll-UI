@@ -15,6 +15,14 @@ public sealed record RegistrationRecord(
     bool ResetBeforeEnrollment, bool ForcePinChangeOnFirstUse, RegistrationOutcome Outcome, int? NativeExitCode)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? GeneratedPin { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? GeneratePinConfigured { get; init; }
+    [JsonIgnore] public string PinModeLabel => (GeneratePinConfigured ?? (GeneratedPin != null ? true : (bool?)null)) switch
+    {
+        true => "Generated initial PIN",
+        false => "Not generated",
+        null => "Not recorded"
+    };
+    [JsonIgnore] public string ChangePinLabel => ForcePinChangeOnFirstUse ? "Yes" : "No";
     [JsonIgnore] public DateTimeOffset RecordedAt => CompletedAt ?? StartedAt;
     [JsonIgnore] public string ListTimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
     [JsonIgnore] public string TimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
@@ -29,7 +37,7 @@ public sealed record RegistrationRecord(
         new(1, Guid.NewGuid(), DateTimeOffset.Now, null, tenant.Name, tenant.TenantId, user.Id,
             user.DisplayName, user.UserPrincipalName, user.Email, key.Model, key.Serial, profile.Name, registrationName.Trim(),
             profile.Reset ?? throw new InvalidOperationException("Choose an explicit reset setting."),
-            profile.ForcePinChange ?? throw new InvalidOperationException("Choose an explicit first-use PIN setting."), RegistrationOutcome.Unknown, null);
+            profile.ForcePinChange ?? throw new InvalidOperationException("Choose an explicit first-use PIN setting."), RegistrationOutcome.Unknown, null) { GeneratePinConfigured = profile.RandomPin };
 
     public RegistrationRecord Complete(int? code) => this with
     {
@@ -51,15 +59,28 @@ public sealed class RegistrationJournal
     private readonly string _settingsPath;
     private readonly Dictionary<Guid, RegistrationAttempt> _pending = new();
     public RegistrationLogPreferences Preferences { get; private set; }
+    public string DefaultLogDirectory { get; }
     public string? SettingsError { get; private set; }
     public int PendingCount => _pending.Count;
     public event Action? Changed;
     public static string DefaultSettingsPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YubiEnroll.UI", "registration-log-settings.json");
 
-    public RegistrationJournal(string settingsPath)
+    public bool IsManaged { get; }
+    public static string LogDirectory(string leaf, string? documents = null)
+    {
+        documents ??= Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments, Environment.SpecialFolderOption.DoNotVerify);
+        return Path.IsPathFullyQualified(documents) ? Path.Combine(documents, "YubiKey Desk", leaf) : "";
+    }
+
+    public RegistrationJournal(string settingsPath, string? documentsFolder = null, RegistrationLogPreferences? policy = null)
     {
         _settingsPath = Path.GetFullPath(settingsPath);
-        Preferences = new(false, Path.Combine(Path.GetDirectoryName(_settingsPath)!, "RegistrationLog"));
+        // Resolve the current account's known folder (including OneDrive or network redirection).
+        // If it is unavailable, the operator can still browse to an explicit location.
+        DefaultLogDirectory = LogDirectory("RegistrationLog", documentsFolder);
+        IsManaged = policy != null;
+        if (policy != null) { ValidateDirectory(policy.Directory); Preferences = policy; return; }
+        Preferences = new(false, DefaultLogDirectory);
         try
         {
             var preferences = JsonSerializer.Deserialize<RegistrationLogPreferences>(File.ReadAllText(_settingsPath), Json)
@@ -70,7 +91,7 @@ public sealed class RegistrationJournal
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { }
         catch (Exception ex) when (IsStorageError(ex))
         {
-            SettingsError = "Registration log preferences could not be read. Open Settings → Registration log and save your choice before enrollment.";
+            SettingsError = "Registration log preferences could not be read. Open Settings → App settings and save your choice before enrollment.";
         }
     }
 
@@ -81,6 +102,7 @@ public sealed class RegistrationJournal
     }
     public void Configure(bool enabled, string directory, bool saveGeneratedPin = false)
     {
+        if (IsManaged) throw new InvalidOperationException("Registration logging is managed by your organization.");
         ValidateDirectory(directory);
         directory = Path.GetFullPath(directory);
         if (PendingCount > 0 && !directory.Equals(Preferences.Directory, StringComparison.OrdinalIgnoreCase))
@@ -179,7 +201,7 @@ public sealed class RegistrationJournal
         }
         AtomicWrite(path, JsonSerializer.Serialize(attempt.Record, Json));
     }
-    private static void AtomicWrite(string path, string content)
+    internal static void AtomicWrite(string path, string content)
     {
         System.IO.Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -202,7 +224,7 @@ public sealed class RegistrationJournal
             (through == null || r.RecordedAt.LocalDateTime.Date <= through.Value.Date) &&
             (!successfulOnly || r.Outcome == RegistrationOutcome.Succeeded)).ToArray();
 
-    public static string Csv(IEnumerable<RegistrationRecord> records, string separator = ";")
+    public static string Csv(IEnumerable<RegistrationRecord> records, string separator = ";", bool includeHeader = true)
     {
         if (separator is not (";" or ",")) throw new ArgumentException("Use a comma or semicolon separator.");
         static string Cell(string value, bool text = false)
@@ -213,7 +235,8 @@ public sealed class RegistrationJournal
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
         string Row(IEnumerable<string> cells) => string.Join(separator, cells.Select(c => Cell(c))) + "\r\n";
-        var csv = new StringBuilder(Row(["Attempt ID", "Started at", "Completed at", "Tenant", "Tenant ID", "Display name", "UPN", "Email", "User ID", "Key model", "Target serial", "Profile", "Registration name", "Reset before enrollment (configured)", "PIN change on first use (configured)", "Result", "Native exit code", "Generated initial PIN"]));
+        var csv = new StringBuilder();
+        if (includeHeader) csv.Append(Row(["Attempt ID", "Started at", "Completed at", "Tenant", "Tenant ID", "Display name", "UPN", "Email", "User ID", "Key model", "Target serial", "Profile", "Registration name", "Reset before enrollment (configured)", "PIN change on first use (configured)", "Result", "Native exit code", "Generated initial PIN"]));
         foreach (var r in records.DistinctBy(r => r.AttemptId))
         {
             string[] cells = [r.AttemptId.ToString(), r.StartedAt.ToString("o"), r.CompletedAt?.ToString("o") ?? "", r.TenantName, r.TenantId, r.DisplayName, r.UserPrincipalName, r.Email, r.UserId,
