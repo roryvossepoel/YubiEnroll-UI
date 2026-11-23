@@ -149,7 +149,7 @@ public partial class MainWindow
             (_enrollStep == ReviewStep || _enrollStep == UserStepIndex) && !_reviewValid ? ProfileCompatibilityText.Text : "";
         FooterInstruction.Visibility = Visible(!string.IsNullOrWhiteSpace(FooterInstruction.Text));
         ResetHeading.Text = new[] { "Choose the key to reset", "Review the FIDO reset", "Reset result" }[_resetStep];
-        ResetDescription.Text = new[] { "This clears the FIDO passkeys and PIN on the selected YubiKey. Other key applications and registrations in Entra or other services are unchanged.", "Confirm the physical key before erasing its FIDO credentials.", "Check the reported outcome and the target’s PIN status." }[_resetStep];
+        ResetDescription.Text = new[] { "The reset clears this YubiKey’s FIDO passkeys and PIN. Online registrations are unchanged.", "Confirm the physical key before erasing its FIDO credentials.", "Check the reported outcome and the target’s PIN status." }[_resetStep];
         OverviewChooser.Visibility = Visible(_resetStep == 0); ResetReview.Visibility = Visible(_resetStep == 1); ResetResult.Visibility = Visible(_resetStep == 2);
         ResetNext.Visibility = Visible(_resetStep != 1); ResetTargetButton.Visibility = Visible(_resetStep == 1);
         ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset";
