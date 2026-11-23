@@ -67,6 +67,16 @@ public partial class MainWindow
         settings.RegistrationTab.IsSelected = true;
         settings.UpdateLayout();
         Assert(view.PreferenceStatus.Text.StartsWith("Logging on") && view.Records.Items.Count == 3 && view.ExportButton.IsEnabled, "Registration log shows successful, interrupted and unknown attempts");
+        view.Filters.IsExpanded = true;
+        settings.UpdateLayout();
+        var resultOrigin = view.ResultFilter.TranslatePoint(new Point(), view);
+        var clearOrigin = view.ClearFiltersButton.TranslatePoint(new Point(), view);
+        Assert(Math.Abs(resultOrigin.Y - clearOrigin.Y) < 1 &&
+            Math.Abs(view.ResultFilter.ActualHeight - view.ClearFiltersButton.ActualHeight) < 1 &&
+            clearOrigin.X >= resultOrigin.X + view.ResultFilter.ActualWidth + 8,
+            "Clear filters aligns with the result selector and leaves space between controls");
+        CaptureWindow(settings, "registration-log-filters.png");
+        view.Filters.IsExpanded = false;
         view.ResultFilter.SelectedIndex = 1;
         Assert(view.Records.Items.Count == 1, "Registration export success filter matches the visible records");
         view.FromDate.SelectedDate = DateTime.Today.AddDays(1);

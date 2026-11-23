@@ -1,10 +1,10 @@
-# Passkey Desk voor YubiKeys · Policy Preview 11
+# Passkey Desk voor YubiKeys · 0.11.0
 
-Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.11**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
+Vanaf **0.11.0** gebruik je dezelfde Windows x64-build met en zonder machinebeleid. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
 ## Indeling van de template (revisie 1.4)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test de EXE van Policy Preview 11 en de meegeleverde ADMX en ADML (revisie 1.4).
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.0 en de meegeleverde ADMX en ADML (revisie 1.4).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
@@ -61,6 +61,11 @@ De CLI blijft de gewone TOML van het **Windows-account dat de app uitvoert** geb
 
 De app valideert alle ontvangen instellingen voordat zij de TOML vervangt. Alleen bij een inhoudelijke wijziging wordt er geschreven; bij vervanging van een bestaand bestand komt er een exacte `.bak` naast. Een bestaande geldige actieve provider blijft behouden. Werk met één app/CLI-schrijver tegelijk. Bij invoer van een nieuwe versie van een policy: laat Intune eerst de synchronisatie afronden.
 
-Lockdown geldt **in de pilot-app**; het bestand krijgt geen andere toegangsrechten. Je kunt het met de losse CLI blijven lezen en bewerken. Bij de volgende pilotstart worden afwijkende beheerde waarden opnieuw toegepast. De vorige versie in een andere programmamap gebruikt dezelfde per-user TOML en kent deze vergrendeling niet.
+Lockdown geldt **in Passkey Desk**; het bestand krijgt geen andere toegangsrechten. Je kunt het met de losse CLI blijven lezen en bewerken. Bij de volgende appstart worden afwijkende beheerde waarden opnieuw toegepast. Oudere versies zonder policyondersteuning gebruiken dezelfde per-user TOML en kennen deze vergrendeling niet.
 
 Als je alle policies verwijdert, wordt de laatst toegepaste TOML je lokale uitgangspunt. De app zet een oud bestand niet automatisch terug. Wil je exact de situatie van vóór de pilot, sluit beide apps, verwijder eerst de policy en zet daarna je oorspronkelijke kopie terug. De lokale voorkeuren voor loggen zijn niet overschreven.
+
+## Volgende testronde
+
+1. Test 0.11.0 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
+2. Test daarna dezelfde build op een Windows-testapparaat zonder toegewezen policy. Controleer na opnieuw starten dat lokale instellingen bewerkbaar zijn en doorloop dezelfde registratie.

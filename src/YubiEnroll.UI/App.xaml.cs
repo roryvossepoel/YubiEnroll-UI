@@ -7,7 +7,7 @@ public partial class App : Application
     {
         MessageBox.Show("Passkey Desk cannot apply the device policy. " + ex.Message +
             "\n\nCheck the policy and the CLI configuration, then restart the app.",
-            "Passkey Desk · Policy preview", MessageBoxButton.OK, MessageBoxImage.Warning);
+            "Passkey Desk · Device policy", MessageBoxButton.OK, MessageBoxImage.Warning);
         Current.Shutdown(1);
     }
 

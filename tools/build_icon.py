@@ -1,4 +1,4 @@
-"""Rebuild the WPF vector, Windows ICO and PNG from Assets/App.svg.
+"""Rebuild the WPF brand mark, application PNG and both Windows executable icons.
 
 Developer tools only: Inkscape 1.x on PATH and Python with Pillow.
 """
@@ -45,9 +45,9 @@ def write_wpf():
 ''', encoding="utf-8")
 
 
-def rasterize(directory):
+def rasterize(directory, svg, ico_file, png_file=None):
     raster = directory / "master.png"
-    subprocess.run(["inkscape", str(SVG), "--export-width=2048", f"--export-filename={raster}"], check=True)
+    subprocess.run(["inkscape", str(svg), "--export-width=2048", f"--export-filename={raster}"], check=True)
     with Image.open(raster) as source:
         master = source.convert("RGBA")
     frames = []
@@ -62,11 +62,14 @@ def rasterize(directory):
     for size, data in zip(SIZES, frames):
         entries.append(struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(data), directory_end))
         directory_end += len(data)
-    (ASSETS / "App.ico").write_bytes(struct.pack("<HHH", 0, 1, len(frames)) + b"".join(entries + frames))
-    (ASSETS / "App.png").write_bytes(frames[-1])
+    ico_file.write_bytes(struct.pack("<HHH", 0, 1, len(frames)) + b"".join(entries + frames))
+    if png_file is not None:
+        png_file.write_bytes(frames[-1])
 
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp:
-        rasterize(Path(tmp))
+        rasterize(Path(tmp), SVG, ASSETS / "App.ico", ASSETS / "App.png")
+        console = ASSETS.parents[1] / "YubiEnroll.ConsoleHost" / "ConsoleHost.svg"
+        rasterize(Path(tmp), console, console.with_suffix(".ico"))
     write_wpf()
