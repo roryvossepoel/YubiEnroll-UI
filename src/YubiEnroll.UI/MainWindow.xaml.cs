@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.8" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.9" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.8\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.9\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -407,12 +407,10 @@ public partial class MainWindow : Window
         try { code = await ExecuteEnrollmentAsync(provider, profile, user, target, KeyName.Text); }
         catch (EnrollmentOutcomeUnknownException)
         {
-            ShowEnrollmentResult("The enrollment outcome is unknown. Check Manage user passkeys before retrying.");
+            ShowEnrollmentResult(null);
             throw;
         }
-        _receiptSuccess = code == 0;
-        ShowEnrollmentResult(code == 0 ? "Registration successful · reported by YubiEnroll"
-            : "Enrollment failed or was interrupted. A credential may already exist. Check Manage user passkeys before retrying.");
+        ShowEnrollmentResult(code, _lastInteractiveFailure);
     });
 
     private sealed class EnrollmentOutcomeUnknownException(Exception inner) : Exception("The enrollment outcome is unknown. Check Manage user passkeys before retrying.", inner) { }

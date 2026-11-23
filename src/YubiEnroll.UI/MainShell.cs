@@ -275,9 +275,12 @@ public partial class MainWindow
         if (EnrollmentTargetNotice == null) return;
         var message = _inventoryDirty ? "" :
             EnrollmentTargetGuard.Explain(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys, IsConnected);
-        EnrollmentTargetNotice.Text = message;
-        ReviewTargetNotice.Text = !_inventoryDirty && _selectedKey?.Key is { IsNfc: true } key && _knownKeys.Any(k => k.Key == key)
-            ? $"Keep this key on {NfcReaderStatus.DisplayName(key.Reader!)}. Remove and replace it only when prompted." : message;
+        var canUseTarget = !_inventoryDirty && EnrollmentTargetGuard.CanStart(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys);
+        if (canUseTarget && _selectedKey?.Key is { IsNfc: true } key)
+            message = $"Keep this YubiKey on {NfcReaderStatus.DisplayName(key.Reader!)}. Remove and replace it only when prompted.";
+        EnrollmentTargetNotice.Text = ReviewTargetNotice.Text = message;
+        TenantNoticeBox.Visibility = Visible(message.Length > 0);
+        TenantNoticeBox.Tag = canUseTarget ? null : "Warning";
         RenderWizard();
     }
     private void InvalidateDeviceInventory()

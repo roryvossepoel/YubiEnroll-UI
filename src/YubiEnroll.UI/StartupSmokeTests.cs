@@ -593,9 +593,9 @@ public partial class MainWindow
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
         EnrollNext_Click(this, e); ApplyInventory(new[] { target }, 0);
         _receipt = new(target.Key, SelectedProvider, SelectedUser, ProfileCompatibility.Managed("Temporary PIN"), "Office key", false);
-        _receiptSuccess = true; _receiptPin = "009876";
-        ShowEnrollmentResult("Synthetic result: YubiEnroll reported success. Review registered keys and test sign-in.");
-        Assert(ReceiptPin.Text == "••••••" && _receiptPin != null, "Receipt masks the temporary PIN by default");
+        _receiptPin = "009876";
+        ShowEnrollmentResult(0);
+        Assert(ReceiptNextStep.Text == "You must change this PIN on first use." && ReceiptPin.Text == "••••••" && _receiptPin != null, "Receipt masks the temporary PIN by default");
         RevealPin_Click(this, e); Assert(ReceiptPin.Text == "009876", "Reveal only on request"); RevealPin_Click(this, e);
         CaptureWindow(this, "enroll-result.png");
         Assert(_enrollStep == 5 && !EnrollButton.IsVisible && EnrollNext.IsEnabled, "Enrollment result offers another key without repeating enrollment");
@@ -606,6 +606,13 @@ public partial class MainWindow
         var existing = target with { Pin = FidoPinState.Set };
         ApplyInventory(new[] { existing }, 0); EnrollmentKeys.SelectedIndex = 0;
         Assert(EnrollNext.IsEnabled, "Existing working PIN permits the addition flow");
+        ApplyInventory([existing with { Capabilities = existing.Capabilities! with { ForcePinChange = true } }], 0);
+        EnrollmentKeys.SelectedIndex = 0; UpdateLayout();
+        Assert(!EnrollNext.IsEnabled && FooterInstruction.Visibility == Visibility.Collapsed
+            && VisualDescendants<TextBlock>(EnrollmentKeys).Any(t => t.IsVisible && t.Text == "PIN change required"),
+            "The selected key explains the required PIN change and blocks continuation");
+        CaptureWindow(this, "add-passkey-pin-change.png");
+        ApplyInventory([existing], 0); EnrollmentKeys.SelectedIndex = 0;
         EnrollNext_Click(this, e); EnrollNext_Click(this, e);
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
         Profiles.SelectedItem = null; EnrollNext_Click(this, e); UpdateLayout();
@@ -615,6 +622,16 @@ public partial class MainWindow
         ApplyInventory(new[] { existing with { Capabilities = existing.Capabilities! with { ForcePinChange = true } } }, 0);
         Assert(!EnrollButton.IsEnabled, "An existing required PIN change blocks preservation mode");
         ApplyInventory(new[] { existing }, 0);
+        _receipt = new(existing.Key, SelectedProvider, SelectedUser, PasskeyAddition.Settings(existing.Capabilities!), existing.Key.RegistrationName, true);
+        ShowEnrollmentResult(1, InteractiveFailure.Describe("fido2.ctap.CtapError: CTAP error: 0x33 - PIN_AUTH_INVALID"));
+        UpdateLayout();
+        Assert(ReceiptOutcomeTitle.IsVisible && ReceiptOutcomeTitle.Text == "Passkey registration failed" && Equals(ReceiptOutcomeBox.Tag, "Error") &&
+            EnrollmentResultText.Text.Contains("0x33") && !ReceiptPinPanel.IsVisible, "A rejected PIN authorization is a visible failure, never a successful registration or a PIN handoff");
+        CaptureWindow(this, "add-passkey-failed.png");
+        ShowEnrollmentResult(125, InteractiveFailure.OperatorInterrupted);
+        Assert(ReceiptOutcomeTitle.Text == "Registration interrupted", "Operator cancellation has its own outcome");
+        ShowEnrollmentResult(null);
+        Assert(ReceiptOutcomeTitle.Text == "Registration outcome unknown" && Equals(ReceiptOutcomeBox.Tag, "Warning"), "An unobserved outcome is not presented as a definite failure");
         Prepare_Click(this, e);
         Assert(!_addPasskey && _enrollStep == 0 && !EnrollButton.IsVisible, "Switching tasks requires a fresh key choice");
         var nfc = existing with { Key = existing.Key with { Reader = "HID Global OMNIKEY 5022 Smart Card Reader 0" },
@@ -687,7 +704,8 @@ public partial class MainWindow
 
     private async Task TestEmbeddedTerminalAsync(string mockExecutable)
     {
-        Assert(TerminalPanel.PromptStatus("settings. Proceed? [y/N]:").Contains("confirmation") &&
+        Assert(TerminalPanel.PromptStatus("Enter PIN:") == "Enter your YubiKey PIN in the terminal" &&
+            TerminalPanel.PromptStatus("settings. Proceed? [y/N]:").Contains("confirmation") &&
             TerminalPanel.PromptStatus("Remove your YubiKey from the NFC reader.").StartsWith("Remove") &&
             TerminalPanel.PromptStatus("Remove the YubiKey from the NFC reader...\nPlace the YubiKey back on the NFC reader...").StartsWith("Place") &&
             TerminalPanel.PromptStatus("Place your YubiKey back on the NFC reader now...\nFIDO application data reset.") == "Operation running",

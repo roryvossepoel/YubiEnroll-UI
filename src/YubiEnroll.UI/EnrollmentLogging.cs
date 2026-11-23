@@ -21,7 +21,7 @@ public partial class MainWindow
     private void CompleteRegistrationRecord(RegistrationAttempt? attempt, int? code, string? generatedPin = null)
     {
         var saved = _registrationJournal.Complete(attempt, code, generatedPin);
-        _registrationResultMessage = attempt == null ? "Registration logging was off for this enrollment." : saved ? "Enrollment record saved." :
+        _registrationResultMessage = attempt == null ? "Registration logging was off for this enrollment." : saved ? (code == 0 ? "Enrollment record saved." : "Attempt saved to the registration log.") :
             code == 0 ? "Enrollment succeeded according to YubiEnroll, but its registration record was not saved. Keep the app open and retry saving." :
             "The enrollment outcome could not be saved. Keep the app open and retry saving; do not repeat enrollment without checking Entra.";
         if (saved && attempt?.SaveGeneratedPin == true && !_addPasskey)

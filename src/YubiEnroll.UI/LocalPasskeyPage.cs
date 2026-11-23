@@ -124,9 +124,13 @@ public partial class MainWindow
             _localStep = 2; _localList = new(choice.Key, updated);
             Record((row == null ? "On-key passkeys read" : "Passkey removed from YubiKey") + " · serial " + choice.Key.Serial + ".");
             LocalRows.ItemsSource = updated; RenderLocalPage();
-            LocalFeedback.Text = (row == null ? "" : "Removed one passkey from this YubiKey. ") +
-                (updated.Count == 0 ? "No discoverable passkeys are stored on this YubiKey." :
-                $"{updated.Count} stored {(updated.Count == 1 ? "passkey" : "passkeys")}.");
+            const string empty = "No discoverable passkeys are stored on this YubiKey.";
+            const string removed = "Passkey removed from this YubiKey.";
+            LocalFeedback.Text = (row, updated.Count) switch
+            {
+                (null, 0) => empty, (null, _) => "",
+                (_, 0) => removed + " " + empty, _ => removed
+            };
         }, "Manage local YubiKey passkeys", false);
         if (failure != null || !Current() && _localList == null)
             Record((row == null ? "On-key passkey read did not complete" : "On-key removal outcome unverified") + " · serial " + choice.Key.Serial + ".", "Warning");

@@ -103,7 +103,9 @@ public partial class MainWindow
         RenderBatch();
         RenderRegistrationLogStatus();
         ReadReviewWarning();
-        ReviewNotice.Background = ReviewWarningBox.Visibility == Visibility.Visible ? new SolidColorBrush(Color.FromRgb(255,244,237)) : new SolidColorBrush(Color.FromRgb(242,245,246));
+        ReviewNotice.Tag = ReviewWarningBox.Visibility == Visibility.Visible || Equals(TenantNoticeBox.Tag, "Warning") ? "Warning" : null;
+        ReviewNotice.Visibility = Visible(ReviewWarningBox.Visibility == Visibility.Visible || ReviewTargetNotice.Text.Length > 0);
+        EnrollmentKeys.Tag = _addPasskey ? "Add" : null;
         RenderProgress(EnrollProgress, EnrollmentStepLabels, _enrollStep == EnrollmentResultStep && _receiptSuccess ? EnrollmentResultStep : Math.Min(_enrollStep, ReviewStep));
         RenderProgress(ResetProgress, ["Key", "Confirm", "Result"], _resetStep);
         EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A YUBIKEY";
@@ -142,7 +144,7 @@ public partial class MainWindow
         SetBackAction(EnrollBack, _enrollStep == 0 || _enrollStep == EnrollmentResultStep ? null : "Back");
         EnrollmentInventoryProgress.Visibility = ResetInventoryProgress.Visibility = Visible(_inventoryDirty && _knownKeys.Count > 0);
         FooterInstruction.Text = _enrollStep >= EnrollmentResultStep ? "" : _inventoryDirty ? (_enrollStep == 0 ? "" : "Checking connected keys…") :
-            _enrollStep == 0 && _addPasskey && CandidateReady && !AdditionCandidateReady ? string.Join(" ", PasskeyAddition.Evaluate((EnrollmentKeys.SelectedItem as KeyStatus)?.Capabilities, (EnrollmentKeys.SelectedItem as KeyStatus)?.Pin ?? FidoPinState.Unknown).Issues) :
+            _enrollStep == 0 && _addPasskey && CandidateReady && !AdditionCandidateReady ? string.Join(" ", PasskeyAddition.Evaluate((EnrollmentKeys.SelectedItem as KeyStatus)?.Capabilities, (EnrollmentKeys.SelectedItem as KeyStatus)?.Pin ?? FidoPinState.Unknown).Issues.Where(issue => issue != PasskeyAddition.PinChangeIssue)) :
             _enrollStep > 0 && !TargetReady ? "The target is unavailable. Select or reconnect it." :
             (_enrollStep == ReviewStep || _enrollStep == UserStepIndex) && !_reviewValid ? ProfileCompatibilityText.Text : "";
         FooterInstruction.Visibility = Visible(!string.IsNullOrWhiteSpace(FooterInstruction.Text));
@@ -234,17 +236,9 @@ public partial class MainWindow
 
     private void RenderReviewSummary()
     {
-        ReviewSummary.Children.Clear(); ReviewAccount.Children.Clear();
-        var group = ReviewSummary;
-        void Row(string label, string value) => SummaryRow(group, label, value, 78);
+        ReviewSummary.Children.Clear();
         var user = Users.SelectedItem as UserCandidate;
-        Row("Key", _selectedKey?.Key.Model ?? "Unavailable"); Row("Serial number", _selectedKey?.Key.Serial ?? "—");
-        Row("Connection", _selectedKey?.Key.ConnectionLabel ?? "—");
-        group = ReviewAccount; Row("Tenant", (Tenants.SelectedItem as Provider)?.Name ?? "—");
-        Row("User", !string.IsNullOrWhiteSpace(user?.DisplayName) ? user.DisplayName : user?.Label ?? "—");
-        if (!string.IsNullOrWhiteSpace(user?.UserPrincipalName)) Row("Sign-in name", user.UserPrincipalName);
-        if (!string.IsNullOrWhiteSpace(user?.Email) && !string.Equals(user.Email, user.UserPrincipalName, StringComparison.OrdinalIgnoreCase)) Row("Email", user.Email);
-        Row(_addPasskey ? "Action" : "Profile", _addPasskey ? "Add passkey · keep existing passkeys, PIN and key settings" : (Profiles.SelectedItem as ProfileChoice)?.Profile.Name ?? "—");
+        RegistrationRows(ReviewSummary, _selectedKey?.Key, _addPasskey, (Profiles.SelectedItem as ProfileChoice)?.Profile.Name, Tenants.SelectedItem as Provider, user);
         ReviewRecipient.Text = user?.DisplayName ?? user?.Label ?? "";
     }
     private void KeyName_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -254,13 +248,33 @@ public partial class MainWindow
         SetNameEditing(false); EditNameButton.Focus(); e.Handled = true;
     }
 
-    private void SummaryRow(StackPanel group, string label, string value, int width = 126)
+    private void RegistrationRows(StackPanel group, ResetKey? key, bool adding, string? profile, Provider? tenant, UserCandidate? user)
+    {
+        SummaryRow(group, "YubiKey", key == null ? "Unavailable" : $"{key.Model} · Serial {key.Serial}");
+        SummaryRow(group, adding ? "Action" : "Profile", adding ? "Add a passkey · keep existing passkeys, PIN and key settings" : profile ?? "—");
+        var tenantFields = new WrapPanel();
+        tenantFields.Children.Add(SummaryValue(tenant?.Name ?? "—"));
+        if (Guid.TryParse(tenant?.TenantId, out var tenantId))
+        {
+            var id = new TextBox { Text = tenantId.ToString(), IsReadOnly = true, ToolTip = "Tenant ID", MinHeight = 0,
+                Padding = new Thickness(0), Margin = new Thickness(10,0,0,0), VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 12, Foreground = (Brush)FindResource("Muted"), Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
+            System.Windows.Automation.AutomationProperties.SetName(id, "Tenant ID");
+            tenantFields.Children.Add(id);
+        }
+        SummaryRow(group, "Tenant", tenantFields);
+        var account = new[] { user?.DisplayName, user?.UserPrincipalName }.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase);
+        var display = string.Join(" · ", account);
+        SummaryRow(group, "User", display.Length > 0 ? display : user?.Label ?? "—");
+    }
+    private static TextBlock SummaryValue(string value) => new() { Text = value, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
+    private void SummaryRow(StackPanel group, string label, string value) => SummaryRow(group, label, SummaryValue(value));
+    private void SummaryRow(StackPanel group, string label, FrameworkElement value)
     {
         var row = new Grid { Margin = new Thickness(0, 3, 0, 3) };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) }); row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(126) }); row.ColumnDefinitions.Add(new ColumnDefinition());
         row.Children.Add(new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("Muted") });
-        var text = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
-        Grid.SetColumn(text, 1); row.Children.Add(text); group.Children.Add(row);
+        Grid.SetColumn(value, 1); row.Children.Add(value); group.Children.Add(row);
     }
 
     private async void EnrollNext_Click(object sender, RoutedEventArgs e)
@@ -331,23 +345,34 @@ public partial class MainWindow
         _pinVisible = !_pinVisible; ReceiptPin.Text = _pinVisible ? _receiptPin : "••••••";
         RevealPin.Content = _pinVisible ? "Hide PIN" : "Show PIN";
     }
-    private void ShowEnrollmentResult(string message)
+    private void ShowEnrollmentResult(int? code, string detail = "")
     {
+        _receiptSuccess = code == 0;
+        var (level, title, message) = code switch
+        {
+            0 => ("Success", "", "Registration successful · reported by YubiEnroll"),
+            125 when detail == InteractiveFailure.OperatorInterrupted => ("Warning", "Registration interrupted", "Check the YubiKey and its Entra registration before retrying."),
+            null or 125 or < 0 => ("Warning", "Registration outcome unknown", "Check the YubiKey and its Entra registration before retrying."),
+            _ => ("Error", "Passkey registration failed", detail.Contains(InteractiveFailure.PinAuthInvalid, StringComparison.Ordinal)
+                ? $"The YubiKey rejected PIN authorization ({InteractiveFailure.PinAuthInvalid}). Check the passkeys on this YubiKey before retrying."
+                : "YubiEnroll reported an error. Check the YubiKey and its Entra registration before retrying.")
+        };
+        ReceiptOutcomeBox.Tag = level; ReceiptOutcomeTitle.Text = title; ReceiptOutcomeTitle.Visibility = Visible(title.Length > 0);
         _enrollStep = EnrollmentResultStep; EnrollmentResultText.Text = message; StatusText.Text = "";
         ReceiptDetails.Children.Clear(); ReceiptNextStep.Text = "";
         if (_receipt is { } r)
         {
-            SummaryRow(ReceiptDetails, "YubiKey", r.Key.Model + " · " + r.Key.Serial + " · " + r.Key.ConnectionLabel);
+            RegistrationRows(ReceiptDetails, r.Key, r.Adding, r.Profile.Name, r.Tenant, r.User);
             SummaryRow(ReceiptDetails, "Registration name", r.Name);
-            SummaryRow(ReceiptDetails, "Tenant", r.Tenant.Name);
-            SummaryRow(ReceiptDetails, "User", r.User.DisplayName + " · " + r.User.UserPrincipalName);
-            SummaryRow(ReceiptDetails, r.Adding ? "Action" : "Profile", r.Adding ? "Add a passkey" : r.Profile.Name);
             SummaryRow(ReceiptDetails, "Finished", DateTimeOffset.Now.ToString("g"));
-            if (_receiptSuccess)
-                ReceiptNextStep.Text = (r.Profile.ForcePinChange == true ? "Change the temporary PIN before first use. " : "") + "Test sign-in with the new passkey.";
-            if (_receiptSuccess && !r.Adding && r.Profile.RandomPin == true && _receiptPin == null)
-                ReceiptNextStep.Text = "Temporary PIN unavailable in this summary. " + ReceiptNextStep.Text;
+            if (_receiptSuccess && !r.Adding)
+            {
+                if (r.Profile.ForcePinChange == true) ReceiptNextStep.Text = "You must change this PIN on first use.";
+                if (r.Profile.RandomPin == true && _receiptPin == null)
+                    ReceiptNextStep.Text = ("Temporary PIN unavailable in this summary. " + ReceiptNextStep.Text).TrimEnd();
+            }
         }
+        ReceiptNextStep.Visibility = Visible(ReceiptNextStep.Text.Length > 0);
         ReceiptPinPanel.Visibility = Visible(_receiptSuccess && _receiptPin != null);
         _pinVisible = false; ReceiptPin.Text = _receiptPin == null ? "" : "••••••"; RevealPin.Content = "Show PIN";
         EnrollmentScroll.ScrollToTop(); RenderWizard();

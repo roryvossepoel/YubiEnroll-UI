@@ -3,6 +3,7 @@ namespace YubiEnroll.Core;
 // Explicit operation-scoped settings prevent inheritance of a provider's destructive default.
 public static class PasskeyAddition
 {
+    public const string PinChangeIssue = "This key already requires a PIN change. Complete that change before using Add a passkey.";
     public static ProfileCompatibilityResult Evaluate(FidoCapabilities? key, FidoPinState pin)
     {
         var issues = new List<string>();
@@ -10,7 +11,7 @@ public static class PasskeyAddition
         else
         {
             if (!key.ClientPin || !key.ResidentKey) issues.Add("This key must support FIDO2 PINs and discoverable credentials.");
-            if (key.ForcePinChange) issues.Add("This key already requires a PIN change. Complete that change before using Add a passkey.");
+            if (key.ForcePinChange) issues.Add(PinChangeIssue);
         }
         if (pin != FidoPinState.Set) issues.Add(pin == FidoPinState.Blocked ? "The existing FIDO PIN is blocked. Adding a passkey cannot bypass or reset it." :
             "A working existing FIDO PIN is required. Use Set up a YubiKey for initial configuration.");

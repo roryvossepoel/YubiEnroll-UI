@@ -15,6 +15,7 @@ internal sealed class TerminalPanel : Border
         HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(16), ContextMenu = new ContextMenu()
     };
+    private readonly TextBlock _pinHint = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,12) };
     private readonly TerminalScreen _screen = new();
     private readonly Button _done = new() { Content = "Return", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Right };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
@@ -36,13 +37,19 @@ internal sealed class TerminalPanel : Border
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
         Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
         var layout = new DockPanel(); Child = layout;
-        var heading = new TextBlock { Text = title + (enrollment && !string.IsNullOrEmpty(profile) ? " · " + (addPasskey ? "Add a passkey" : profile) : ""), TextWrapping = TextWrapping.Wrap, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
+        var heading = new TextBlock { Text = title + (enrollment && !addPasskey && !string.IsNullOrEmpty(profile) ? " · " + profile : ""), TextWrapping = TextWrapping.Wrap, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(heading, Dock.Top); layout.Children.Add(heading);
         var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : nfc ? "Follow the Yubico prompts below. Click the terminal to type. Keep the key flat on the NFC reader; remove and replace it only when prompted." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
         var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
         footer.Children.Add(_status);
-        if (enrollment && !addPasskey) footer.Children.Add(new TextBlock { Text = single && captureSerial != null ? (savePin ? "Your temporary PIN is available in the summary and will be saved in the registration log." : "Your temporary PIN is available in the summary for this session.") : savePin ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved." : "Record any generated PIN before returning. Terminal output is not saved to the activity log.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
+        if (enrollment && !addPasskey && (!single || captureSerial != null))
+        {
+            _pinHint.Text = single ? "If a temporary PIN is generated, you can view it in the registration summary."
+                : savePin ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved."
+                : "Record any generated PIN before returning. Terminal output is not saved to the activity log.";
+            footer.Children.Add(_pinHint);
+        }
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
         _cancel.Click += async (_, _) =>
@@ -75,6 +82,7 @@ internal sealed class TerminalPanel : Border
     internal static string PromptStatus(string output)
     {
         var line = output.TrimEnd().Split('\n').LastOrDefault()?.Trim() ?? "";
+        if (line.Equals("Enter PIN:", StringComparison.OrdinalIgnoreCase)) return "Enter your YubiKey PIN in the terminal";
         if (line.EndsWith("[y/N]:", StringComparison.OrdinalIgnoreCase)) return "Waiting for your confirmation in the terminal";
         if (line.StartsWith("Remove ", StringComparison.OrdinalIgnoreCase) && line.Contains("NFC reader", StringComparison.OrdinalIgnoreCase)) return "Remove this YubiKey from the NFC reader";
         if (line.StartsWith("Place ", StringComparison.OrdinalIgnoreCase) && line.Contains("NFC reader", StringComparison.OrdinalIgnoreCase)) return "Place the same YubiKey back on the NFC reader";
@@ -114,8 +122,13 @@ internal sealed class TerminalPanel : Border
         if (_cancelRequested)
         {
             exit = 125; GeneratedPin = null;
-            FailureDetail = "Interrupted by operator. Outcome unverified.";
+            FailureDetail = InteractiveFailure.OperatorInterrupted;
             _status.Text = "Operation interrupted. Check the key and any Entra registration before retrying.";
+        }
+        if (_maskPin)
+        {
+            _pinHint.Visibility = exit == 0 && GeneratedPin != null ? Visibility.Visible : Visibility.Collapsed;
+            _pinHint.Text = "Your temporary PIN is available in the registration summary.";
         }
         NativeFinished?.Invoke();
         CompletedExitCode = exit;

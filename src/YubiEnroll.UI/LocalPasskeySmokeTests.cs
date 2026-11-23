@@ -8,7 +8,7 @@ public partial class MainWindow
     {
         var usb = new KeyStatus(new("12345678","YubiKey 5C NFC (5.4.3)"),FidoPinState.Set);
         var nfc = new KeyStatus(new("87654321","YubiKey 5C NFC (5.4.3)","Test OMNIKEY 5022"),FidoPinState.Set);
-        LocalPasskey[] rows = [new("abcd","login.example","01","alex@example.test","Alex"),new("abce","github.example","02","alex","")];
+        LocalPasskey[] rows = [new("abcd","login.example","01","alex@example.test","Alex"),new(new string('e',256),"github.example","02","alex","")];
         int calls = 0;
         Task<IReadOnlyList<LocalPasskey>> Read(ResetKey key, string pin, LocalPasskey? target)
         {
@@ -26,6 +26,16 @@ public partial class MainWindow
         await LocalOperationAsync(null, (_,_)=>"ci-only",Read);
         Assert(calls == 1 && LocalRows.Items.Count == 2 && LocalTitle.Text == "Passkeys on this YubiKey" && LocalIntro.Text.Contains("87654321"),
             "Unlocked list shows the verified serial and only on-key credentials");
+        UpdateLayout();
+        Assert(StoredPasskeysHeading.Text == "Stored passkeys (2)" && !LocalFeedback.IsVisible, "Count is shown once in the header after unlock");
+        var shortCard = (FrameworkElement)LocalRows.ItemContainerGenerator.ContainerFromIndex(0);
+        var longCard = (FrameworkElement)LocalRows.ItemContainerGenerator.ContainerFromIndex(1);
+        LocalRows.SelectedIndex = 0; UpdateLayout();
+        var firstHeight = shortCard.ActualHeight; var secondHeight = longCard.ActualHeight;
+        var secondTop = longCard.TranslatePoint(new Point(), LocalRows).Y;
+        LocalRows.SelectedIndex = 1; UpdateLayout();
+        Assert(firstHeight > 0 && firstHeight == secondHeight && firstHeight == shortCard.ActualHeight && secondHeight == longCard.ActualHeight &&
+            secondTop == longCard.TranslatePoint(new Point(), LocalRows).Y, "Selecting a card keeps even a long credential ID on one row and does not move adjacent cards");
         CaptureWindow(this, "local-passkeys.png");
         var removal = Dispatcher.InvokeAsync(() =>
         {
