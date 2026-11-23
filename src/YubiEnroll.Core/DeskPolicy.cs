@@ -149,8 +149,11 @@ public sealed class DeskPolicy
     };
 
     public static ProfileSetup ReadProfile(string text, string name, DeskPolicy? policy)
+        => ReadProfile(Toml.ToModel(text), name, policy);
+
+    public static ProfileSetup ReadProfile(TomlTable model, string name, DeskPolicy? policy)
     {
-        var stored = ProfileConfigWriter.Read(text, name);
+        var stored = ProfileConfigWriter.Read(model, name);
         var managed = policy?._profiles?.FirstOrDefault(p => p.Name == name);
         if (managed == null) return stored;
         if (stored != CliProfile(managed))

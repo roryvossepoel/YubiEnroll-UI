@@ -60,6 +60,12 @@ if (args.FirstOrDefault() == "--terminal-probe")
     return response == "confirm" && hidden == "synthetic-pin" ? 7 : 9;
 }
 
+if (args is ["--activation-fixture", var action, var pathBefore, var pathAfter])
+{
+    PolicyActivationFixture.Run(action, pathBefore, pathAfter);
+    return 0;
+}
+
 if (args is ["--write-policy-fixture", var policyFixturePath])
 {
     PolicyTemplateFixture.Write(policyFixturePath, (ok, msg) => { if (!ok) throw new InvalidOperationException(msg); });
@@ -217,6 +223,12 @@ Check(config.Profiles.Count == 2, "Full TOML parser accepts inline comments and 
 Check(config.Profiles[0].Summary.Contains("min_pin_length: 6"), "Profile values preserved");
 ConfigReader.EnsureUnchanged(config, config.Providers[0], config.Profiles[1]);
 Check(true, "Non-default profile accepted without reset to default");
+var ordered = ConfigReader.Parse("[profiles.test]\nreset=true\nextra={ b=2, a=[1,2] }").Profiles.Single();
+var reformatted = ConfigReader.Parse("[profiles.test]\n# rewritten\nextra={ a=[1,2], b=2 }\nreset = true").Profiles.Single();
+Check(ordered.Fingerprint == reformatted.Fingerprint, "TOML table order and comments do not invalidate a selected profile");
+foreach (var changed in new[] { "a=[2,1], b=2", "a=[1,2], b='2'", "a=[1,2], c=2" })
+    Check(ordered.Fingerprint != ConfigReader.Parse("[profiles.test]\nreset=true\nextra={" + changed + "}").Profiles.Single().Fingerprint,
+        "Unknown fields, scalar types and array order remain significant");
 Reject(() => ConfigReader.EnsureUnchanged(ConfigReader.Parse(configText.Replace("min_pin_length = 8", "min_pin_length = 9")),
     config.Providers[0], config.Profiles[1]), "Changed selected profile is rejected");
 Reject(() => ConfigReader.EnsureUnchanged(ConfigReader.Parse(configText.Replace("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee")),

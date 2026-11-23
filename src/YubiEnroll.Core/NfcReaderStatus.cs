@@ -4,6 +4,12 @@ namespace YubiEnroll.Core;
 
 public sealed record NfcReaderStatus(string Name, bool IsNfc, string State)
 {
+    // Cosmetic only: keep the original PC/SC name for routing. Keep nonzero slot indices visible.
+    public static string DisplayName(string name) =>
+        Regex.Match(name, @"^HID Global (OMNIKEY [^()]+?) Smart Card Reader (\d+)$", RegexOptions.IgnoreCase)
+            is { Success: true } match ? match.Groups[1].Value + (match.Groups[2].Value == "0" ? "" : " · reader " + match.Groups[2].Value)
+            : name.EndsWith(" 0", StringComparison.Ordinal) ? name[..^2] : name;
+
     public string Message => State switch
     {
         "ready" or "empty" => "",

@@ -82,7 +82,19 @@ try {
     if ($LASTEXITCODE -ne 0 -or ($policyProvider -join ' ') -notmatch 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee') { throw 'Native CLI did not read policy tenant' }
     $policyProfiles = & $exe profiles list
     if ($LASTEXITCODE -ne 0 -or ($policyProfiles -join ' ') -notmatch 'Profile5') { throw 'Native CLI did not read policy profiles' }
-    'PASS: native YubiEnroll 1.2.0 reads the GUI-generated provider and profile.'
+    $fixture = './tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe'
+    $before = Join-Path $env:RUNNER_TEMP 'policy-before-activation.toml'
+    & $fixture --activation-fixture prepare $before $legacy
+    if ($LASTEXITCODE -ne 0) { throw 'Could not prepare three managed profiles' }
+    & $exe providers activate 'Second pilot tenant'
+    if ($LASTEXITCODE -ne 0) { throw 'Native activation failed' }
+    & $fixture --activation-fixture verify $before $legacy
+    if ($LASTEXITCODE -ne 0) {
+        # Only synthetic CI data: show what the supported native CLI changed.
+        Compare-Object (Get-Content $before) (Get-Content $legacy) | Out-Host
+        throw 'Native activation invalidated tenant or managed profile selections'
+    }
+    'PASS: all three managed profiles retain the same meaning after native tenant activation.'
 } finally {
     if (Test-Path $legacy) { Remove-Item -LiteralPath $legacy }
     if (Test-Path "$legacy.ui.lock") { Remove-Item -LiteralPath "$legacy.ui.lock" }

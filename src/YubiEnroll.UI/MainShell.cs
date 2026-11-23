@@ -28,8 +28,6 @@ public partial class MainWindow
 
     private void ResizePreparation()
     {
-        Users.MinHeight = 80;
-        Users.MaxHeight = Math.Clamp(ActualHeight * 0.34, 160, 420);
         var compact = ActualWidth < 950;
         SidebarColumn.Width = new GridLength(compact ? 205 : 260);
         BrandTitle.FontSize = compact ? 13 : 19;

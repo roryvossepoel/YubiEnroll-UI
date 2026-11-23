@@ -21,10 +21,17 @@ public partial class MainWindow
         public EnrollmentProfile Profile { get; } = profile;
         public bool Compatible { get; private set; }
         public string Message { get; private set; } = "Choose a key to check compatibility.";
+        public ProfileSetup? Setup { get; private set; }
+        public List<ProfileEffect> Pills { get; private set; } = [];
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-        public void Set(ProfileCompatibilityResult result)
+        public void Set(ProfileCompatibilityResult result, ProfileSetup? setup)
         {
-            var message = result.Compatible ? "Compatible with this key" : string.Join(" ", result.Issues);
+            if (Setup != setup)
+            {
+                Setup = setup; Pills = setup == null ? [] : ProfileEffect.Describe(setup);
+                PropertyChanged?.Invoke(this, new(nameof(Pills)));
+            }
+            var message = result.Compatible ? "" : string.Join(" ", result.Issues);
             if (Compatible == result.Compatible && Message == message) return;
             Compatible = result.Compatible; Message = message;
             PropertyChanged?.Invoke(this, new(nameof(Compatible))); PropertyChanged?.Invoke(this, new(nameof(Message)));
@@ -110,7 +117,8 @@ public partial class MainWindow
         EnrollmentChooser.Visibility = Visible(_enrollStep == 0);
         TenantStep.Visibility = Visible(_enrollStep == TenantStepIndex); UserCard.Visibility = Visible(_enrollStep == UserStepIndex);
         ProfileStep.Visibility = Visible(!_addPasskey && _enrollStep == 1);
-        NamePanel.Visibility = Visible(_enrollStep == UserStepIndex);
+        EnrollmentScroll.Visibility = Visible(_enrollStep != UserStepIndex);
+        UserContext.Text = $"Tenant: {(Tenants.SelectedItem as Provider)?.Name}   ·   {_selectedKey?.Key.Label}";
         PreparationCard.Visibility = Visible(_enrollStep == ReviewStep); EnrollmentResult.Visibility = Visible(_enrollStep == EnrollmentResultStep);
         FooterTargetText.Visibility = Visible(_enrollStep > 0 && _enrollStep < ReviewStep);
         FooterTargetText.Text = _selectedKey != null ? "Target · " + _selectedKey.Key.Label : "Target unavailable";
@@ -133,7 +141,7 @@ public partial class MainWindow
         FooterInstruction.Text = _enrollStep >= EnrollmentResultStep ? "" : _inventoryDirty ? (_enrollStep == 0 ? "" : "Checking connected keys…") :
             _enrollStep == 0 && _addPasskey && CandidateReady && !AdditionCandidateReady ? string.Join(" ", PasskeyAddition.Evaluate((EnrollmentKeys.SelectedItem as KeyStatus)?.Capabilities, (EnrollmentKeys.SelectedItem as KeyStatus)?.Pin ?? FidoPinState.Unknown).Issues) :
             _enrollStep > 0 && !TargetReady ? "The target is unavailable. Select or reconnect it." :
-            _enrollStep == ReviewStep && !_reviewValid ? ProfileCompatibilityText.Text : "";
+            (_enrollStep == ReviewStep || _enrollStep == UserStepIndex) && !_reviewValid ? ProfileCompatibilityText.Text : "";
         FooterInstruction.Visibility = Visible(!string.IsNullOrWhiteSpace(FooterInstruction.Text));
         ResetHeading.Text = new[] { "Choose the key to reset", "Review the FIDO reset", "Reset result" }[_resetStep];
         ResetDescription.Text = new[] { "This clears the FIDO passkeys and PIN on the selected YubiKey. Other key applications and registrations in Entra or other services are unchanged.", "Confirm the physical key before erasing its FIDO credentials.", "Check the reported outcome and the target’s PIN status." }[_resetStep];
@@ -158,41 +166,65 @@ public partial class MainWindow
     private void ReadReviewWarning()
     {
         _reviewValid = false;
+        ReviewWarningBox.Visibility = Visibility.Collapsed;
+        var caps = TargetReady ? _selectedKey?.Capabilities : null;
+        var pin = _selectedKey?.Pin ?? FidoPinState.Unknown;
+        if (_addPasskey)
+        {
+            var result = PasskeyAddition.Evaluate(caps, pin);
+            _reviewValid = result.Compatible;
+            ProfileCompatibilityText.Text = string.Join(" ", result.Issues);
+            return;
+        }
         try
         {
-            var current = ConfigReader.Read(_configPath);
+            var model = Tomlyn.Toml.ToModel(File.ReadAllText(_configPath));
+            var current = ConfigReader.Parse(model, _configPath);
             foreach (var choice in Profiles.Items.OfType<ProfileChoice>())
             {
-                ProfileCompatibilityResult result;
+                if (!current.Profiles.Any(p => p.Name == choice.Profile.Name && p.Fingerprint == choice.Profile.Fingerprint))
+                {
+                    choice.Set(new(["Profile settings changed. Reload the configuration before continuing."]), null);
+                    continue;
+                }
                 try
                 {
-                    if (!current.Profiles.Any(p => p.Name == choice.Profile.Name && p.Fingerprint == choice.Profile.Fingerprint))
-                        throw new InvalidOperationException();
-                    result = ProfileCompatibility.Evaluate(DeskPolicy.ReadProfile(File.ReadAllText(_configPath), choice.Profile.Name, _policy), TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
+                    var setup = DeskPolicy.ReadProfile(model, choice.Profile.Name, _policy);
+                    var result = ProfileCompatibility.Evaluate(setup, caps, pin);
+                    choice.Set(result.Compatible ? result : new(["Not supported: " + string.Join(" ", result.Issues)]), setup);
                 }
-                catch { result = new(["Profile changed or could not be read. Reopen Settings."]); }
-                choice.Set(result);
+                catch (InvalidDataException ex) { choice.Set(new([ex.Message]), null); }
             }
-            if (_addPasskey)
-            {
-                var result = PasskeyAddition.Evaluate(TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
-                _reviewValid = result.Compatible;
-                ProfileCompatibilityText.Text = string.Join(" ", result.Issues);
-                ReviewWarningBox.Visibility = Visibility.Collapsed;
-                return;
-            }
-            var profile = SelectedProfile;
-            if (!current.Profiles.Any(p => p.Name == profile.Name && p.Fingerprint == profile.Fingerprint))
-                throw new InvalidOperationException("Profile changed. Reopen Settings.");
-            var setup = DeskPolicy.ReadProfile(File.ReadAllText(_configPath), profile.Name, _policy);
-            var compatibility = ProfileCompatibility.Evaluate(setup, TargetReady ? _selectedKey?.Capabilities : null, _selectedKey?.Pin ?? FidoPinState.Unknown);
-            _reviewValid = compatibility.Compatible;
-            ProfileCompatibilityText.Text = compatibility.Compatible ? "" : compatibility.Message;
-            ReviewWarningBox.Visibility = Visible(setup.Reset != false);
-            ReviewWarning.Text = setup.Reset == true ? "All existing FIDO credentials and the FIDO PIN on this key will be erased before enrollment." : "Reset behavior is unspecified. Choose an explicit profile before continuing.";
         }
-        catch { ProfileCompatibilityText.Text = Profiles.Items.Count == 0 ? "Create a configuration profile in Settings → Profiles." : "Select a compatible profile. If the configuration changed, reopen Settings."; }
+        catch
+        {
+            foreach (var choice in Profiles.Items.OfType<ProfileChoice>())
+                choice.Set(new(["Cannot read the configuration. Check the TOML file and reload."]), null);
+        }
+        var selected = Profiles.SelectedItem as ProfileChoice;
+        _reviewValid = selected?.Compatible == true;
+        ProfileCompatibilityText.Text = selected?.Message ?? (Profiles.Items.Count == 0 ? "Create a configuration profile in Settings → Profiles." : "Choose a profile to continue.");
+        if (selected?.Setup is { } reviewed)
+        {
+            ReviewWarningBox.Visibility = Visible(reviewed.Reset != false);
+            ReviewWarning.Text = reviewed.Reset == true ? "All existing FIDO credentials and the FIDO PIN on this key will be erased before enrollment." : "Reset behavior is unspecified. Choose an explicit profile before continuing.";
+        }
     }
+
+    private void SetNameEditing(bool editing)
+    {
+        if (!editing) { KeyName.Text = KeyName.Text.Trim(); SuggestRegistrationName(); }
+        KeyName.Visibility = Visible(editing); ReviewName.Visibility = Visible(!editing);
+        EditNameButton.Content = editing ? "Done" : "Edit";
+    }
+
+    private void EditName_Click(object sender, RoutedEventArgs e)
+    {
+        var editing = KeyName.Visibility != Visibility.Visible;
+        SetNameEditing(editing);
+        if (editing) { KeyName.Focus(); KeyName.SelectAll(); }
+    }
+
     private void RenderReviewSummary()
     {
         ReviewSummary.Children.Clear();
@@ -212,12 +244,12 @@ public partial class MainWindow
         if (!string.IsNullOrWhiteSpace(user?.UserPrincipalName)) Row("Sign-in name", user.UserPrincipalName);
         if (!string.IsNullOrWhiteSpace(user?.Email) && !string.Equals(user.Email, user.UserPrincipalName, StringComparison.OrdinalIgnoreCase)) Row("Email", user.Email);
         Row(_addPasskey ? "Action" : "Profile", _addPasskey ? "Add passkey · keep existing passkeys, PIN and key settings" : (Profiles.SelectedItem as ProfileChoice)?.Profile.Name ?? "—");
-        Row("Registration name", string.IsNullOrWhiteSpace(KeyName.Text) ? "Default (serial number)" : KeyName.Text.Trim());
         ReviewRecipient.Text = user?.DisplayName ?? user?.Label ?? "";
     }
     private async void EnrollNext_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
+        var previousStep = _enrollStep;
         if (_enrollStep == 0 && (!_addPasskey || AdditionCandidateReady) && CommitTarget()) _enrollStep = 1;
         else if (!_addPasskey && _enrollStep == 1 && TargetReady && _reviewValid) _enrollStep = TenantStepIndex;
         else if (_enrollStep == TenantStepIndex && TargetReady && IsConnected) _enrollStep = UserStepIndex;
@@ -227,13 +259,15 @@ public partial class MainWindow
             BeginNextKey();
             if (_inventoryDirty || !_inventoryLoaded) await RefreshOverviewAsync();
         }
+        if (previousStep != _enrollStep) { StatusText.Text = ""; if (_enrollStep == ReviewStep) SetNameEditing(false); }
         EnrollmentScroll.ScrollToTop(); UpdateSummary();
+        if (_enrollStep == UserStepIndex) Query.Focus();
     }
     private void EnrollBack_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
         if (_enrollStep == 0 || _enrollStep == EnrollmentResultStep) ShowPage(OverviewPage);
-        else { _enrollStep--; EnrollmentScroll.ScrollToTop(); UpdateSummary(); }
+        else { _enrollStep--; StatusText.Text = ""; EnrollmentScroll.ScrollToTop(); UpdateSummary(); }
     }
     private void ResetNext_Click(object sender, RoutedEventArgs e)
     {

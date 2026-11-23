@@ -28,6 +28,11 @@ public static class ConfigReader
         TomlTable model;
         try { model = Toml.ToModel(text); }
         catch { throw new InvalidDataException("Cannot parse YubiEnroll TOML configuration."); }
+        return Parse(model, path);
+    }
+
+    public static Configuration Parse(TomlTable model, string path)
+    {
         var providers = new List<Provider>();
         var profiles = new List<EnrollmentProfile>();
         if (model.TryGetValue("providers", out var p) && p is TomlTable pt)
@@ -61,7 +66,32 @@ public static class ConfigReader
             System.Globalization.CultureInfo.InvariantCulture) ?? fallback : fallback;
 
     private static string Hash(TomlTable table) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Toml.FromModel(table))));
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Toml.FromModel((TomlTable)Canonical(table)))));
+
+    // YubiEnroll rewrites TOML during provider activation. Compare typed values; table order,
+    // comments, quote style and inline vs. expanded notation are not configuration changes.
+    private static object Canonical(object value)
+    {
+        if (value is TomlTable t)
+        {
+            var sorted = new TomlTable();
+            foreach (var key in t.Keys.Order(StringComparer.Ordinal)) sorted.Add(key, Canonical(t[key]));
+            return sorted;
+        }
+        if (value is TomlTableArray tables)
+        {
+            var result = new TomlTableArray();
+            foreach (var item in tables) result.Add((TomlTable)Canonical(item));
+            return result;
+        }
+        if (value is TomlArray array)
+        {
+            var result = new TomlArray();
+            foreach (var item in array) result.Add(Canonical(item!));
+            return result;
+        }
+        return value;
+    }
 
     public static void EnsureUnchanged(Configuration current, Provider provider, EnrollmentProfile? profile)
     {

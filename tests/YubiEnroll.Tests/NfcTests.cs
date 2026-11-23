@@ -8,7 +8,7 @@ internal static class NfcTests
         var usb = new ResetKey("12345678", "YubiKey 5C NFC (5.7.1)");
         var nfc = usb with { Reader = reader };
         var admin = new ResetKey("87654321", "YubiKey 5C NFC (5.4.3)");
-        check(nfc != usb && nfc.ConnectionLabel.Contains(reader), "NFC identity includes reader and never substitutes the USB endpoint");
+        check(nfc != usb && nfc.ConnectionLabel == "NFC via OMNIKEY 5022" && nfc.Reader == reader, "NFC identity includes reader and never substitutes the USB endpoint");
         check(EnrollmentTargetGuard.CanStart(nfc, [nfc, admin], 1), "Explicit NFC reader does not require unplugging USB admin keys");
         check(EnrollmentTargetGuard.CanStart(usb, [usb, nfc], 0), "USB enrollment ignores NFC endpoints");
         check(!EnrollmentTargetGuard.CanStart(nfc, [usb], 0), "NFC removal never falls back to USB with the same serial");

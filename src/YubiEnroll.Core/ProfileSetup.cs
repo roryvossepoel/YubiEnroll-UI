@@ -35,8 +35,11 @@ public static class ProfileConfigWriter
     }
 
     public static ProfileSetup Read(string text, string name)
+        => Read(Toml.ToModel(text), name);
+
+    internal static ProfileSetup Read(TomlTable model, string name)
     {
-        var profiles = Profiles(Model(text));
+        var profiles = Profiles(model);
         if (!profiles.TryGetValue(name, out var value) || value is not TomlTable table)
             throw new InvalidOperationException("The selected profile no longer exists. Reload the configuration.");
         bool? Flag(string key) => !table.TryGetValue(key, out var v) ? null :

@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.6" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.7" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -202,9 +202,8 @@ public partial class MainWindow : Window
         SearchPanel.IsEnabled = IsConnected;
         if (!IsConnected) SelectedUserText.Text = "Connect to a tenant first.";
         PreparePanel.IsEnabled = TargetReady;
-        var profile = Profiles.SelectedItem as EnrollmentProfile;
         // Wizard rendering determines which action is available at the current step.
-        SelectedUserText.Visibility = Users.SelectedItem == null ? Visibility.Visible : Visibility.Collapsed;
+        SelectedUserText.Visibility = Visibility.Visible;
         UpdateEnrollmentGuidance();
         RenderManagement();
     }
@@ -220,8 +219,8 @@ public partial class MainWindow : Window
     private void User_Changed(object sender, SelectionChangedEventArgs e)
     {
         var user = Users.SelectedItem as UserCandidate;
-        SelectedUserText.Text = user == null ? "Search and select a user." : "User selected.";
-        if (user != null) StatusText.Text = _addPasskey ? "User selected. Review the registration before adding the passkey." : "User selected. Review the registration before enrolling the key.";
+        SelectedUserText.Text = user == null ? "Select a user." : $"Selected: {user.DisplayName} · {user.UserPrincipalName}";
+        if (user != null) StatusText.Text = "";
         UpdateSummary();
     }
 
@@ -229,6 +228,7 @@ public partial class MainWindow : Window
     {
         var before = ConfigReader.Read(_configPath);
         ConfigReader.EnsureUnchanged(before, provider, profile);
+        if (before.ActiveProvider == provider.Name) return;
         var result = await Runner.CaptureAsync("providers", "activate", provider.Name);
         RequireSuccess(result, "Tenant activation");
         var after = ConfigReader.Read(_configPath);
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.6\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.7\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -330,7 +330,7 @@ public partial class MainWindow : Window
         {
             ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, null);
             _connectedProvider = provider;
-            StatusText.Text = ManagePage.IsVisible ? $"Signed in to {provider.Name}." : "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
+            StatusText.Text = ManagePage.IsVisible || _selectedKey?.Key.IsNfc == true ? $"Signed in to {provider.Name}." : "Signed in. Disconnect the administrator key before enrollment; keep the chosen target connected.";
             // Sign-in does not change the inventory; hardware notifications schedule their own refresh.
         }
         else StatusText.Text = $"{_lastInteractiveFailure} Select Connect to try again.";
@@ -350,10 +350,9 @@ public partial class MainWindow : Window
         StatusText.Text = "Searching users…";
         var users = await FindUsersAsync(Query.Text.Trim());
         Users.ItemsSource = users;
-        SelectedUserText.Text = users.Count == 0 ? "No users found." : $"{users.Count} user(s) found. Select a user.";
+        SelectedUserText.Text = users.Count == 0 ? "No users found." : users.Count == 1 ? "1 result. Select the user." : $"{users.Count} results. Select a user.";
         Record($"User search completed: {users.Count} user(s) found.");
-        StatusText.Text = users.Count == 0 ? "No users recognized. Try another name or email; unsupported output formats cannot be used for enrollment." :
-            $"Select a user from {users.Count} result(s).";
+        StatusText.Text = "";
     });
 
     private async Task<IReadOnlyList<UserCandidate>> FindUsersAsync(string query)
@@ -374,6 +373,7 @@ public partial class MainWindow : Window
         var user = SelectedUser;
         var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
         int code;
+        SetNameEditing(false);
         try { code = await ExecuteEnrollmentAsync(provider, profile, user, target, KeyName.Text); }
         catch (EnrollmentOutcomeUnknownException)
         {

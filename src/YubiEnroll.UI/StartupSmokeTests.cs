@@ -509,10 +509,18 @@ public partial class MainWindow
         Assert(_enrollStep == 3 && UserCard.IsVisible && !TenantStep.IsVisible && !EnrollNext.IsEnabled, "Recipient is a separate gated step");
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } };
         Users.SelectedIndex = 0;
+        Assert(EnrollNext.IsEnabled && !KeyName.IsVisible && !EnrollmentScroll.IsVisible, "A recipient enables Review in a single scroll region");
         CaptureWindow(this, "enroll-user.png");
         EnrollNext_Click(this, e);
         Assert(_enrollStep == 4 && PreparationCard.IsVisible && !Profiles.IsVisible && !KeyName.IsVisible && !EnrollButton.IsEnabled && ReviewTargetNotice.Text.Contains(admin.Key.Serial),
             "Review blocks enrollment while another key is attached");
+        EditName_Click(this, e); KeyName.Text = "Pilot custom name"; EditName_Click(this, e);
+        var chosen = Profiles.SelectedItem;
+        EnrollBack_Click(this, e); EnrollBack_Click(this, e); EnrollBack_Click(this, e);
+        Assert(_enrollStep == 1 && EnrollNext.IsEnabled && Profiles.SelectedItem == chosen && StatusText.Text == "",
+            "Returning to the profile retains the choice, readiness and a step-local status");
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Assert(_enrollStep == 4 && ReviewName.Text == "Pilot custom name", "Back and forward preserve the recipient and edited registration name");
         ApplyInventory(new[] { admin }, 0);
         Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Missing target is never replaced by the administrator key");
         ApplyInventory(new[] { target }, 0);

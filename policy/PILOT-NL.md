@@ -1,10 +1,10 @@
-# Passkey Desk voor YubiKeys · Policy Preview 6
+# Passkey Desk voor YubiKeys · Policy Preview 7
 
-Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.6**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
+Dit is de afzonderlijke Windows x64-testversie **0.11.0-policy.7**, gebaseerd op 0.10.9. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
 ## Indeling van de template (revisie 1.4)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test de EXE van Policy Preview 6 en de meegeleverde ADMX en ADML (revisie 1.4).
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test de EXE van Policy Preview 7 en de meegeleverde ADMX en ADML (revisie 1.4).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |

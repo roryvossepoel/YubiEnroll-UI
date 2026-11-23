@@ -21,8 +21,8 @@ public partial class MainWindow
                 var line = new DockPanel();
                 line.Children.Add(new Image { Width = 15, Height = 15, Source = (ImageSource)FindResource("NfcGlyph"),
                     Margin = new Thickness(0, 2, 7, 0), VerticalAlignment = VerticalAlignment.Top });
-                var displayName = visible.Count == 1 && reader.Name.EndsWith(" 0", StringComparison.Ordinal)
-                    ? reader.Name[..^2] : reader.Name;
+                var displayName = NfcReaderStatus.DisplayName(reader.Name);
+                if (visible.Count(r => NfcReaderStatus.DisplayName(r.Name) == displayName) > 1) displayName = reader.Name;
                 line.Children.Add(new TextBlock { Text = "NFC reader connected · " + displayName,
                     TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("Muted") });
                 body.Children.Add(line);

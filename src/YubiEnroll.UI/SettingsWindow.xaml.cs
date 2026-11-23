@@ -104,8 +104,7 @@ public partial class SettingsWindow : Window
         if (!TerminalManaged) _terminal = EmbeddedChoice.IsChecked == true;
         RefreshDirty();
     }
-    private sealed record Pill(string Label, bool Warning = false);
-    private sealed record ProfileRow(string Name, List<Pill> Pills, string Compatibility, string Details);
+    private sealed record ProfileRow(string Name, List<ProfileEffect> Pills, string Compatibility, string Details);
     private readonly ActivityJournal _activity;
     private KeyStatus? _profileKey;
     public bool Changed { get; private set; }
@@ -269,9 +268,7 @@ public partial class SettingsWindow : Window
     private static ProfileRow DescribeProfile(ProfileSetup p, KeyStatus? key)
     {
         static string Flag(bool? value) => value switch { true => "On", false => "Off", _ => "Not specified" };
-        List<Pill> pills = [new(p.Reset switch { true => "⚠ Clears passkeys on key", false => "Keeps passkeys on key", _ => "Reset not specified" }, p.Reset == true),
-            new(p.RandomPin switch { true => p.RandomPinLength is int length ? $"Generated PIN · {length} chars" : "Generated PIN · length not specified", false => "No PIN generated", _ => "Initial PIN not specified" })];
-        if (p.ForcePinChange == true) pills.Add(new("PIN change required"));
+        var pills = ProfileEffect.Describe(p);
         var policy = p.MinPinLength.HasValue || p.ForcePinChange == true || p.RequireAlwaysUv == true;
         var needs = new List<string>();
         if (p.MinPinLength.HasValue) needs.Add("configurable PIN minimum");

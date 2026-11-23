@@ -6,7 +6,7 @@ namespace YubiEnroll.Core;
 public sealed record ResetKey(string Serial, string Model, string? Reader = null)
 {
     public bool IsNfc => Reader != null;
-    public string ConnectionLabel => IsNfc ? "NFC · " + Reader : "USB";
+    public string ConnectionLabel => IsNfc ? "NFC via " + NfcReaderStatus.DisplayName(Reader!) : "USB";
     public string Label => $"{Model} · Serial {Serial}" + (IsNfc ? " · " + ConnectionLabel : "");
     public string RegistrationName => $"{Regex.Replace(Model, @"\s*\(\d+\.\d+\.\d+\)\s*$", "").Trim()} ({Serial})";
 }
