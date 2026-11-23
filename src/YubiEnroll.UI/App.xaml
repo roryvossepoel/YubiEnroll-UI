@@ -152,6 +152,7 @@
   <Style x:Key="SectionTitle" TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource Heading}"/><Setter Property="FontSize" Value="17"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   <Style TargetType="TextBox"><Setter Property="Padding" Value="10,8"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="BorderBrush" Value="#CED8E3"/><Setter Property="BorderThickness" Value="1"/></Style>
   <Style TargetType="ComboBox"><Setter Property="Padding" Value="10,8"/><Setter Property="MinHeight" Value="38"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+  <SolidColorBrush x:Key="TabHighlight" Color="#F0F2F3"/>
   <Style TargetType="TabItem">
    <Setter Property="Padding" Value="14,11"/>
    <Setter Property="Foreground" Value="#52606B"/>
@@ -164,14 +165,14 @@
       <Trigger Property="IsSelected" Value="True">
        <Setter Property="Foreground" Value="#172B41"/>
        <Setter TargetName="TabSurface" Property="BorderBrush" Value="#84BD00"/>
-       <Setter TargetName="TabSurface" Property="Background" Value="White"/>
+       <Setter TargetName="TabSurface" Property="Background" Value="{StaticResource TabHighlight}"/>
       </Trigger>
       <MultiTrigger>
        <MultiTrigger.Conditions>
         <Condition Property="IsSelected" Value="False"/>
         <Condition SourceName="TabSurface" Property="IsMouseOver" Value="True"/>
        </MultiTrigger.Conditions>
-       <Setter TargetName="TabSurface" Property="Background" Value="#F0F2F3"/>
+       <Setter TargetName="TabSurface" Property="Background" Value="{StaticResource TabHighlight}"/>
       </MultiTrigger>
      </ControlTemplate.Triggers>
     </ControlTemplate>

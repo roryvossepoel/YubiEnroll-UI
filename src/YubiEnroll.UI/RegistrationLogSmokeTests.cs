@@ -83,6 +83,7 @@ public partial class MainWindow
         showFirst.IsChecked = true; settings.UpdateLayout();
         Assert(Value(first).Text == "001234" && showFirst.TranslatePoint(new Point(), view.Records) == origin,
             "Reveal preserves leading zeroes and keeps the button in place");
+        CaptureWindow(settings, "registration-log-initial-pin.png");
         showOther.IsChecked = true; settings.UpdateLayout();
         Assert(showFirst.IsChecked == false && Value(first).Text == "••••••" && Value(other).Text == other.GeneratedPin && row.ActualHeight == originalHeight,
             "Only one PIN is visible; a long PIN wraps without resizing its row");
