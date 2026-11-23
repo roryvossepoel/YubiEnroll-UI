@@ -9,6 +9,23 @@ namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
+    private static void AssertLogScrollsToCopy(DataGrid table)
+    {
+        table.UpdateLayout();
+        var viewer = VisualDescendants<ScrollViewer>(table).First();
+        var bar = VisualDescendants<ScrollBar>(viewer).First(b => b.Orientation == Orientation.Horizontal);
+        Assert(bar.IsVisible && viewer.ScrollableWidth > 10, "Wide log entries show a horizontal scrollbar");
+        viewer.ScrollToRightEnd();
+        table.UpdateLayout();
+        var copy = VisualDescendants<Button>(table).First(b => b.IsVisible &&
+            System.Windows.Automation.AutomationProperties.GetName(b).StartsWith("Copy"));
+        var x = copy.TranslatePoint(new Point(), table).X;
+        Assert(viewer.HorizontalOffset > 0 && x >= 0 && x + copy.ActualWidth <= table.ActualWidth + 1,
+            "Scrolling right brings the entire last-column copy action into view");
+        viewer.ScrollToLeftEnd();
+        table.UpdateLayout();
+    }
+
     private void TestRegistrationLogView(SettingsWindow settings)
     {
         var tenant = new Provider("Demo tenant", "ENTRA", "11111111-2222-3333-4444-555555555555", "Managed PIN", "fixture");
@@ -80,7 +97,11 @@ public partial class MainWindow
         var originalHeight = row.ActualHeight;
         var origin = showFirst.TranslatePoint(new Point(), view.Records);
         Assert(cells.Length == 2 && Value(first).Text == "••••••", "Masked PIN by default; records without a saved PIN offer no reveal action");
+        Assert(Equals(showFirst.ToolTip, "Show PIN") && System.Windows.Automation.AutomationProperties.GetName(showFirst) == "Show PIN" &&
+            !VisualDescendants<TextBlock>(showFirst).Any(), "Icon-only reveal has an accessible label and tooltip");
         showFirst.IsChecked = true; settings.UpdateLayout();
+        Assert(Equals(showFirst.ToolTip, "Hide PIN") && System.Windows.Automation.AutomationProperties.GetName(showFirst) == "Hide PIN" &&
+            ((UIElement)showFirst.Template.FindName("Slash", showFirst)).IsVisible, "Revealed PIN offers the hide icon and label");
         Assert(Value(first).Text == "001234" && showFirst.TranslatePoint(new Point(), view.Records) == origin,
             "Reveal preserves leading zeroes and keeps the button in place");
         CaptureWindow(settings, "registration-log-initial-pin.png");
@@ -94,6 +115,8 @@ public partial class MainWindow
         var width = settings.Width; var height = settings.Height;
         settings.Width = 740; settings.Height = 600;
         CaptureWindow(settings, "registration-log-compact.png");
+        view.Records.ItemsSource = new[] { sample[0] with { DisplayName = new string('W', 220) } };
+        AssertLogScrollsToCopy(view.Records);
         settings.Width = width; settings.Height = height;
         settings.AppSettingsTab.IsSelected = true;
         settings.FolderPath.Text = originalFolder + "-empty";

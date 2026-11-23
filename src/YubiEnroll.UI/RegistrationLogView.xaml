@@ -10,7 +10,7 @@
   </WrapPanel></Expander>
   <WrapPanel Margin="0,0,0,12"><Button x:Name="RetryButton" Content="Retry saving results" Click="Retry_Click" Visibility="Collapsed"/></WrapPanel>
   <TextBlock x:Name="CountText" Foreground="{StaticResource Muted}" Margin="0,0,0,8" TextWrapping="Wrap"/>
-</StackPanel>  <Grid><DataGrid x:Name="Records" RowDetailsVisibilityMode="Collapsed"  IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#EDF0F1" BorderBrush="#DCE3EB" Background="White" AlternatingRowBackground="#F6F8F9" HeadersVisibility="Column" MinRowHeight="44" ColumnHeaderHeight="40" EnableRowVirtualization="True" AutomationProperties.Name="Enrollment records">
+</StackPanel>  <Grid><DataGrid x:Name="Records" RowDetailsVisibilityMode="Collapsed" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#EDF0F1" BorderBrush="#DCE3EB" Background="White" AlternatingRowBackground="#F6F8F9" HeadersVisibility="Column" MinRowHeight="44" ColumnHeaderHeight="40" EnableRowVirtualization="True" AutomationProperties.Name="Enrollment records">
    <DataGrid.Resources>
     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"/>
@@ -22,25 +22,28 @@
    <DataGrid.Columns>
     <DataGridTextColumn Header="Date/time" Binding="{Binding ListTimeLabel}" Width="Auto"/>
     <DataGridTextColumn Header="Tenant" Binding="{Binding TenantName}" Width="Auto"/>
-    <DataGridTextColumn Header="User" Binding="{Binding UserLabel}" Width="*" MinWidth="120"/>
+    <DataGridTextColumn Header="User" Binding="{Binding UserLabel}" Width="Auto" MinWidth="120"/>
     <DataGridTemplateColumn Header="Key info" Width="Auto"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding KeyModel}"/><TextBlock Text="{Binding TargetSerial}" Foreground="{StaticResource Muted}"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-    <DataGridTemplateColumn Header="Initial PIN" Width="184" MinWidth="184" CanUserSort="False">
+    <DataGridTemplateColumn Header="Initial PIN" Width="132" MinWidth="132" CanUserSort="False">
      <DataGridTemplateColumn.CellTemplate><DataTemplate><Grid>
       <TextBlock x:Name="Unavailable" Visibility="Collapsed" Text="{Binding PinUnavailableLabel}" VerticalAlignment="Center" Foreground="{StaticResource Muted}"/>
-      <Grid x:Name="PinControls"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="84"/></Grid.ColumnDefinitions>
+      <Grid x:Name="PinControls"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
        <Grid Margin="0,0,6,0" VerticalAlignment="Center" TextElement.FontFamily="Consolas" TextElement.FontSize="15">
         <TextBlock Text="{Binding PinLayoutSample}" Visibility="Hidden" TextWrapping="Wrap"/>
         <TextBlock x:Name="PinValue" Text="••••••" TextWrapping="Wrap" VerticalAlignment="Center"/>
        </Grid>
-       <ToggleButton Grid.Column="1" x:Name="Reveal" Content="Show PIN" ContentTemplate="{StaticResource PinToggleContent}"
-         MinHeight="30" VerticalAlignment="Center" Cursor="Hand" AutomationProperties.Name="{Binding Content,RelativeSource={RelativeSource Self}}"
+       <ToggleButton Grid.Column="1" x:Name="Reveal" Content="Show PIN" ToolTip="{Binding Content,RelativeSource={RelativeSource Self}}"
+         Width="32" Height="32" VerticalAlignment="Center" Cursor="Hand" AutomationProperties.Name="{Binding Content,RelativeSource={RelativeSource Self}}"
          Checked="Pin_Checked" Unchecked="Pin_Unchecked" DataContextChanged="PinContext_Changed" Unloaded="Pin_Unloaded">
         <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
          <Border x:Name="Chrome" Padding="4,2" BorderThickness="1" CornerRadius="5" Background="Transparent" BorderBrush="Transparent">
-          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+           <Path Stroke="{StaticResource Heading}" StrokeThickness="1.5" StrokeLineJoin="Round" Data="M1,10 Q10,-2 19,10 Q10,22 1,10 Z M12.5,10 A2.5,2.5 0 1 1 7.5,10 A2.5,2.5 0 1 1 12.5,10"/>
+           <Path x:Name="Slash" Visibility="Collapsed" Stroke="{StaticResource Heading}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M3,2 L17,18"/>
+          </Grid>
          </Border><ControlTemplate.Triggers>
           <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E6EDF0"/></Trigger>
-          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Chrome" Property="Background" Value="#E3F0F5"/></Trigger>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Slash" Property="Visibility" Value="Visible"/><Setter TargetName="Chrome" Property="Background" Value="#E3F0F5"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Heading}"/></Trigger>
          </ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
        </ToggleButton>

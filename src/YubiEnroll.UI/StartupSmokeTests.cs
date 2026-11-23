@@ -380,6 +380,9 @@ public partial class MainWindow
                 && VisualDescendants<TextBlock>(diagnosticRow).Any(x => x.IsVisible && x.Text == "HTTP status: 405"),
                 "Activity diagnostics are visible directly in the row without expanding");
             CaptureWindow(this, "activity-log.png");
+            _activityView.Add("Synthetic wide entry", "Info", new string('W', 240));
+            activityGrid.ScrollIntoView(activityGrid.Items[0]);
+            AssertLogScrollsToCopy(activityGrid);
             ShowPage(OverviewPage);
             Width = 800; Height = 580;
             CaptureWindow(this, "overview-compact.png");
