@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='utf-8'?>
+<policyDefinitionResources revision="1.4" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>Passkey Desk for YubiKeys</displayName>
+  <description>Machine policy for the independent Passkey Desk application.</description>
+  <resources>
+    <stringTable>
+      <string id="SupportedVersion">Passkey Desk 0.11.0 Policy Preview 6 or later</string>
+      <string id="CategoryName">Passkey Desk for YubiKeys</string>
+      <string id="CliConfigLabelCategory">YubiEnroll CLI configuration (TOML)</string>
+      <string id="TenantsCategoryLabelCategory">Tenants</string>
+      <string id="ProfilesLabelCategory">Configuration profiles</string>
+      <string id="AppSettingsLabelCategory">Passkey Desk app settings</string>
+      <string id="LoggingLabelCategory">Logging</string>
+      <string id="Off">Off</string>
+      <string id="On">On</string>
+      <string id="Internal">In-app terminal</string>
+      <string id="External">External console</string>
+      <string id="TenantsLabel">Entra tenants (JSON)</string>
+      <string id="TenantsHelp">Replaces the Entra tenants in the current user's yubienroll.toml when Passkey Desk starts. Profiles are managed separately. Supply a JSON array with name, tenantId, clientId and redirectUri for each tenant. An explicit [] clears the Entra list. There is no tenant slot count. Do not enter credentials.</string>
+      <string id="ActivityLabel">Activity logging</string>
+      <string id="ActivityHelp">App setting only; does not change yubienroll.toml. Choose whether to keep activity, the retention in days and the log folder. Leave the folder blank to use YubiKey Desk\ActivityLog under the current user's Documents folder, including redirected Documents. Paths may contain environment variables.</string>
+      <string id="RegistrationLabel">Registration logging</string>
+      <string id="RegistrationHelp">App setting only; does not change yubienroll.toml. Choose whether to save registration records and whether those records and CSV exports include newly generated initial PINs (off by default). Existing PINs are never captured. While logging is on, expired records are deleted from the selected folder after the specified number of days (1–3650, default 30). CSV exports are kept. A blank folder uses YubiKey Desk\RegistrationLog under the current user's Documents folder.</string>
+      <string id="TerminalLabel">Terminal preference</string>
+      <string id="TerminalHelp">App setting only; does not change yubienroll.toml. Choose the preferred terminal. Enrollment with generated PIN capture still uses the in-app terminal. Only the terminal preference becomes read-only. Other settings, tenants and profiles remain editable unless managed separately.</string>
+      <string id="Profile1Label">Configuration profile 1</string>
+      <string id="Profile1Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile2Label">Configuration profile 2</string>
+      <string id="Profile2Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile3Label">Configuration profile 3</string>
+      <string id="Profile3Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile4Label">Configuration profile 4</string>
+      <string id="Profile4Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile5Label">Configuration profile 5</string>
+      <string id="Profile5Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="Tenants">
+        <textBox refId="TenantsTenantsJson">
+          <label>Tenant list (single-line JSON)</label>
+        </textBox>
+      </presentation>
+      <presentation id="Activity">
+        <dropdownList refId="ActivityEnabled" defaultItem="1">Keep activity between sessions</dropdownList>
+        <decimalTextBox refId="ActivityRetentionDays" defaultValue="30">Retention (days)</decimalTextBox>
+        <textBox refId="ActivityFolder">
+          <label>Activity log folder (blank = user default)</label>
+        </textBox>
+      </presentation>
+      <presentation id="Registration">
+        <dropdownList refId="RegistrationEnabled" defaultItem="0">Save enrollment records</dropdownList>
+        <dropdownList refId="RegistrationSaveGeneratedPin" defaultItem="0">Include generated initial PINs</dropdownList>
+        <textBox refId="RegistrationFolder">
+          <label>Registration log folder (blank = user default)</label>
+        </textBox>
+        <decimalTextBox refId="RegistrationRetentionDays" defaultValue="30">Keep registrations for (days)</decimalTextBox>
+      </presentation>
+      <presentation id="Terminal">
+        <dropdownList refId="TerminalEmbeddedTerminal" defaultItem="1">Terminal</dropdownList>
+      </presentation>
+      <presentation id="Profile1">
+        <textBox refId="Profile1Name">
+          <label>Profile name</label>
+        </textBox>
+        <dropdownList refId="Profile1Reset" defaultItem="0">Reset FIDO before setup</dropdownList>
+        <dropdownList refId="Profile1RandomPin" defaultItem="1">Generate an initial PIN</dropdownList>
+        <decimalTextBox refId="Profile1RandomPinLength" defaultValue="6">Generated PIN length (0 = CLI default, otherwise 4–63)</decimalTextBox>
+        <decimalTextBox refId="Profile1MinPinLength" defaultValue="0">Minimum PIN length (0 = no override, otherwise 4–63)</decimalTextBox>
+        <dropdownList refId="Profile1ForcePinChange" defaultItem="0">Require PIN change at first use</dropdownList>
+        <dropdownList refId="Profile1AlwaysUv" defaultItem="0">Always require user verification</dropdownList>
+        <dropdownList refId="Profile1RequireEa" defaultItem="0">Require enterprise attestation</dropdownList>
+      </presentation>
+      <presentation id="Profile2">
+        <textBox refId="Profile2Name">
+          <label>Profile name</label>
+        </textBox>
+        <dropdownList refId="Profile2Reset" defaultItem="0">Reset FIDO before setup</dropdownList>
+        <dropdownList refId="Profile2RandomPin" defaultItem="1">Generate an initial PIN</dropdownList>
+        <decimalTextBox refId="Profile2RandomPinLength" defaultValue="6">Generated PIN length (0 = CLI default, otherwise 4–63)</decimalTextBox>
+        <decimalTextBox refId="Profile2MinPinLength" defaultValue="0">Minimum PIN length (0 = no override, otherwise 4–63)</decimalTextBox>
+        <dropdownList refId="Profile2ForcePinChange" defaultItem="0">Require PIN change at first use</dropdownList>
+        <dropdownList refId="Profile2AlwaysUv" defaultItem="0">Always require user verification</dropdownList>
+        <dropdownList refId="Profile2RequireEa" defaultItem="0">Require enterprise attestation</dropdownList>
+      </presentation>
+      <presentation id="Profile3">
+        <textBox refId="Profile3Name">
+          <label>Profile name</label>
+        </textBox>
+        <dropdownList refId="Profile3Reset" defaultItem="0">Reset FIDO before setup</dropdownList>
+        <dropdownList refId="Profile3RandomPin" defaultItem="1">Generate an initial PIN</dropdownList>
+        <decimalTextBox refId="Profile3RandomPinLength" defaultValue="6">Generated PIN length (0 = CLI default, otherwise 4–63)</decimalTextBox>
+        <decimalTextBox refId="Profile3MinPinLength" defaultValue="0">Minimum PIN length (0 = no override, otherwise 4–63)</decimalTextBox>
+        <dropdownList refId="Profile3ForcePinChange" defaultItem="0">Require PIN change at first use</dropdownList>
+        <dropdownList refId="Profile3AlwaysUv" defaultItem="0">Always require user verification</dropdownList>
+        <dropdownList refId="Profile3RequireEa" defaultItem="0">Require enterprise attestation</dropdownList>
+      </presentation>
+      <presentation id="Profile4">
+        <textBox refId="Profile4Name">
+          <label>Profile name</label>
+        </textBox>
+        <dropdownList refId="Profile4Reset" defaultItem="0">Reset FIDO before setup</dropdownList>
+        <dropdownList refId="Profile4RandomPin" defaultItem="1">Generate an initial PIN</dropdownList>
+        <decimalTextBox refId="Profile4RandomPinLength" defaultValue="6">Generated PIN length (0 = CLI default, otherwise 4–63)</decimalTextBox>
+        <decimalTextBox refId="Profile4MinPinLength" defaultValue="0">Minimum PIN length (0 = no override, otherwise 4–63)</decimalTextBox>
+        <dropdownList refId="Profile4ForcePinChange" defaultItem="0">Require PIN change at first use</dropdownList>
+        <dropdownList refId="Profile4AlwaysUv" defaultItem="0">Always require user verification</dropdownList>
+        <dropdownList refId="Profile4RequireEa" defaultItem="0">Require enterprise attestation</dropdownList>
+      </presentation>
+      <presentation id="Profile5">
+        <textBox refId="Profile5Name">
+          <label>Profile name</label>
+        </textBox>
+        <dropdownList refId="Profile5Reset" defaultItem="0">Reset FIDO before setup</dropdownList>
+        <dropdownList refId="Profile5RandomPin" defaultItem="1">Generate an initial PIN</dropdownList>
+        <decimalTextBox refId="Profile5RandomPinLength" defaultValue="6">Generated PIN length (0 = CLI default, otherwise 4–63)</decimalTextBox>
+        <decimalTextBox refId="Profile5MinPinLength" defaultValue="0">Minimum PIN length (0 = no override, otherwise 4–63)</decimalTextBox>
+        <dropdownList refId="Profile5ForcePinChange" defaultItem="0">Require PIN change at first use</dropdownList>
+        <dropdownList refId="Profile5AlwaysUv" defaultItem="0">Always require user verification</dropdownList>
+        <dropdownList refId="Profile5RequireEa" defaultItem="0">Require enterprise attestation</dropdownList>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

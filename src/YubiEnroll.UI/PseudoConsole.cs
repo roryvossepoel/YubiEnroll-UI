@@ -64,8 +64,8 @@ internal sealed class PseudoConsole(int columns = 100) : IDisposable
         }
     }
 
-    // Invoked only by the sign-in panel. Enrollment/reset never call this method.
-    public async Task CancelLoginAsync()
+    // Stop only this explicitly cancelled interactive operation.
+    public async Task CancelOperationAsync()
     {
         Write("\x03");
         if (await Task.WhenAny(_exited.Task, Task.Delay(1500)) == _exited.Task) return;

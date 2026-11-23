@@ -15,11 +15,11 @@ try {
     if (-not $SkipTests) { Invoke-Dotnet run --project tests/YubiEnroll.Tests -c Release }
     $out = Join-Path $PSScriptRoot "artifacts/$Runtime"
     if (Test-Path $out) { Remove-Item -LiteralPath $out -Recurse -Force }
-    $bundle = @('-p:PublishSingleFile=true', '-p:PublishTrimmed=false', '-p:DebugType=None', '-p:DebugSymbols=false')
-    Invoke-Dotnet publish src/YubiEnroll.UI -c Release -r $Runtime --self-contained false @bundle -o "$out/app"
-    Invoke-Dotnet publish src/YubiEnroll.ConsoleHost -c Release -r $Runtime --self-contained false @bundle -o "$out/host"
+    $bundle = @('-p:SelfContained=false', '-p:PublishSelfContained=false', '-p:PublishSingleFile=true', '-p:PublishTrimmed=false', '-p:DebugType=None', '-p:DebugSymbols=false')
+    Invoke-Dotnet publish src/YubiEnroll.UI -c Release -r $Runtime @bundle -o "$out/app"
+    Invoke-Dotnet publish src/YubiEnroll.ConsoleHost -c Release -r $Runtime @bundle -o "$out/host"
     # Bundle application assemblies only; .NET 10 Desktop Runtime is a prerequisite.
-    Move-Item -LiteralPath "$out/host/YubiEnroll.ConsoleHost.exe" -Destination "$out/app/YubiEnroll.ConsoleHost.exe"
+    Move-Item -LiteralPath "$out/host/PasskeyDesk.ConsoleHost.exe" -Destination "$out/app/PasskeyDesk.ConsoleHost.exe"
     Copy-Item README.md, LICENSE, THIRD-PARTY-NOTICES.md -Destination "$out/app"
     $files = @(Get-ChildItem -LiteralPath "$out/app" -Recurse -File)
     if ($files.Count -ne 5) { throw "Expected two executables and three documentation files; got $($files.Count) files." }
@@ -27,5 +27,6 @@ try {
     if ($SigningCertificateThumbprint) {
         & "$PSScriptRoot/scripts/Sign-App.ps1" -AppDirectory "$out/app" -CertificateThumbprint $SigningCertificateThumbprint -TimestampServer $TimestampServer
     }
-    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/YubiEnroll-UI-$Runtime.zip" -Force
+    Copy-Item -Recurse -LiteralPath policy -Destination "$out/app/policy"
+    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.0-$Runtime.zip" -Force
 } finally { Pop-Location }

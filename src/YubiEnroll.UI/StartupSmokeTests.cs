@@ -1,4 +1,6 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Controls;
 using System.Runtime.InteropServices;
 using YubiEnroll.Core;
 
@@ -16,10 +18,35 @@ public partial class MainWindow
         try
         {
             await TestStartupRequirementsAsync(mockExecutable);
+            var startupPolicyView = new MainWindow(smokeTest: true);
+            try
+            {
+                await startupPolicyView.ApplyStartupPolicyAsync(null, () => throw new Exception("Unmanaged startup accessed TOML"));
+                Assert(!startupPolicyView._activityJournal.Read().Any(), "Unmanaged startup does not log policy detection");
+                var appOnly = DeskPolicy.Read(k => k == @"AppSettings\Terminal" ? new Dictionary<string,object?> { ["EmbeddedTerminal"] = 0 } : null, root, root);
+                await startupPolicyView.ApplyStartupPolicyAsync(appOnly, () => throw new Exception("App-only startup accessed TOML"));
+                Assert(startupPolicyView.StartupPolicyStep.Visibility == Visibility.Visible && startupPolicyView.StartupPolicyStatus.Text.Contains("App settings applied"),
+                    "App policy is visible without touching TOML");
+                Assert(startupPolicyView._activityJournal.Read().Single() is { Level: "Info", Message: "Policy mode detected at startup. App settings applied. No TOML synchronization needed." },
+                    "Preferences-only policy records one accurate startup outcome");
+                var profilePath = Path.Combine(root, "preview-policy.toml");
+                var states = new Dictionary<string, Dictionary<string,object?>> { [@"YubiEnroll\Tenants"] = new() { ["TenantsJson"] = "[]" } };
+                var empty = DeskPolicy.Read(k => states.GetValueOrDefault(k), root, root);
+                await startupPolicyView.ApplyStartupPolicyAsync(empty, () => profilePath);
+                Assert(!File.Exists(profilePath) && startupPolicyView.StartupPolicyStatus.Text.Contains("No TOML file needed"), "Empty managed tenants do not report a file write");
+                Directory.CreateDirectory(root);
+                File.WriteAllText(profilePath, "# Local CLI settings");
+                await startupPolicyView.ApplyStartupPolicyAsync(empty, () => profilePath);
+                var policyRecords = startupPolicyView._activityJournal.Read();
+                Assert(policyRecords.Count == 3 && policyRecords.Count(entry => entry.Level == "Info" && entry.Message == "Policy mode detected at startup. YubiEnroll TOML already up to date.") == 1,
+                    "Synchronization records a single persisted outcome without claiming an unchanged TOML was rewritten");
+            }
+            finally { startupPolicyView.Close(); }
             await TestKeyToolsAsync();
             await TestEmbeddedTerminalAsync(mockExecutable);
             await TestExternalOutcomeAsync(mockExecutable);
             await TestLoginCancellationAsync(mockExecutable);
+            await TestManagementCallbackAsync();
             TraceStartup("Initializing");
             await InitializeAsync(root, "");
             Assert(_config?.Providers.Count == 0 && Diagnostics.Text.Length == 0 && StatusText.Text.Contains("Add tenant"), "First run offers tenant setup without an error");
@@ -68,6 +95,7 @@ public partial class MainWindow
                 {
                     Assert(profileDialog.MinimumPinLength.Text.Length == 0 && profileDialog.ForcePinChange.IsChecked == false,
                         "New profile starts with basic settings suitable for older FIDO2 keys");
+                    Assert(!profileDialog.AlwaysUv.IsThreeState && profileDialog.BasicPreset.IsChecked == true, "New profile has explicit flags and a visible preset");
                     profileDialog.ManagedPreset.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                     Assert(profileDialog.MinimumPinLength.Text == "6" && profileDialog.ForcePinChange.IsChecked == true && profileDialog.RequirementsText.Text.Contains("forced PIN change"),
                         "Managed preset sets policy and displays live capability requirements");
@@ -77,7 +105,7 @@ public partial class MainWindow
                     profileDialog.ProfileName.Text = "Second profile";
                     profileDialog.MinimumPinLength.Text = "8";
                     profileDialog.GeneratedPinLength.Text = "6";
-                    Assert(!profileDialog.TrySave(), "Profile form rejects generated PIN shorter than minimum");
+                    Assert(profileDialog.CustomPreset.IsVisible && !profileDialog.TrySave(), "Profile form rejects generated PIN shorter than minimum");
                     CaptureWindow(profileDialog, "profile-editor.png");
                     profileDialog.GeneratedPinLength.Text = "10";
                     Assert(profileDialog.TrySave(), "Independent profile can be created");
@@ -124,13 +152,66 @@ public partial class MainWindow
             });
             tenantEditor.ShowDialog();
             await tenantEditOperation.Task;
+            var scopedValues = new Dictionary<string, Dictionary<string,object?>> { [@"AppSettings\Terminal"] = new() { ["EmbeddedTerminal"] = 0 } };
+            SettingsWindow PolicySettings()
+            {
+                var policy = DeskPolicy.Read(k => scopedValues.GetValueOrDefault(k), Path.Combine(root, "activity-logs"), Path.Combine(root, "registration-logs"));
+                var registration = new RegistrationJournal(Path.Combine(root,"policy-registration.json"), root, policy?.Registration);
+                var activity = new ActivityJournal(Path.Combine(root,"policy-activity.json"), root, policy?.Activity);
+                return new SettingsWindow(path, mockExecutable,"Mock CLI", registration, activity, policy:policy);
+            }
+            var terminalView = PolicySettings();
+            Assert(terminalView.TenantActions.Visibility == Visibility.Visible && terminalView.ProfileActions.Visibility == Visibility.Visible
+                && terminalView.ActivityControls.IsEnabled && terminalView.RegistrationControls.IsEnabled && !terminalView.TerminalControls.IsEnabled
+                && terminalView.TenantTransfer.IsEnabled && terminalView.ProfileTransfer.IsEnabled && terminalView.TenantPolicyBadge.Visibility == Visibility.Collapsed
+                && !terminalView.EmbeddedTerminal, "External terminal policy locks only the terminal controls");
+            terminalView.PreviewImport(ConfigTransfer.Export(File.ReadAllText(path)));
+            Assert(terminalView.ImportButton.IsEnabled, "App-only policy allows normal configuration import");
+            Assert(terminalView.TerminalPolicyBadge.Visibility == Visibility.Visible && terminalView.ActivityPolicyBadge.Visibility == Visibility.Collapsed
+                && terminalView.RegistrationPolicyBadge.Visibility == Visibility.Collapsed, "Only the explicitly managed terminal shows a policy badge");
+            terminalView.Close();
+            scopedValues.Clear();
+            scopedValues[@"AppSettings\Logging\Activity"] = new() { ["Enabled"] = 1, ["RetentionDays"] = 14 };
+            scopedValues[@"AppSettings\Logging\Registration"] = new() { ["Enabled"] = 1, ["SaveGeneratedPin"] = 0, ["RetentionDays"] = 30 };
+            var logView = PolicySettings();
+            logView.Owner = this;
+            logView.Show();
+            logView.AppSettingsTab.IsSelected = true;
+            CaptureWindow(logView, "settings-managed-logs.png");
+            Assert(!logView.ActivityControls.IsEnabled && !logView.RegistrationControls.IsEnabled && logView.ActivityPolicyBadge.Visibility == Visibility.Visible
+                && logView.RegistrationPolicyBadge.Visibility == Visibility.Visible && logView.TerminalPolicyBadge.Visibility == Visibility.Collapsed
+                && logView.EmbeddedChoice.IsEnabled && logView.ExternalChoice.IsEnabled, "Both managed logs have badges while the unconfigured terminal stays editable");
+            logView.ExternalChoice.IsChecked = true;
+            logView.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert(!logView.EmbeddedTerminal && !logView.SaveLogSettingsButton.IsEnabled, "Local external-console choice can be saved alongside enforced log settings");
+            logView.Close();
+            scopedValues.Clear(); scopedValues[@"YubiEnroll\Tenants"] = new() { ["TenantsJson"] = "[]" };
+            var tenantView = PolicySettings();
+            Assert(tenantView.PolicyNotice.Visibility == Visibility.Visible && tenantView.TenantActions.Visibility == Visibility.Collapsed
+                && tenantView.ProfileActions.Visibility == Visibility.Visible && tenantView.TerminalControls.IsEnabled && tenantView.ActivityControls.IsEnabled,
+                "Empty tenant policy locks only tenant edits; profiles and all preferences remain editable");
+            Assert(tenantView.TenantTransfer.Visibility == Visibility.Collapsed && tenantView.TenantPolicyBadge.Visibility == Visibility.Visible
+                && tenantView.ProfileTransfer.IsEnabled && tenantView.ProfilePolicyBadge.Visibility == Visibility.Collapsed, "Tenant badge replaces only the tenant transfer action");
+            tenantView.Close();
+            scopedValues.Clear(); scopedValues[@"YubiEnroll\Profiles\Profile1"] = new() { ["Name"] = "Managed" };
+            foreach (var field in new[] { "Reset", "AlwaysUv", "RequireEa", "ForcePinChange", "RandomPin", "RandomPinLength", "MinPinLength" })
+                scopedValues[@"YubiEnroll\Profiles\Profile1"][field] = 0;
+            var profileView = PolicySettings();
+            Assert(profileView.ProfilePolicyBadge.Visibility == Visibility.Visible && profileView.ProfileTransfer.Visibility == Visibility.Collapsed
+                && profileView.TenantTransfer.IsEnabled && profileView.TenantPolicyBadge.Visibility == Visibility.Collapsed, "Profile badge is independent of tenant policy");
+            profileView.Close();
+            scopedValues[@"YubiEnroll\Tenants"] = new() { ["TenantsJson"] = "[]" };
+            var bothView = PolicySettings();
+            Assert(!bothView.ProfileTransfer.IsEnabled && !bothView.TenantTransfer.IsEnabled
+                && bothView.ProfilePolicyBadge.Visibility == Visibility.Visible && bothView.TenantPolicyBadge.Visibility == Visibility.Visible, "Both managed lists show only their badge");
+            bothView.Close();
             var settings = new SettingsWindow(path, mockExecutable, "Mock CLI", _registrationJournal) { Owner = this };
             var settingsOperation = settings.Dispatcher.InvokeAsync(() =>
             {
                 try
                 {
-                    Assert(settings.SettingsTabs.Items.Count == 7 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
-                        "Settings separates tenants, profiles, system and transfer");
+                    Assert(settings.SettingsTabs.Items.Count == 6 && settings.TenantList.Items.Count == 1 && settings.ProfileList.Items.Count == 2,
+                        "Settings includes app preferences alongside tenant, profile and tool management");
                     var transfer = ConfigTransfer.Export(File.ReadAllText(path));
                     var beforePreview = File.ReadAllText(path);
                     settings.PreviewImport(transfer);
@@ -142,14 +223,14 @@ public partial class MainWindow
                     settings.ApplyImport();
                     Assert(settings.Changed && ConfigReader.Read(path).Profiles.Count == 2, "Import applies both tenants and profiles");
                     CaptureWindow(settings, "settings-tenants.png");
-                    settings.SettingsTabs.SelectedIndex = 1;
+                    settings.ProfilesTab.IsSelected = true;
                     CaptureWindow(settings, "settings-profiles.png");
                     settings.SetRequirements(new RequirementReport(true, new(true, "Installed · version 1.2.0"), new(true, "Installed · version 5.9.2"), mockExecutable));
-                    settings.SettingsTabs.SelectedIndex = 2;
+                    settings.AboutTab.IsSelected = true;
                     CaptureWindow(settings, "settings-system.png");
-                    settings.SettingsTabs.SelectedIndex = 3;
+                    settings.AppSettingsTab.IsSelected = true;
                     CaptureWindow(settings, "settings-transfer.png");
-                    settings.SettingsTabs.SelectedIndex = 4;
+                    settings.AboutTab.IsSelected = true;
                     CaptureWindow(settings, "settings-about.png");
                     TestRegistrationLogView(settings);
                 }
@@ -159,6 +240,8 @@ public partial class MainWindow
             await settingsOperation.Task;
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
+            await TestBatchPageAsync();
+            await TestLocalPasskeyPageAsync();
             TestGuidedWorkflow();
             var connectedBeforeProbe = _connectedProvider;
             var targetBeforeProbe = _selectedKey;
@@ -167,20 +250,83 @@ public partial class MainWindow
             Assert(connectedBeforeProbe != null && ReferenceEquals(connectedBeforeProbe, _connectedProvider) &&
                 ReferenceEquals(targetBeforeProbe, _selectedKey) && ReferenceEquals(inventoryBeforeProbe, _knownKeys),
                 "Automatic software detection preserves the authenticated tenant and selected target");
-            Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test") }; Users.SelectedIndex = 0;
-            var keysCapture = Dispatcher.InvokeAsync(() =>
+            var previousCliReady = _cliReady;
+            _cliReady = false; _connectedProvider = null;
+            Manage_Click(this, new RoutedEventArgs()); UpdateLayout();
+            Assert(ManageTenants.SelectedIndex == -1 && !ManageConnect.IsEnabled, "Management requires an explicit tenant choice");
+            ManageTenants.SelectedItem = Tenants.SelectedItem;
+            Assert(ManagePage.IsVisible && _manageStep == 0 && ManageConnect.IsEnabled,
+                "Cloud management does not depend on the CLI, an enrollment login, or a target key");
+            var directory = new SmokeGraphHandler();
+            using var graphHttp = new System.Net.Http.HttpClient(directory);
+            int signIns = 0;
+            Task<ManagementGraph> ConnectTestGraph(TenantSetup tenant, CancellationToken ct)
             {
-                var keys = OwnedWindows.Cast<System.Windows.Window>().Single(w => w.Title == "Registered keys");
-                CaptureWindow(keys, "registered-keys.png"); keys.Close();
+                ++signIns;
+                return Task.FromResult(new ManagementGraph(graphHttp, _ => Task.FromResult("synthetic")));
+            }
+            await ConnectManagementAsync(ConnectTestGraph);
+            Assert(_manageStep == 0 && ManageContinue.IsEnabled, "Connecting unlocks the separate user search step");
+            ManageContinue_Click(this, new RoutedEventArgs());
+            ManageQuery.Text = "Alex";
+            await SearchManagedUsersAsync();
+            ManageUsers.SelectedIndex = 0;
+            var managedUser = (UserCandidate)ManageUsers.SelectedItem;
+            await ReadManagedListAsync(); await ReadManagedListAsync();
+            Assert(!IsConnected && signIns == 1 && directory.Reads == 3 && directory.Writes == 0,
+                "Connect, search, view and refresh use one Graph session and only GET requests");
+            Assert(ManageRows.Items.Count == 2 && _managedList!.Rows.All(row => row.Id != "phone-id") &&
+                ManageFeedback.Text.StartsWith("2 YubiKey registrations"), "Only recognized hardware registrations are shown, counted and actionable");
+            Assert(ManageRows.Items[0] is RegistrationCard { Dates.LastUsed: not null } &&
+                ManageRows.Items[1] is RegistrationCard { Dates.LastUsed: null }, "Cards show dates from the same Graph list; missing dates stay unknown");
+            CaptureWindow(this, "manage-user-passkeys.png");
+            var office = (RegistrationCard)ManageRows.Items[0];
+            var removalReview = new RemoveRegistrationWindow(this, SelectedProvider, managedUser, office.Credential, office.DateLine);
+            var inspectReview = removalReview.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    Assert(removalReview.RegistrationId.Text == "office-id" && removalReview.KeyName.Text == "Demo office key" &&
+                        removalReview.UserId.Text == managedUser.Id && removalReview.TenantLabel.Text == SelectedProvider.Name,
+                        "Removal review identifies exactly the selected registration, tenant and user");
+                    Assert(removalReview.CancelAction.IsDefault && removalReview.CancelAction.IsCancel &&
+                        !removalReview.RemoveAction.IsDefault && !removalReview.Details.IsExpanded,
+                        "Removal requires an explicit action; Cancel is the default");
+                    CaptureWindow(removalReview, "remove-registration.png");
+                }
+                finally { removalReview.Close(); }
             });
-            ShowRegisteredKeys(SelectedUser, SelectedProvider, "Display name  Model  ID\nDemo key  YubiKey 5 NFC  synthetic-credential-id");
-            await keysCapture.Task;
+            Assert(removalReview.ShowDialog() != true, "Closing the removal review does not confirm");
+            await inspectReview.Task;
+            var dismiss = Dispatcher.InvokeAsync(() =>
+            {
+                var cancel = OwnedWindows.OfType<RemoveRegistrationWindow>().Single().CancelAction;
+                var peer = new System.Windows.Automation.Peers.ButtonAutomationPeer(cancel);
+                ((System.Windows.Automation.Provider.IInvokeProvider)peer).Invoke();
+            });
+            ManageRemove_Click(new Button { DataContext = office }, new RoutedEventArgs());
+            await dismiss.Task;
+            Assert(directory.Writes == 0 && directory.Reads == 3, "Cancelling the actual Remove action sends no Graph request");
+            ManageBack_Click(this, new RoutedEventArgs());
+            Assert(_managedList == null && ManageRows.ItemsSource == null && !ManageView.IsEnabled,
+                "Changing management user clears registrations and the removal target");
+            ManageUsers.SelectedIndex = 0;
+            directory.OnlyPhone = true; await ReadManagedListAsync();
+            Assert(ManageRows.Items.Count == 0 && ManageFeedback.Text.Contains("No recognized YubiKey"),
+                "Unknown models leave the list empty without saying the user has no passkeys");
+            directory.Expired = true; await ReadManagedListAsync();
+            Assert(_manageStep == 0 && _management == null && _managedList == null && signIns == 1 &&
+                ManageTenantHint.Text.Contains("Connect again"), "An expired session offers Connect without opening a browser or replaying an action");
+            _cliReady = previousCliReady;
             TenantConfigWriter.Save(ConfigSnapshot.Read(path), new TenantSetup("Another tenant", "22222222-2222-3333-4444-555555555555",
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "http://localhost/yubienroll-redirect", linkedProfile, false));
             LoadConfiguration(path);
             _connectedProvider = SelectedProvider;
             UpdateSummary();
             Tenants.SelectedIndex = 1;
+            Assert(_managedList == null && ManageRows.ItemsSource == null && _manageStep == 0 && !ManageView.IsEnabled,
+                "Changing tenant clears the passkey management context");
+            ShowPage(OverviewPage);
             Assert(!IsConnected && !SearchPanel.IsEnabled && !EnrollButton.IsEnabled && Users.SelectedItem == null,
                 "Changing tenants invalidates connection and selected user");
             File.WriteAllText(path, "[broken-secret-marker");
@@ -214,26 +360,29 @@ public partial class MainWindow
             UpdateLayout();
             var hosted = (SettingsWindow)_hostedWindow!;
             Assert(System.Windows.Documents.TextElement.GetFontSize((System.Windows.DependencyObject)HostedPage.Content!) == 14, "Hosted settings retains the shared body font size");
-            hosted.SettingsTabs.SelectedIndex = 5;
+            hosted.ActivityTab.IsSelected = true;
             UpdateLayout();
             Assert(hosted.ActivityHost.Content == _activityView && _activityView.IsVisible, "Activity log is visible directly in its Settings tab");
             Assert(System.Windows.Documents.TextElement.GetFontWeight(_activityView) == System.Windows.FontWeights.Normal, "Selected tab does not make all activity text bold");
-            hosted.SettingsTabs.SelectedIndex = 0;
+            hosted.TenantsTab.IsSelected = true;
             CaptureWindow(this, "shell-settings.png");
             ShowPage(OverviewPage);
             Assert(double.IsPositiveInfinity(MaxWidth) && double.IsPositiveInfinity(MaxHeight), "Main window does not constrain maximization to a reduced work area");
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
             _activityView.Add("Synthetic summary only.", "Info", "   ");
-            OpenSettings(5); UpdateLayout();
-            var disclosures = VisualDescendants<System.Windows.Controls.Expander>(_activityView).ToArray();
-            Assert(!disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic summary only.")).IsVisible,
-                "Activity entries with empty or whitespace details have no disclosure control");
-            var diagnostic = disclosures.Single(x => x.Header.ToString()!.Contains("Synthetic operation failed."));
-            Assert(diagnostic.IsVisible, "Activity entries with diagnostics retain a disclosure control");
-            diagnostic.IsExpanded = true; UpdateLayout();
-            Assert(VisualDescendants<System.Windows.Controls.TextBlock>(diagnostic).Any(x => x.IsVisible && x.Text == "HTTP status: 405"),
-                "Expanding an activity diagnostic shows its actual details");
+            OpenSettings(s => s.ActivityTab); UpdateLayout();
+            var activityGrid = VisualDescendants<DataGrid>(_activityView).Single();
+            var diagnostic = activityGrid.Items.Cast<object>().Single(x => x.ToString()!.Contains("Synthetic operation failed."));
+            activityGrid.ScrollIntoView(diagnostic);
+            UpdateLayout();
+            var diagnosticRow = (DataGridRow)activityGrid.ItemContainerGenerator.ContainerFromItem(diagnostic);
+            Assert(diagnosticRow != null && !VisualDescendants<Expander>(diagnosticRow).Any()
+                && VisualDescendants<TextBlock>(diagnosticRow).Any(x => x.IsVisible && x.Text == "HTTP status: 405"),
+                "Activity diagnostics are visible directly in the row without expanding");
             CaptureWindow(this, "activity-log.png");
+            _activityView.Add("Synthetic wide entry", "Info", new string('W', 240));
+            activityGrid.ScrollIntoView(activityGrid.Items[0]);
+            AssertLogScrollsToCopy(activityGrid);
             ShowPage(OverviewPage);
             Width = 800; Height = 580;
             CaptureWindow(this, "overview-compact.png");
@@ -258,6 +407,7 @@ public partial class MainWindow
     private async Task TestStartupRequirementsAsync(string mockExecutable)
     {
         _startupChecksComplete = true;
+        Assert(StartupPolicyStep.Visibility == Visibility.Collapsed, "Unmanaged startup has no policy substep");
         var calls = 0;
         Task<CliResult> ReadyVersion(string path)
         {
@@ -305,7 +455,7 @@ public partial class MainWindow
         Host(settings);
         var prerequisiteVisits = 0;
         settings.PrerequisitesOpened += () => prerequisiteVisits++;
-        settings.SettingsTabs.SelectedIndex = 2;
+        settings.AboutTab.IsSelected = true;
         Assert(prerequisiteVisits == 1, "Opening the Prerequisites tab requests automatic detection");
         // Preserve the actual object reference; probing must not reload the config or clear a session.
         var session = _connectedProvider;
@@ -313,11 +463,11 @@ public partial class MainWindow
         await CheckRequirementsAsync(() => Task.FromResult(ready));
         Assert(ReferenceEquals(_connectedProvider, session) && ReferenceEquals(_knownKeys, inventory) && HostedPage.IsVisible,
             "Returning to Prerequisites checks software without changing login or key inventory");
-        Assert(settings.ManagerInfo.Text.Contains("5.9.2") && settings.VersionInfo.Text == "Version 1.2.0" && settings.EnrollmentStatus.Text == "Installed" && settings.RuntimeVersion.Text.StartsWith("Version 10."),
+        Assert(settings.ManagerInfo.Text.Contains("5.9.2") && settings.VersionInfo.Text == "1.2.0" && settings.EnrollmentStatus.Text == "Installed" && settings.RuntimeVersion.Text.StartsWith("10."),
             "Prerequisite cards display the latest detected tool status");
         CaptureWindow(this, "prerequisites-ready.png");
         await CheckRequirementsAsync(() => Task.FromResult(missing with { Administrator = true }));
-        Assert(settings.ManagerStatus.Text == "Not installed" && ((System.Windows.Controls.Border)settings.ManagerInfo.Parent).Visibility == System.Windows.Visibility.Collapsed, "Removal is reflected in the prerequisite cards");
+        Assert(settings.ManagerStatus.Text == "Missing" && ((System.Windows.Controls.Border)settings.ManagerInfo.Parent).Visibility == System.Windows.Visibility.Collapsed, "Removal is reflected in the prerequisite cards");
         CaptureWindow(this, "prerequisites-missing.png");
         _requirements = null; _startupChecksComplete = false;
         ShowPage(OverviewPage);
@@ -362,10 +512,18 @@ public partial class MainWindow
         Assert(_enrollStep == 3 && UserCard.IsVisible && !TenantStep.IsVisible && !EnrollNext.IsEnabled, "Recipient is a separate gated step");
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } };
         Users.SelectedIndex = 0;
+        Assert(EnrollNext.IsEnabled && !KeyName.IsVisible && !EnrollmentScroll.IsVisible, "A recipient enables Review in a single scroll region");
         CaptureWindow(this, "enroll-user.png");
         EnrollNext_Click(this, e);
         Assert(_enrollStep == 4 && PreparationCard.IsVisible && !Profiles.IsVisible && !KeyName.IsVisible && !EnrollButton.IsEnabled && ReviewTargetNotice.Text.Contains(admin.Key.Serial),
             "Review blocks enrollment while another key is attached");
+        EditName_Click(this, e); KeyName.Text = "Pilot custom name"; EditName_Click(this, e);
+        var chosen = Profiles.SelectedItem;
+        EnrollBack_Click(this, e); EnrollBack_Click(this, e); EnrollBack_Click(this, e);
+        Assert(_enrollStep == 1 && EnrollNext.IsEnabled && Profiles.SelectedItem == chosen && StatusText.Text == "",
+            "Returning to the profile retains the choice, readiness and a step-local status");
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Assert(_enrollStep == 4 && ReviewName.Text == "Pilot custom name", "Back and forward preserve the recipient and edited registration name");
         ApplyInventory(new[] { admin }, 0);
         Assert(_selectedKey == null && _selectionSerial == target.Key.Serial && !EnrollButton.IsEnabled, "Missing target is never replaced by the administrator key");
         ApplyInventory(new[] { target }, 0);
@@ -426,15 +584,22 @@ public partial class MainWindow
         Assert(_selectedKey == admin && Users.SelectedItem == null && KeyName.Text == admin.Key.RegistrationName,
             "Confirming a different target clears the previous recipient and name");
         Assert(_connectedProvider == tenant && ReferenceEquals(Profiles.SelectedItem, profile), "Changing target retains tenant login and profile");
-        ResetResultText.Text = "Synthetic result: reset reported successful. Read-back: target PIN is not set. Entra registrations remain.";
-        _resetStep = 2; RenderWizard(); CaptureWindow(this, "reset-result.png");
+        ShowResetResult(admin.Key, 0, true); InvalidateDeviceInventory(); ApplyInventory(new[] { target }, 0); UpdateLayout();
+        Assert(_resetStep == 2 && ResetResult.IsVisible && !ResetReview.IsVisible && !ResetTargetButton.IsVisible && Equals(ResetBack.Content, "Home")
+            && ResetResultTarget.Text.Contains(admin.Key.Serial) && ResetResultText.Text.Contains("successful"),
+            "The reset receipt is final and retains the original target when the NFC key goes away");
+        ApplyInventory(new[] { target, admin }, 0); CaptureWindow(this, "reset-result.png");
         ResetNext_Click(this, e);
         Assert(_resetStep == 0 && _selectedKey == null && !ResetNext.IsEnabled, "Reset another key requires a fresh explicit selection");
         ShowPage(PreparePage);
         EnrollmentKeys.SelectedIndex = 0; EnrollNext_Click(this, e); EnrollNext_Click(this, e);
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
         EnrollNext_Click(this, e); ApplyInventory(new[] { target }, 0);
-        ShowEnrollmentResult("Synthetic result: YubiEnroll reported success. Review registered keys and test sign-in.");
+        _receipt = new(target.Key, SelectedProvider, SelectedUser, ProfileCompatibility.Managed("Temporary PIN"), "Office key", false);
+        _receiptPin = "009876";
+        ShowEnrollmentResult(0);
+        Assert(ReceiptNextStep.Text == "You must change this PIN on first use." && ReceiptPin.Text == "••••••" && _receiptPin != null, "Receipt masks the temporary PIN by default");
+        RevealPin_Click(this, e); Assert(ReceiptPin.Text == "009876", "Reveal only on request"); RevealPin_Click(this, e);
         CaptureWindow(this, "enroll-result.png");
         Assert(_enrollStep == 5 && !EnrollButton.IsVisible && EnrollNext.IsEnabled, "Enrollment result offers another key without repeating enrollment");
         AddPasskey_Click(this, e); UpdateLayout();
@@ -444,6 +609,13 @@ public partial class MainWindow
         var existing = target with { Pin = FidoPinState.Set };
         ApplyInventory(new[] { existing }, 0); EnrollmentKeys.SelectedIndex = 0;
         Assert(EnrollNext.IsEnabled, "Existing working PIN permits the addition flow");
+        ApplyInventory([existing with { Capabilities = existing.Capabilities! with { ForcePinChange = true } }], 0);
+        EnrollmentKeys.SelectedIndex = 0; UpdateLayout();
+        Assert(!EnrollNext.IsEnabled && FooterInstruction.Visibility == Visibility.Collapsed
+            && VisualDescendants<TextBlock>(EnrollmentKeys).Any(t => t.IsVisible && t.Text == "PIN change required"),
+            "The selected key explains the required PIN change and blocks continuation");
+        CaptureWindow(this, "add-passkey-pin-change.png");
+        ApplyInventory([existing], 0); EnrollmentKeys.SelectedIndex = 0;
         EnrollNext_Click(this, e); EnrollNext_Click(this, e);
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
         Profiles.SelectedItem = null; EnrollNext_Click(this, e); UpdateLayout();
@@ -453,8 +625,73 @@ public partial class MainWindow
         ApplyInventory(new[] { existing with { Capabilities = existing.Capabilities! with { ForcePinChange = true } } }, 0);
         Assert(!EnrollButton.IsEnabled, "An existing required PIN change blocks preservation mode");
         ApplyInventory(new[] { existing }, 0);
+        _receipt = new(existing.Key, SelectedProvider, SelectedUser, PasskeyAddition.Settings(existing.Capabilities!), existing.Key.RegistrationName, true);
+        ShowEnrollmentResult(1, InteractiveFailure.Describe("fido2.ctap.CtapError: CTAP error: 0x33 - PIN_AUTH_INVALID"));
+        UpdateLayout();
+        Assert(ReceiptOutcomeTitle.IsVisible && ReceiptOutcomeTitle.Text == "Passkey registration failed" && Equals(ReceiptOutcomeBox.Tag, "Error") &&
+            EnrollmentResultText.Text.Contains("0x33") && !ReceiptPinPanel.IsVisible, "A rejected PIN authorization is a visible failure, never a successful registration or a PIN handoff");
+        CaptureWindow(this, "add-passkey-failed.png");
+        ShowEnrollmentResult(125, InteractiveFailure.OperatorInterrupted);
+        Assert(ReceiptOutcomeTitle.Text == "Registration interrupted", "Operator cancellation has its own outcome");
+        ShowEnrollmentResult(null);
+        Assert(ReceiptOutcomeTitle.Text == "Registration outcome unknown" && Equals(ReceiptOutcomeBox.Tag, "Warning"), "An unobserved outcome is not presented as a definite failure");
         Prepare_Click(this, e);
         Assert(!_addPasskey && _enrollStep == 0 && !EnrollButton.IsVisible, "Switching tasks requires a fresh key choice");
+        var nfc = existing with { Key = existing.Key with { Reader = "HID Global OMNIKEY 5022 Smart Card Reader 0" },
+            Capabilities = existing.Capabilities! with { IsNfc = true, ResetOverNfc = true } };
+        ApplyInventory([nfc, admin], 0); EnrollmentKeys.SelectedIndex = 0;
+        CaptureWindow(this, "nfc-key-selection.png");
+        EnrollNext_Click(this, e); Profiles.SelectedIndex = 0;
+        Assert(_selectedKey == nfc && _reviewValid, "NFC target supports the same profile-first setup flow");
+        AddPasskey_Click(this, e); ApplyInventory([nfc, admin], 0); EnrollmentKeys.SelectedIndex = 0;
+        EnrollNext_Click(this, e); EnrollNext_Click(this, e);
+        Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test" } }; Users.SelectedIndex = 0;
+        EnrollNext_Click(this, e);
+        Assert(EnrollButton.IsEnabled && _selectedKey == nfc, "NFC passkey addition can retain a USB admin key");
+        CaptureWindow(this, "nfc-passkey-review.png");
+        ShowPage(ResetPage); _resetStep = 0; ResetNext_Click(this, e); ResetAcknowledged.IsChecked = true;
+        Assert(ResetTargetButton.IsEnabled && ResetConnectionHelp.Text.Contains("NFC reader"), "NFC reset review shows reader instructions");
+        CaptureWindow(this, "nfc-reset-review.png");
+        ApplyInventory([existing, admin], 0);
+        Assert(_selectedKey == null && !ResetTargetButton.IsEnabled && ResetAcknowledged.IsChecked != true,
+            "NFC target removal cannot switch to a USB key with the same serial");
+        ApplyInventory([nfc with { Key = nfc.Key with { Serial = "11112222" } }], 0);
+        Assert(_selectedKey == null && !EnrollButton.IsEnabled, "Replacing a card on the same reader requires explicit selection");
+        Assert(NfcPresenceMonitor.Snapshot().Length > 0, "Windows PC/SC presence probe handles readers or absent service without opening a card");
+        BeginNextKey(); ShowPage(PreparePage);
+        var emptyReader = new NfcReaderStatus(nfc.Key.Reader!, true, "empty");
+        ApplyInventory([], 0, [emptyReader]);
+        Assert(EnrollmentReaderStatus.IsVisible && ResetReaderStatus.Children.Count == 1 && EnrollmentKeys.Items.Count == 0 &&
+            !EnrollNext.IsEnabled && EnrollmentKeysPlaceholder.IsVisible && (string?)EnrollmentKeysPlaceholder.Content == "Connect a YubiKey by USB or place it on the NFC reader.",
+            "Empty connected NFC reader has a named status and one USB/NFC instruction");
+        CaptureWindow(this, "nfc-reader-empty.png");
+        ApplyInventory([nfc], 0, [emptyReader with { State = "ready" }, new("Internal contact reader", false, "unavailable"),
+            new("Windows Hello for Business 1", true, "unavailable")]);
+        Assert(EnrollmentReaderStatus.Children.Count == 1 && KeyInfo.Visibility == System.Windows.Visibility.Collapsed,
+            "Unrelated reader failure does not warn about a successfully discovered NFC key");
+        Assert(EnrollmentReaderStatus.ActualHeight < 50 &&
+            !VisualDescendants<TextBlock>(EnrollmentReaderStatus).Any(t => t.Text.Contains("Windows Hello") || t.Text == "YubiKey detected"),
+            "Reader presence is compact and excludes Windows Hello and redundant detection text");
+        CaptureWindow(this, "nfc-reader-ready.png");
+        EnrollmentKeys.SelectedIndex = 0;
+        InvalidateDeviceInventory(); UpdateLayout();
+        Assert(EnrollmentKeys.Items.Count == 1 && EnrollmentReaderStatus.Children.Count == 1 &&
+            !EnrollNext.IsEnabled && !ResetNext.IsEnabled && !EnrollButton.IsEnabled &&
+            KeyInfo.Visibility == Visibility.Collapsed && FooterInstruction.Visibility == Visibility.Collapsed &&
+            VisualDescendants<TextBlock>(this).Count(t => t.IsVisible && t.Text == "Checking connected keys…") == 1,
+            "Refreshing preserves inventory, gates actions and shows one progress message beside Refresh");
+        CaptureWindow(this, "nfc-reader-refreshing.png");
+        ApplyInventory([existing], 0, []); EnrollmentKeys.SelectedIndex = 0;
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && ResetReaderStatus.Visibility == System.Windows.Visibility.Collapsed && EnrollNext.IsEnabled,
+            "USB remains selectable with no NFC block when the reader is disconnected");
+        CaptureWindow(this, "usb-without-nfc-reader.png");
+        ApplyInventory([], 0, [new("Windows Hello for Business 1", true, "unavailable")]);
+        Assert(EnrollmentReaderStatus.Visibility == System.Windows.Visibility.Collapsed && EnrollmentKeysPlaceholder.IsVisible && (string?)EnrollmentKeysPlaceholder.Content == "Connect a YubiKey by USB." &&
+            !EnrollNext.IsEnabled && EnrollmentInventoryProgress.Visibility == Visibility.Collapsed,
+            "No reader and no key has simple USB guidance without NFC text");
+        CaptureWindow(this, "no-reader-no-key.png");
+
+        ShowPage(OverviewPage);
 
     }
 
@@ -470,6 +707,12 @@ public partial class MainWindow
 
     private async Task TestEmbeddedTerminalAsync(string mockExecutable)
     {
+        Assert(TerminalPanel.PromptStatus("Enter PIN:") == "Enter your YubiKey PIN in the terminal" &&
+            TerminalPanel.PromptStatus("settings. Proceed? [y/N]:").Contains("confirmation") &&
+            TerminalPanel.PromptStatus("Remove your YubiKey from the NFC reader.").StartsWith("Remove") &&
+            TerminalPanel.PromptStatus("Remove the YubiKey from the NFC reader...\nPlace the YubiKey back on the NFC reader...").StartsWith("Place") &&
+            TerminalPanel.PromptStatus("Place your YubiKey back on the NFC reader now...\nFIDO application data reset.") == "Operation running",
+            "Terminal status follows the current prompt only");
         using var terminal = new PseudoConsole();
         var output = new System.Text.StringBuilder();
         var sent = false;
@@ -508,12 +751,12 @@ public partial class MainWindow
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
         foreach (var capture in new[] { false, true })
         {
-            var pinPanel = new TerminalPanel("Synthetic PIN summary", true, captureSerial: capture ? "00123456" : null);
+            var pinPanel = new TerminalPanel("Synthetic PIN summary", true, captureSerial: capture ? "00123456" : null, single: true);
             TerminalOverlay.Content = pinPanel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
             var pinRun = pinPanel.RunAsync(mockExecutable, ["--pin-summary-probe"]);
             var end = DateTime.UtcNow.AddSeconds(10);
             while (pinPanel.CompletedExitCode == null && DateTime.UtcNow < end) await Task.Delay(50);
-            Assert(pinPanel.CompletedExitCode == 0 && pinPanel.GeneratedPin == (capture ? "001234" : null),
+            Assert(pinPanel.CompletedExitCode == 0 && !pinPanel.Screen.Text.Contains("Temporary PIN: 001234") && pinPanel.GeneratedPin == (capture ? "001234" : null),
                 "Published terminal captures the generated summary PIN only with explicit opt-in: " + capture);
             pinPanel.DismissCompleted(); await pinRun;
         }
@@ -527,7 +770,7 @@ public partial class MainWindow
         var result = Path.Combine(Path.GetTempPath(), "yubienroll-test-exit-" + Guid.NewGuid().ToString("N"));
         try
         {
-            var host = Path.Combine(AppContext.BaseDirectory, "YubiEnroll.ConsoleHost.exe");
+            var host = Path.Combine(AppContext.BaseDirectory, "PasskeyDesk.ConsoleHost.exe");
             using var process = System.Diagnostics.Process.Start(CliRunner.StartInfo(host, ["--result-file", result, mockExecutable, "--exit-probe"]))!;
             try
             {
@@ -580,6 +823,44 @@ public partial class MainWindow
             if (child is T match) yield return match;
             foreach (var descendant in VisualDescendants<T>(child)) yield return descendant;
         }
+    }
+
+    private sealed class SmokeGraphHandler : System.Net.Http.HttpMessageHandler
+    {
+        public int Reads, Writes;
+        public bool OnlyPhone, Expired;
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage req, CancellationToken ct)
+        {
+            if (req.Method != System.Net.Http.HttpMethod.Get) { Writes++; throw new InvalidOperationException("Unexpected write"); }
+            Reads++;
+            if (Expired) return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized));
+            var json = req.RequestUri!.AbsolutePath switch
+            {
+                "/v1.0/users" => """{"value":[{"id":"11111111-2222-3333-4444-555555555555","displayName":"Alex Example","userPrincipalName":"alex@example.test"}]}""",
+                "/v1.0/users/11111111-2222-3333-4444-555555555555/authentication/fido2Methods" => OnlyPhone ?
+                    """{"value":[{"id":"phone-id","displayName":"Phone","model":"Unknown"}]}""" :
+                    """{"value":[{"id":"phone-id","displayName":"YubiKey 5C NFC","model":"Microsoft Authenticator - Android"},{"id":"office-id","displayName":"Demo office key","model":"YubiKey 5 Series with NFC","createdDateTime":"2026-04-18T12:00:00Z","lastUsedDateTime":"2026-11-19T09:00:00Z"},{"id":"backup-id","displayName":"Backup","model":"YubiKey Bio Series - FIDO Edition"}]}""",
+                _ => throw new InvalidOperationException("Unexpected Graph resource")
+            };
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        }
+    }
+
+    private static async Task TestManagementCallbackAsync()
+    {
+        // Verify the exact existing Entra callback path against the same Windows HTTP listener prefix MSAL uses.
+        var redirect = ManagementSignIn.LoopbackAddress("http://localhost/yubienroll-redirect");
+        using var listener = new System.Net.HttpListener();
+        listener.Prefixes.Add(redirect.AbsoluteUri + "/"); listener.Start();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var browser = new System.Net.Http.HttpClient(new System.Net.Http.HttpClientHandler { UseProxy = false });
+        var pending = listener.GetContextAsync().WaitAsync(timeout.Token);
+        var post = browser.PostAsync(redirect, new System.Net.Http.StringContent("synthetic"), timeout.Token);
+        var context = await pending;
+        context.Response.Close();
+        using var accepted = await post;
+        Assert(accepted.IsSuccessStatusCode && context.Request.Url?.AbsolutePath == "/yubienroll-redirect",
+            "The Windows management sign-in listener accepts the configured redirect path without a trailing slash");
     }
 
     private static void CaptureWindow(System.Windows.Window window, string file, int dpi = 96)

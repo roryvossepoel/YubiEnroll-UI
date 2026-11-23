@@ -20,7 +20,7 @@ if ($TimestampServer) {
     if (-not $timestampUri.IsAbsoluteUri -or $timestampUri.Scheme -notin @('http', 'https')) { throw 'TimestampServer must be an absolute HTTP(S) URL.' }
 }
 $app = (Resolve-Path -LiteralPath $AppDirectory).Path
-$names = @('YubiEnroll.UI.exe', 'YubiEnroll.ConsoleHost.exe')
+$names = @('PasskeyDesk.exe', 'PasskeyDesk.ConsoleHost.exe')
 foreach ($name in $names) {
     if (-not (Test-Path -LiteralPath (Join-Path $app $name) -PathType Leaf)) { throw "Missing executable: $name" }
 }

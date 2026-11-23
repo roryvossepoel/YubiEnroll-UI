@@ -2,25 +2,11 @@ using System.Text.RegularExpressions;
 
 namespace YubiEnroll.Core;
 
-public sealed record RegisteredCredential(string Name, string Model, string Id);
-
-public static class RegisteredCredentials
+public sealed record RegisteredCredential(string Name, string Model, string Id)
 {
-    // Read-only presentation: only a recognized table with three columns is interpreted.
-    // Unrecognized formats are never interpreted as proof that there are no registrations.
-    public static IReadOnlyList<RegisteredCredential> Parse(string text)
-    {
-        var result = new List<RegisteredCredential>();
-        var started = false;
-        foreach (var raw in text.Split('\n'))
-        {
-            var line = raw.Trim();
-            if (Regex.IsMatch(line, @"^Display name\s{2,}Model\s{2,}ID$", RegexOptions.IgnoreCase)) { started = true; continue; }
-            if (!started || line.Length == 0) continue;
-            var fields = Regex.Split(line, @"\s{2,}");
-            if (fields.Length == 3 && fields.All(x => x.Length > 0) && !fields[0].StartsWith('-'))
-                result.Add(new(fields[0], fields[1], fields[2]));
-        }
-        return result;
-    }
+    // Graph reports the authenticator model separately from the user-editable display name.
+    // Classify known Yubico hardware families only; "Security Key" alone has no vendor.
+    public bool IsYubicoHardware => Regex.IsMatch(Model,
+        @"^(?:(?:Yubico )?YubiKey (?:5(?:Ci?)?|Bio|4|NEO|FIPS)|Yubico Security Key|Security Key (?:C )?(?:NFC )?by Yubico)(?: |$)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 }

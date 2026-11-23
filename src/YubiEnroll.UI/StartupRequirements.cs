@@ -1,4 +1,6 @@
+using System.IO;
 using System.Windows;
+using YubiEnroll.Core;
 using System.Windows.Media;
 
 namespace YubiEnroll.UI;
@@ -14,9 +16,46 @@ public partial class MainWindow
     {
         ShowPage(StartupPage);
         Navigation.IsEnabled = SettingsButton.IsEnabled = false;
+        try { await ApplyStartupPolicyAsync(_policy, () => ConfigReader.FindPath()); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            ReportStartupPolicy("Could not synchronize settings from policy.", "Error");
+            App.StopForPolicyError(ex);
+            return;
+        }
         await InitializeAsync();
         await CheckRequirementsAsync();
         _startupChecksComplete = true;
+    }
+
+    // A requirement refresh (including returning from an installer) never reapplies policy.
+    private async Task ApplyStartupPolicyAsync(DeskPolicy? policy, Func<string> resolvePath)
+    {
+        if (policy == null) return;
+        StartupPolicyStep.Visibility = Visibility.Visible;
+        if (!policy.ManagesTenants && !policy.ManagesProfiles)
+        {
+            ReportStartupPolicy("App settings applied. No TOML synchronization needed.");
+            return;
+        }
+        StartupPolicyStatus.Text = "Policy detected. Synchronizing the YubiEnroll TOML…";
+        // Allow the startup page to paint before starting file I/O; no artificial delay.
+        await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
+        var result = await Task.Run(() => DeskPolicy.Synchronize(policy, resolvePath));
+        ReportStartupPolicy(result switch
+        {
+            PolicySyncResult.TomlCreated => "YubiEnroll TOML created from policy.",
+            PolicySyncResult.TomlUpdated => "YubiEnroll TOML updated from policy.",
+            PolicySyncResult.TomlUnchanged => "YubiEnroll TOML already up to date.",
+            PolicySyncResult.NoTomlNeeded => "Policy loaded. No TOML file needed for an empty tenant list.",
+            _ => throw new InvalidOperationException("Unexpected policy synchronization result.")
+        });
+    }
+
+    private void ReportStartupPolicy(string outcome, string level = "Info")
+    {
+        StartupPolicyStatus.Text = outcome;
+        Record("Policy mode detected at startup. " + outcome, level);
     }
 
     private async void Window_Activated(object? sender, EventArgs e)
@@ -24,7 +63,7 @@ public partial class MainWindow
         if (_smokeTest || !_startupChecksComplete || _busy || _checkingRequirements) return;
         // Returning from a browser/installer refreshes requirements, not keys, configuration or tenant login.
         if (StartupPage.Visibility == Visibility.Visible ||
-            _hostedWindow is SettingsWindow { SettingsTabs.SelectedIndex: 2 })
+            _hostedWindow is SettingsWindow { AboutTab.IsSelected: true })
             await CheckRequirementsAsync();
     }
 
@@ -65,6 +104,6 @@ public partial class MainWindow
         StartupManagerStatus.Foreground = report.Manager.Ready ? normal : attention;
         StartupElevate.Visibility = report.Administrator ? Visibility.Collapsed : Visibility.Visible;
         StartupRequirements.Visibility = report.Enrollment.Ready && report.Manager.Ready ? Visibility.Collapsed : Visibility.Visible;
-        StartupFeedback.Text = report.Administrator ? "" : "Restarting opens the Windows permission prompt. Using a different administrator account loads that account’s configuration and sign-in.";
+        StartupFeedback.Text = report.Administrator ? "" : "Restarting opens the Windows permission prompt. Using a different administrator account loads that account’s configuration and sign-in. ";
     }
 }

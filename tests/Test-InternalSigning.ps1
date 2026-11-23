@@ -12,11 +12,11 @@ try {
     Export-Certificate -Cert $certificate -FilePath $publicPath | Out-Null
     # The hosted runner is elevated; machine trust avoids the interactive user-root dialog.
     Import-Certificate -FilePath $publicPath -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
-    $names = @('YubiEnroll.UI.exe', 'YubiEnroll.ConsoleHost.exe')
+    $names = @('PasskeyDesk.exe', 'PasskeyDesk.ConsoleHost.exe')
     foreach ($name in $names) {
         Copy-Item -LiteralPath "$root/artifacts/win-x64/app/$name" -Destination $temporary
         $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $temporary $name))
-        if ($version.ProductName -ne 'YubiEnroll UI' -or $version.CompanyName -ne 'Rory Vossepoel') { throw "Incorrect product/publisher metadata: $name" }
+        if ($version.ProductName -ne 'Passkey Desk for YubiKeys' -or $version.CompanyName -ne 'Rory Vossepoel') { throw "Incorrect product/publisher metadata: $name" }
     }
     & "$root/scripts/Sign-App.ps1" -AppDirectory $temporary -CertificateThumbprint $certificate.Thumbprint
     $zip = Join-Path $temporary 'signed.zip'

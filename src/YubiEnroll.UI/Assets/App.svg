@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect x="16" y="16" width="992" height="992" rx="150" fill="#84BD00"/><g transform="rotate(40 512 512)"><rect x="330" y="145" width="364" height="555" rx="75" fill="white"/><circle cx="512" cy="272" r="49" fill="#84BD00"/><path d="M401 700H623V866H401Z" fill="white"/><path d="M430 739H468V820H430ZM554 739H592V820H554Z" fill="#84BD00"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Passkey Desk for YubiKeys</title>
+  <desc>Two offset teal tiles with a lime keyhole on the front tile.</desc>
+  <g fill-rule="evenodd">
+    <path id="rear-tile" fill="#41898E" d="M12 3 H39 Q48 3 48 12 V16 H27 Q16 16 16 27 V47 H12 Q3 47 3 38 V12 Q3 3 12 3 Z"/>
+    <path id="front-tile" fill="#0B536F" d="M28 18 H52 Q61 18 61 27 V52 Q61 61 52 61 H28 Q18 61 18 52 V28 Q18 18 28 18 Z"/>
+    <path id="keyhole" fill="#A4D52A" d="M40 27 C44.4 27 48 30.6 48 35 C48 38.1 46.3 40.7 43.8 42 L46.1 50.2 Q46.4 51.5 45 51.5 H35 Q33.6 51.5 33.9 50.2 L36.2 42 C33.7 40.7 32 38.1 32 35 C32 30.6 35.6 27 40 27 Z"/>
+  </g>
+</svg>

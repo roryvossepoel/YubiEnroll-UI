@@ -6,8 +6,10 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon>Assets/App.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyName>YubiEnroll.UI</AssemblyName>
+    <AssemblyName>PasskeyDesk</AssemblyName>
+    <RootNamespace>YubiEnroll.UI</RootNamespace>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../YubiEnroll.Core/YubiEnroll.Core.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Identity.Client" Version="4.92.0" /></ItemGroup>
   <ItemGroup><Resource Include="Assets/App.ico" /><Resource Include="Assets/App.png" /></ItemGroup>
 </Project>

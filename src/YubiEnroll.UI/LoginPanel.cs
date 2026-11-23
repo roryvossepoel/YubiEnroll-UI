@@ -21,18 +21,29 @@ internal sealed class LoginPanel : Border
     internal bool IsRunning { get; private set; }
     internal Task? Cancellation { get; private set; }
     private readonly Action<Uri> _launch;
-    internal LoginPanel(string tenantName, Action<Uri>? launch = null)
+    internal LoginPanel(string tenantName, Action<Uri>? launch = null, string eyebrow = "TENANT SIGN-IN", string title = "Connect to a tenant", Action<Grid>? drawSteps = null)
     {
         _launch = launch ?? (uri => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }));
-        Background = Brushes.White; Padding = new Thickness(28);
-        var body = new StackPanel { MaxWidth = 680, HorizontalAlignment = HorizontalAlignment.Left };
-        body.Children.Add(new TextBlock { Text = "Connect to tenant", Style = (Style)Application.Current.FindResource("PageTitle") });
-        body.Children.Add(new TextBlock { Text = tenantName, FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 12, 0, 0) });
-        body.Children.Add(_status);
-        var actions = new WrapPanel(); actions.Children.Add(_open); actions.Children.Add(_cancel); body.Children.Add(actions);
-        body.Children.Add(new TextBlock { Text = "Closed the browser? Open it again, or cancel to return to tenant selection.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 16, 0, 20), Foreground = (Brush)Application.Current.FindResource("Muted") });
+        Style Resource(string name) => (Style)Application.Current.FindResource(name);
+        Background = Brushes.White;
+        var page = new DockPanel();
+        var actions = new DockPanel(); _cancel.Style = Resource("QuietButton"); _open.Style = Resource("PrimaryButton");
+        DockPanel.SetDock(_open, Dock.Right); actions.Children.Add(_open);
+        _cancel.HorizontalAlignment = HorizontalAlignment.Left; actions.Children.Add(_cancel);
+        var footer = new Border { Padding = new Thickness(28,16,28,16), BorderThickness = new Thickness(0,1,0,0),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(221,226,228)), Child = actions };
+        DockPanel.SetDock(footer,Dock.Bottom); page.Children.Add(footer);
+        var frame = new DockPanel { Style = Resource("WizardFrame") }; page.Children.Add(frame);
+        var header = new StackPanel(); DockPanel.SetDock(header,Dock.Top); frame.Children.Add(header);
+        if (drawSteps != null) { var steps = new Grid { Style = Resource("WizardSteps") }; header.Children.Add(steps); drawSteps(steps); }
+        header.Children.Add(new TextBlock { Text = eyebrow, Style = Resource("WizardEyebrow") });
+        header.Children.Add(new TextBlock { Text = title, Style = Resource("PageTitle") });
+        _status.Style = Resource("WizardIntro"); _status.ClearValue(MarginProperty); header.Children.Add(_status);
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock { Text = tenantName, Style = Resource("SectionTitle"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,12) });
         body.Children.Add(new Expander { Header = "Sign-in details", Content = _details });
-        Child = body;
+        frame.Children.Add(new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        Child = page;
         _open.Click += (_, _) => Launch();
         _cancel.Click += (_, _) => Cancel();
     }
@@ -51,7 +62,7 @@ internal sealed class LoginPanel : Border
     }
     private async Task StopAsync()
     {
-        try { if (_session != null) await _session.CancelLoginAsync(); }
+        try { if (_session != null) await _session.CancelOperationAsync(); }
         catch { _status.Text = "Sign-in could not be stopped. Try cancelling again."; _cancelled = false; _cancel.IsEnabled = true; }
     }
     internal async Task<int> RunAsync(string executable, TenantSetup tenant, string[]? arguments = null, TimeSpan? timeout = null)

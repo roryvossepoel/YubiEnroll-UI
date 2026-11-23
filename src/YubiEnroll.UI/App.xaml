@@ -1,25 +1,127 @@
 <Application x:Class="YubiEnroll.UI.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Application.Resources>
+  <ResourceDictionary>
+   <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="Assets/BrandMark.xaml"/>
+   </ResourceDictionary.MergedDictionaries>
   <SolidColorBrush x:Key="Accent" Color="#84BD00"/>
   <SolidColorBrush x:Key="Heading" Color="#0B536F"/>
   <SolidColorBrush x:Key="Muted" Color="#52606B"/>
-  <DrawingImage x:Key="BrandMark"><DrawingImage.Drawing><DrawingGroup>
-   <GeometryDrawing Brush="Transparent" Geometry="M0,0 H1024 V1024 H0 Z"/><GeometryDrawing Brush="#84BD00"><GeometryDrawing.Geometry><RectangleGeometry Rect="16,16,992,992" RadiusX="150" RadiusY="150"/></GeometryDrawing.Geometry></GeometryDrawing>
-   <DrawingGroup><DrawingGroup.Transform><RotateTransform Angle="40" CenterX="512" CenterY="512"/></DrawingGroup.Transform>
-    <GeometryDrawing Brush="White"><GeometryDrawing.Geometry><RectangleGeometry Rect="330,145,364,555" RadiusX="75" RadiusY="75"/></GeometryDrawing.Geometry></GeometryDrawing><GeometryDrawing Brush="White" Geometry="M401,700 H623 V866 H401 Z"/>
-    <GeometryDrawing Brush="#84BD00" Geometry="M463,272 A49,49 0 1 0 561,272 A49,49 0 1 0 463,272 M430,739 H468 V820 H430 Z M554,739 H592 V820 H554 Z"/>
-   </DrawingGroup></DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <Style x:Key="LogCopyButton" TargetType="Button">
+   <Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Foreground" Value="#536874"/><Setter Property="Cursor" Value="Hand"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="HitArea" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="4"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HitArea" Property="Background" Value="#E6EDF0"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="HitArea" Property="BorderBrush" Value="#0B536F"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="LogColumnHeader" TargetType="DataGridColumnHeader"><Setter Property="Padding" Value="10,8"/><Setter Property="Background" Value="#F3F6F7"/><Setter Property="BorderThickness" Value="0,0,1,1"/><Setter Property="BorderBrush" Value="#DCE3EB"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <!-- Paint the exposed corner above a vertical scrollbar as part of the 40-DIP header. -->
+  <Style x:Key="LogTable" TargetType="DataGrid">
+   <Setter Property="ColumnHeaderHeight" Value="40"/>
+   <Setter Property="ColumnHeaderStyle" Value="{StaticResource LogColumnHeader}"/>
+   <Setter Property="RowBackground" Value="White"/>
+   <Setter Property="Background"><Setter.Value>
+    <LinearGradientBrush MappingMode="Absolute" StartPoint="0,0" EndPoint="0,40">
+     <GradientStop Color="#F3F6F7" Offset="0"/><GradientStop Color="#F3F6F7" Offset="0.975"/>
+     <GradientStop Color="#DCE3EB" Offset="0.975"/><GradientStop Color="#DCE3EB" Offset="1"/>
+     <GradientStop Color="White" Offset="1"/>
+    </LinearGradientBrush>
+   </Setter.Value></Setter>
+  </Style>
+  <DataGrid x:Key="ActivityTable" x:Shared="False" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" RowHeaderWidth="0" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#EDF0F1" BorderBrush="#DCE3EB" Style="{StaticResource LogTable}" AlternatingRowBackground="#F6F8F9" HeadersVisibility="Column" MinRowHeight="44" EnableRowVirtualization="True" AutomationProperties.Name="Activity log entries">
+   <DataGrid.Resources>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="Transparent"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="Transparent"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"/>
+    <Style TargetType="DataGridCell"><Setter Property="Padding" Value="10,4"/><Setter Property="BorderThickness" Value="0"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DataGridCell"><Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}"><ContentPresenter VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+   </DataGrid.Resources>
+   <DataGrid.Columns>
+    <DataGridTextColumn Header="Date/time" Binding="{Binding Time,StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="Auto"/>
+    <DataGridTemplateColumn Header="Level" Width="Auto" SortMemberPath="Level"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+     <Border x:Name="Badge" HorizontalAlignment="Left" VerticalAlignment="Center" Background="#E5F1F7" CornerRadius="12" Padding="10,4"><TextBlock x:Name="Label" Text="{Binding Level}" Foreground="#214E66" FontSize="12"/></Border>
+     <DataTemplate.Triggers><DataTrigger Binding="{Binding Level}" Value="Warning"><Setter TargetName="Badge" Property="Background" Value="#FFF2DC"/><Setter TargetName="Label" Property="Foreground" Value="#704408"/></DataTrigger><DataTrigger Binding="{Binding Level}" Value="Error"><Setter TargetName="Badge" Property="Background" Value="#FBECEE"/><Setter TargetName="Label" Property="Foreground" Value="#83263A"/></DataTrigger></DataTemplate.Triggers>
+    </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+    <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="Auto" MinWidth="180"/>
+    <DataGridTextColumn Header="Details" Binding="{Binding Detail}" Width="Auto" MinWidth="150"/>
+    <DataGridTemplateColumn Header="Copy" Width="Auto" CanUserSort="False"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Tag="CopyActivity" Style="{StaticResource LogCopyButton}" ToolTip="Copy activity entry" AutomationProperties.Name="Copy activity entry"><Path Width="15" Height="16" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round" Data="M6,5 H15 V17 H6 Z M3,13 H2 V1 H11 V2"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+   </DataGrid.Columns>
+  </DataGrid>
+  <Style x:Key="InfoNotice" TargetType="Border">
+   <Setter Property="Background" Value="#EDF6FA"/><Setter Property="BorderBrush" Value="#ADCEDD"/>
+   <Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="12,9"/>
+   <Style.Triggers><Trigger Property="Tag" Value="Warning"><Setter Property="Background" Value="#FFF4E8"/><Setter Property="BorderBrush" Value="#DCAF77"/></Trigger></Style.Triggers>
+  </Style>
+  <DataTemplate x:Key="PinToggleContent"><StackPanel Orientation="Horizontal">
+   <Path Data="M1,6 Q7,-2 13,6 Q7,14 1,6 Z M8.7,6 A1.7,1.7 0 1 1 5.3,6 A1.7,1.7 0 1 1 8.7,6" Stroke="{StaticResource Heading}" StrokeThickness="1.2" Width="16" Height="12" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0"/>
+   <TextBlock Text="{Binding}" Foreground="{StaticResource Heading}"/>
+  </StackPanel></DataTemplate>
+  <Style x:Key="WizardFrame" TargetType="DockPanel"><Setter Property="Margin" Value="40,32,40,0"/><Setter Property="MaxWidth" Value="900"/></Style>
+  <Style x:Key="WizardSteps" TargetType="Grid"><Setter Property="Margin" Value="0,0,0,30"/></Style>
+  <Style x:Key="WizardEyebrow" TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource Heading}"/><Setter Property="Margin" Value="0,0,0,10"/></Style>
+  <Style x:Key="WizardIntro" TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="FontSize" Value="16"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="Margin" Value="0,10,0,20"/></Style>
   <DrawingImage x:Key="HomeGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 L24,24 L0,24 Z"/><GeometryDrawing Geometry="M3,11 L12,3 L21,11 M5,10 L5,21 L10,21 L10,15 L14,15 L14,21 L19,21 L19,10"><GeometryDrawing.Pen><Pen Brush="#0B536F" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage>
-  <DrawingImage x:Key="EnrollGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H24 V24 H0 Z"/><GeometryDrawing Geometry="M6,2 H14 Q16,2 16,4 V14 Q16,16 14,16 H6 Q4,16 4,14 V4 Q4,2 6,2 Z M7,16 V22 H13 V16 M10,19 V21 M8.5,6 A1.5,1.5 0 1 0 11.5,6 A1.5,1.5 0 1 0 8.5,6 M20,8 V14 M17,11 H23"><GeometryDrawing.Pen><Pen Brush="#0B536F" Thickness="1.7" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage>
-  <DrawingImage x:Key="PasskeyGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H24 V24 H0 Z"/><GeometryDrawing Geometry="M2,9 A5,5 0 1 0 12,9 A5,5 0 1 0 2,9 M11,12 L19,20 H22 V17 H19 V14 H16 L12,10 M6,8 H6.1"><GeometryDrawing.Pen><Pen Brush="#0B536F" Thickness="1.7" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingGroup x:Key="KeyBody"><DrawingGroup.Transform><RotateTransform Angle="38" CenterX="16" CenterY="16"/></DrawingGroup.Transform><GeometryDrawing Brush="White" Geometry="M13,2 H20 Q23,2 23,5 V19 Q23,22 20,22 H13 Q10,22 10,19 V5 Q10,2 13,2 Z M12.5,22 V29 H20.5 V22 M15,24.5 V26.3 M18,24.5 V26.3 M13.7,11 A2.8,2.8 0 1 0 19.3,11 A2.8,2.8 0 1 0 13.7,11 Z"><GeometryDrawing.Pen><Pen Brush="{StaticResource Heading}" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup><DrawingImage x:Key="EnrollGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H36 V32 H0 Z"/><StaticResource ResourceKey="KeyBody"/><GeometryDrawing Geometry="M5.2,2 Q5.8,5.6 9,6.1 Q5.8,6.9 5.2,10.2 Q4.5,6.9 1.5,6.1 Q4.5,5.5 5.2,2 Z"><GeometryDrawing.Pen><Pen Brush="{StaticResource Accent}" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage><DrawingImage x:Key="BulkGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H36 V32 H0 Z"/><DrawingGroup Transform="1,0,0,1,7,0"><StaticResource ResourceKey="KeyBody"/></DrawingGroup><StaticResource ResourceKey="KeyBody"/><GeometryDrawing Geometry="M5.2,2 Q5.8,5.6 9,6.1 Q5.8,6.9 5.2,10.2 Q4.5,6.9 1.5,6.1 Q4.5,5.5 5.2,2 Z"><GeometryDrawing.Pen><Pen Brush="{StaticResource Accent}" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage><DrawingImage x:Key="PasskeyGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H36 V32 H0 Z"/><StaticResource ResourceKey="KeyBody"/><GeometryDrawing Geometry="M2,6 H10 M6,2 V10"><GeometryDrawing.Pen><Pen Brush="{StaticResource Accent}" Thickness="2"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage><DrawingImage x:Key="LocalGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H36 V32 H0 Z"/><StaticResource ResourceKey="KeyBody"/><GeometryDrawing Brush="White" Geometry="M15,19 A5.5,5.5 0 1 0 26,19 A5.5,5.5 0 1 0 15,19 Z M24,23 L30,29"><GeometryDrawing.Pen><Pen Brush="{StaticResource Accent}" Thickness="2.4" EndLineCap="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage><DrawingImage x:Key="ManageGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H36 V32 H0 Z"/><GeometryDrawing Geometry="M4.6,10 A4.2,4.2 0 1 0 13,10 A4.2,4.2 0 1 0 4.6,10 Z M17,20 Q15,16.3 9,16.3 Q2,16.3 1.8,25 H13"><GeometryDrawing.Pen><Pen Brush="{StaticResource Heading}" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing><DrawingGroup Transform="0.65,0,0,0.65,12,10"><StaticResource ResourceKey="KeyBody"/></DrawingGroup></DrawingGroup></DrawingImage.Drawing></DrawingImage><DrawingImage x:Key="NfcGlyph"><DrawingImage.Drawing><DrawingGroup>
+   <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z"/>
+   <GeometryDrawing Geometry="M4,13 C6,15 6,17 4,19 M10,9 C14,13 14,19 10,23 M16,5.5 C22,12 22,20 16,26.5 M22,2.5 C30,10.5 30,21.5 22,29.5"><GeometryDrawing.Pen><Pen Brush="{StaticResource Accent}" Thickness="2.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DrawingImage x:Key="RefreshGlyph"><DrawingImage.Drawing><DrawingGroup>
+   <GeometryDrawing Brush="Transparent" Geometry="M0,0 H32 V32 H0 Z"/>
+   <GeometryDrawing Geometry="M26,6 V13 H19 M25.6,12 A10.4,10.4 0 1 0 26,20"><GeometryDrawing.Pen><Pen Brush="{StaticResource Heading}" Thickness="3" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing>
+  </DrawingGroup></DrawingImage.Drawing></DrawingImage>
+  <DataTemplate x:Key="RefreshContent"><StackPanel Orientation="Horizontal"><Image Source="{StaticResource RefreshGlyph}" Width="17" Height="17" Margin="0,0,7,0"/><TextBlock Text="{Binding}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/></StackPanel></DataTemplate>
+  <Style x:Key="StepArrow" TargetType="Path">
+   <Setter Property="Data" Value="M1,6 H11 M7,2 L11,6 L7,10"/>
+   <Setter Property="Width" Value="12"/><Setter Property="Height" Value="12"/>
+   <Setter Property="VerticalAlignment" Value="Center"/>
+   <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+   <Setter Property="StrokeThickness" Value="1.6"/><Setter Property="StrokeStartLineCap" Value="Round"/>
+   <Setter Property="StrokeEndLineCap" Value="Round"/><Setter Property="StrokeLineJoin" Value="Round"/>
+  </Style>
+  <DataTemplate x:Key="ForwardContent">
+   <StackPanel Orientation="Horizontal">
+    <TextBlock Text="{Binding}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/>
+    <Path Style="{StaticResource StepArrow}" Margin="6,0,0,0"/>
+   </StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="BackContent">
+   <StackPanel Orientation="Horizontal">
+    <Path Style="{StaticResource StepArrow}" Margin="0,0,6,0" RenderTransformOrigin="0.5,0.5">
+     <Path.RenderTransform><ScaleTransform ScaleX="-1"/></Path.RenderTransform>
+    </Path>
+    <TextBlock Text="{Binding}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" VerticalAlignment="Center"/>
+   </StackPanel>
+  </DataTemplate>
   <DrawingImage x:Key="ResetGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 L24,24 L0,24 Z"/><GeometryDrawing Geometry="M4,5 L4,10 L9,10 M4,10 A9,9 0 1 1 5,19"><GeometryDrawing.Pen><Pen Brush="#0B536F" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage>
   <DrawingImage x:Key="SettingsGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="Transparent" Geometry="M0,0 H24 V24 H0 Z"/><GeometryDrawing Geometry="M19.209,9.933 L21.877,10.436 L21.877,13.564 L19.209,14.067 L18.560,15.636 L20.090,17.878 L17.878,20.090 L15.636,18.560 L14.067,19.209 L13.564,21.877 L10.436,21.877 L9.933,19.209 L8.364,18.560 L6.122,20.090 L3.910,17.878 L5.440,15.636 L4.791,14.067 L2.123,13.564 L2.123,10.436 L4.791,9.933 L5.440,8.364 L3.910,6.122 L6.122,3.910 L8.364,5.440 L9.933,4.791 L10.436,2.123 L13.564,2.123 L14.067,4.791 L15.636,5.440 L17.878,3.910 L20.090,6.122 L18.560,8.364 Z M8.5,12 A3.5,3.5 0 1 0 15.5,12 A3.5,3.5 0 1 0 8.5,12"><GeometryDrawing.Pen><Pen Brush="#0B536F" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage>
   <Style x:Key="PageTitle" TargetType="TextBlock"><Setter Property="FontSize" Value="30"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{StaticResource Heading}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+  <ControlTemplate x:Key="ProfileEffectsTemplate" TargetType="ContentControl"><ItemsControl ItemsSource="{Binding Pills}" Margin="0,7,0,0"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+       <ItemsControl.ItemTemplate><DataTemplate><Border CornerRadius="10" Padding="9,3" Margin="0,0,6,5"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="#EDF2F3"/><Style.Triggers><DataTrigger Binding="{Binding Warning}" Value="True"><Setter Property="Background" Value="#FFF0CF"/></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{Binding Label}" Foreground="#304852" FontSize="12"/></Border></DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl></ControlTemplate>
   <Style x:Key="KeyChoice" TargetType="ListBoxItem">
    <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Margin" Value="0,0,0,12"/><Setter Property="Padding" Value="18"/><Setter Property="Cursor" Value="Hand"/>
-   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><Border x:Name="Surface" Background="White" BorderBrush="#CCD2D5" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions><ContentPresenter/><Grid Grid.Column="1" VerticalAlignment="Center"><Ellipse Width="22" Height="22" Stroke="#68747A" StrokeThickness="1.5"/><Ellipse x:Name="Dot" Width="12" Height="12" Fill="{StaticResource Accent}" Visibility="Collapsed"/></Grid></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#F5F9E9"/><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Accent}"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/><Setter TargetName="Dot" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Heading}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#F5F7F1"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+    <Grid>
+     <Border x:Name="Surface" Background="White" BorderBrush="#CCD2D5" BorderThickness="1" CornerRadius="8"/>
+     <Border Margin="2" Padding="{TemplateBinding Padding}"><Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
+      <ContentPresenter/><Grid Grid.Column="1" VerticalAlignment="Center"><Ellipse Width="22" Height="22" Stroke="#68747A" StrokeThickness="1.5"/><Ellipse x:Name="Dot" Width="12" Height="12" Fill="{StaticResource Accent}" Visibility="Collapsed"/></Grid>
+     </Grid></Border>
+    </Grid>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#F5F9E9"/><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Accent}"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/><Setter TargetName="Dot" Property="Visibility" Value="Visible"/></Trigger>
+     <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Heading}"/></Trigger>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#F5F7F1"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Background" Value="#F5F6F6"/><Setter TargetName="Surface" Property="BorderBrush" Value="#D6DBDD"/><Setter TargetName="Dot" Property="Visibility" Value="Collapsed"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+    </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
-  <DataTemplate x:Key="KeyChoiceTemplate"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition/></Grid.ColumnDefinitions><Viewbox Width="24" Height="42" HorizontalAlignment="Left"><Canvas Width="24" Height="40"><Path Stroke="#52606B" StrokeThickness="1.7" Data="M5,1 L19,1 Q22,1 22,4 L22,28 Q22,31 19,31 L5,31 Q2,31 2,28 L2,4 Q2,1 5,1 Z M7,31 L7,39 L17,39 L17,31 M10,34 L10,37 M14,34 L14,37"/><Ellipse Canvas.Left="9" Canvas.Top="6" Width="6" Height="6" Stroke="#52606B" StrokeThickness="1.7"/></Canvas></Viewbox><StackPanel Grid.Column="1"><TextBlock Text="{Binding Key.Model}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Heading}" TextWrapping="Wrap"/><TextBlock Text="{Binding Key.Serial, StringFormat=Serial {0}}" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/></StackPanel></Grid></DataTemplate>
+  <ControlTemplate x:Key="HardwareKeyIcon" TargetType="ContentControl"><Viewbox Width="24" Height="42" HorizontalAlignment="Left"><Canvas Width="24" Height="40"><Path Stroke="#52606B" StrokeThickness="1.7" Data="M5,1 L19,1 Q22,1 22,4 L22,28 Q22,31 19,31 L5,31 Q2,31 2,28 L2,4 Q2,1 5,1 Z M7,31 L7,39 L17,39 L17,31 M10,34 L10,37 M14,34 L14,37"/><Ellipse Canvas.Left="9" Canvas.Top="6" Width="6" Height="6" Stroke="#52606B" StrokeThickness="1.7"/></Canvas></Viewbox></ControlTemplate>
+  <ControlTemplate x:Key="EmptyKeyTemplate" TargetType="ContentControl">
+   <Border BorderBrush="#D5DADD" BorderThickness="1" Background="#F8F9F9" CornerRadius="8" Padding="18" MinHeight="110" Margin="2,2,2,12">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition/></Grid.ColumnDefinitions>
+     <ContentControl Template="{StaticResource HardwareKeyIcon}" Opacity="0.65" Focusable="False"/>
+     <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{TemplateBinding Tag}" FontSize="18" FontWeight="SemiBold" Foreground="#52606B"/>
+      <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel>
+    </Grid></Border>
+  </ControlTemplate>
+  <DataTemplate x:Key="KeyChoiceTemplate"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition/></Grid.ColumnDefinitions><ContentControl Template="{StaticResource HardwareKeyIcon}" Focusable="False"/><StackPanel Grid.Column="1"><TextBlock Text="{Binding Key.Model}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Heading}" TextWrapping="Wrap"/><TextBlock Text="{Binding Key.Serial, StringFormat=Serial {0}}" Foreground="{StaticResource Muted}" Margin="0,6,0,0"/><TextBlock Text="{Binding Key.ConnectionLabel}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/></StackPanel></Grid></DataTemplate>
   <Style TargetType="Button">
    <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="Padding" Value="17,10"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#263238"/><Setter Property="BorderBrush" Value="#CED8E3"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Cursor" Value="Hand"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" RecognizesAccessKey="True"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Opacity" Value="0.8"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Heading}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
@@ -62,6 +164,33 @@
   <Style x:Key="SectionTitle" TargetType="TextBlock"><Setter Property="Foreground" Value="{StaticResource Heading}"/><Setter Property="FontSize" Value="17"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   <Style TargetType="TextBox"><Setter Property="Padding" Value="10,8"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="BorderBrush" Value="#CED8E3"/><Setter Property="BorderThickness" Value="1"/></Style>
   <Style TargetType="ComboBox"><Setter Property="Padding" Value="10,8"/><Setter Property="MinHeight" Value="38"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
-  <Style TargetType="TabItem"><Setter Property="Padding" Value="14,11"/><Setter Property="Foreground" Value="#52606B"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem"><Border x:Name="TabSurface" Background="Transparent" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}"><ContentPresenter ContentSource="Header"/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="#172B41"/><Setter TargetName="TabSurface" Property="BorderBrush" Value="#84BD00"/><Setter TargetName="TabSurface" Property="Background" Value="White"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="TabSurface" Property="Background" Value="#F0F2F3"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  <SolidColorBrush x:Key="TabHighlight" Color="#F0F2F3"/>
+  <Style TargetType="TabItem">
+   <Setter Property="Padding" Value="14,11"/>
+   <Setter Property="Foreground" Value="#52606B"/>
+   <Setter Property="Template"><Setter.Value>
+    <ControlTemplate TargetType="TabItem">
+     <Border x:Name="TabSurface" Background="Transparent" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}">
+      <ContentPresenter ContentSource="Header"/>
+     </Border>
+     <ControlTemplate.Triggers>
+      <Trigger Property="IsSelected" Value="True">
+       <Setter Property="Foreground" Value="#172B41"/>
+       <Setter TargetName="TabSurface" Property="BorderBrush" Value="#84BD00"/>
+       <Setter TargetName="TabSurface" Property="Background" Value="{StaticResource TabHighlight}"/>
+      </Trigger>
+      <MultiTrigger>
+       <MultiTrigger.Conditions>
+        <Condition Property="IsSelected" Value="False"/>
+        <Condition SourceName="TabSurface" Property="IsMouseOver" Value="True"/>
+       </MultiTrigger.Conditions>
+       <Setter TargetName="TabSurface" Property="BorderBrush" Value="#899297"/>
+       <Setter TargetName="TabSurface" Property="Background" Value="{StaticResource TabHighlight}"/>
+      </MultiTrigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate>
+   </Setter.Value></Setter>
+  </Style>
+ </ResourceDictionary>
  </Application.Resources>
 </Application>
