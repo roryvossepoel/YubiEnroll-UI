@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.7" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0-policy.8" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.7\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0-policy.8\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -289,29 +289,59 @@ public partial class MainWindow : Window
             var path = KeyResetService.FindExecutable();
             if (path.Length == 0) throw new InvalidOperationException("Install YubiKey Manager CLI in Prerequisites.");
             var runner = new CliRunner(path);
-            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a), () => NfcDiscovery.ReadAsync(runner));
+            var service = new KeyResetService(a => runner.CaptureAsync(a), a => RunInteractiveAsync(path, a, target), () => NfcDiscovery.ReadAsync(runner));
             // The dedicated review page is the destructive confirmation. Native prompts remain enabled.
             var exit = resetExit = await service.ResetAsync(target, key =>
                 _resetStep == 1 && _resetReviewTarget == key && _selectedKey?.Key == key && ResetAcknowledged.IsChecked == true);
             StatusText.Text = exit switch { null => "Reset cancelled.", 0 => "YubiKey Manager reported a successful FIDO reset. Reading target status…", _ => "Reset failed or was interrupted. Check the target key before retrying." };
             Record(StatusText.Text + " · serial " + target.Serial, exit is null or 0 ? "Info" : "Error");
         }, "Reset target key");
-        var operationMessage = StatusText.Text;
-        await RefreshOverviewAsync();
-        if (resetCompleted && resetExit == 0)
+        ShowResetResult(target, resetCompleted ? resetExit : null, resetCompleted);
+        InvalidateDeviceInventory();
+        if (resetCompleted && resetExit == 0) await ReadResetPinAsync();
+    }
+
+    private ResetKey? _resultKey;
+    private CancellationTokenSource? _pinRead;
+    private void StopPinRead() { var pending = _pinRead; _pinRead = null; pending?.Cancel(); }
+    private void ShowResetResult(ResetKey target, int? exit, bool completed)
+    {
+        StopPinRead(); _resultKey = target;
+        _resetStep = 2; _resetReviewTarget = null; ResetAcknowledged.IsChecked = false;
+        ResetResultTarget.Text = target.Label + (target.IsNfc ? "" : " · USB");
+        ResetResultText.Text = exit == 0 ? "YubiKey Manager reported a successful FIDO reset." :
+            completed && exit == null ? "Reset cancelled before the erase command." :
+            "Reset not confirmed. Inspect this key before starting another reset.";
+        ResetPinCheck.Text = exit == 0 ? "Checking the FIDO PIN on this key…" : "FIDO PIN status has not been checked.";
+        ResetReadButton.IsEnabled = true; StatusText.Text = ""; RenderWizard();
+    }
+
+    private async void ResetRead_Click(object sender, RoutedEventArgs e) => await ReadResetPinAsync();
+    private async Task ReadResetPinAsync()
+    {
+        if (_resetStep != 2 || _resultKey is not { } target || _pinRead != null) return;
+        using var request = new CancellationTokenSource();
+        _pinRead = request; ResetReadButton.IsEnabled = false;
+        ResetPinCheck.Text = "Checking the FIDO PIN on this key…";
+        try
         {
-            var readBack = _selectedKey?.Key == target ? _selectedKey.Pin : FidoPinState.Unknown;
-            StatusText.Text = readBack switch
+            // The probe checks serial and reader on the same connection used for the PIN read.
+            var runner = new CliRunner(KeyResetService.FindExecutable());
+            var caps = await FidoCapabilityProbe.ReadAsync(runner, target, request.Token);
+            if (ReferenceEquals(_pinRead, request)) ResetPinCheck.Text = caps.PinConfigured switch
             {
-                FidoPinState.NotSet => "Reset reported successful. Read-back: target PIN is not set. Entra registrations remain.",
-                FidoPinState.Set or FidoPinState.Blocked => "Reset reported successful, but a PIN is still set. Inspect the target before continuing.",
-                _ => "Reset reported successful, but target PIN status could not be verified. Reconnect the target and refresh."
+                false => "FIDO PIN: not set (verified on this key).",
+                true => "FIDO PIN: still set. Inspect this key before continuing.",
+                _ => "FIDO PIN status could not be verified."
             };
-            Record(StatusText.Text + " · serial " + target.Serial, readBack == FidoPinState.NotSet ? "Info" : "Warning");
         }
-        else StatusText.Text = operationMessage;
-        ResetResultText.Text = "Target · " + target.Label + "\n\n" + StatusText.Text;
-        _resetStep = 2; ResetAcknowledged.IsChecked = false; RenderWizard();
+        catch (Exception) when (!request.IsCancellationRequested)
+        {
+            if (ReferenceEquals(_pinRead, request))
+                ResetPinCheck.Text = "FIDO PIN status unavailable. Reconnect this key and select Refresh key status.";
+        }
+        catch (Exception) when (request.IsCancellationRequested) { }
+        finally { if (ReferenceEquals(_pinRead, request)) { _pinRead = null; ResetReadButton.IsEnabled = true; } }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
@@ -373,14 +403,15 @@ public partial class MainWindow : Window
         var user = SelectedUser;
         var target = _selectedKey?.Key ?? throw new InvalidOperationException("Choose a target key first.");
         int code;
-        SetNameEditing(false);
+        ClearReceipt(); _registrationResultMessage = ""; SetNameEditing(false);
         try { code = await ExecuteEnrollmentAsync(provider, profile, user, target, KeyName.Text); }
         catch (EnrollmentOutcomeUnknownException)
         {
             ShowEnrollmentResult("The enrollment outcome is unknown. Check Manage user passkeys before retrying.");
             throw;
         }
-        ShowEnrollmentResult(code == 0 ? "YubiEnroll reported success. Test sign-in with the new passkey."
+        _receiptSuccess = code == 0;
+        ShowEnrollmentResult(code == 0 ? "Registration successful · reported by YubiEnroll"
             : "Enrollment failed or was interrupted. A credential may already exist. Check Manage user passkeys before retrying.");
     });
 
@@ -410,6 +441,7 @@ public partial class MainWindow : Window
         var fresh = await CheckEnrollmentTargetAsync(target, setup, batch);
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, name);
+        if (batch == null) _receipt = new(target, provider, user, setup, name, _addPasskey);
         _generatedPin = null;
         _captureGeneratedPin = registration?.SaveGeneratedPin == true && !_addPasskey && setup.RandomPin == true;
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · serial {target.Serial} · profile {setup.Name} · reset {reset}.");
@@ -430,7 +462,7 @@ public partial class MainWindow : Window
             batch?.Start(user, target, fresh.Pin, setup);
             var generation = _deviceGeneration;
             int? finishedGeneration = null;
-            code = await RunInteractiveAsync(_exePath, arguments, target, () => finishedGeneration = _deviceGeneration);
+            code = await RunInteractiveAsync(_exePath, arguments, target, () => finishedGeneration = _deviceGeneration, batch == null, setup);
             targetChanged = batch != null && generation != (finishedGeneration ?? _deviceGeneration);
             batch?.Complete(targetChanged ? null : code);
         }
@@ -450,7 +482,8 @@ public partial class MainWindow : Window
             { Record("Temporary enrollment profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
         }
         // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
-        CompleteRegistrationRecord(registration, targetChanged ? null : code, targetChanged ? null : _generatedPin);
+        if (batch == null && code == 0 && !targetChanged) _receiptPin = _generatedPin;
+        CompleteRegistrationRecord(registration, targetChanged ? null : code, !targetChanged && code == 0 && registration?.SaveGeneratedPin == true ? _generatedPin : null);
         _generatedPin = null;
         InvalidateDeviceInventory(); // Native enrollment can change PIN state without a device notification.
         if (batch != null) _deviceRefresh?.Start();
@@ -497,5 +530,6 @@ public partial class MainWindow : Window
         else if (_registrationJournal.PendingCount > 0)
             e.Cancel = MessageBox.Show(this, $"{_registrationJournal.PendingCount} enrollment result(s) have not been saved. Closing loses their final outcomes; the on-disk attempts will remain unknown. Close anyway?", "Unsaved enrollment records", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes;
         if (!e.Cancel && _hostedWindow is SettingsWindow settings) e.Cancel = !settings.ConfirmLeavePreferences();
+        if (!e.Cancel) { StopPinRead(); ClearReceipt(); }
     }
 }

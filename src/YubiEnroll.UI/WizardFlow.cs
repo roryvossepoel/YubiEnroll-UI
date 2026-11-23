@@ -103,17 +103,20 @@ public partial class MainWindow
         RenderBatch();
         RenderRegistrationLogStatus();
         ReadReviewWarning();
-        RenderProgress(EnrollProgress, EnrollmentStepLabels, Math.Min(_enrollStep, ReviewStep));
+        ReviewNotice.Background = ReviewWarningBox.Visibility == Visibility.Visible ? new SolidColorBrush(Color.FromRgb(255,244,237)) : new SolidColorBrush(Color.FromRgb(242,245,246));
+        RenderProgress(EnrollProgress, EnrollmentStepLabels, _enrollStep == EnrollmentResultStep && _receiptSuccess ? EnrollmentResultStep : Math.Min(_enrollStep, ReviewStep));
         RenderProgress(ResetProgress, ["Key", "Confirm", "Result"], _resetStep);
         EnrollmentTaskLabel.Text = _addPasskey ? "ADD A PASSKEY" : "SET UP A YUBIKEY";
         EnrollHeading.Text = _enrollStep == 0 ? (_addPasskey ? "Choose your existing key" : "Choose the key to set up") :
             _enrollStep == TenantStepIndex ? "Connect to a tenant" : _enrollStep == UserStepIndex ? "Choose the user" :
             _enrollStep == ReviewStep ? (_addPasskey ? "Review and add passkey" : "Review and enroll") :
-            _enrollStep == EnrollmentResultStep ? "Registration result" : "Choose a configuration profile";
+            _enrollStep == EnrollmentResultStep ? "Registration summary" : "Choose a configuration profile";
         EnrollDescription.Text = _enrollStep == 0 ? (_addPasskey ? "Use a key with an existing FIDO PIN. Its passkeys and PIN will be kept." : "Select the physical key you want to give to the user.") :
             _enrollStep == TenantStepIndex ? "Sign in with your administrator account." : _enrollStep == UserStepIndex ? "Select the account to register on this key." :
             _enrollStep == ReviewStep ? "Check these details before starting." : _enrollStep == EnrollmentResultStep ? "Check the outcome before continuing." :
             "Only profiles supported by the selected key can be chosen.";
+        EnrollDescription.Visibility = Visible(_enrollStep < ReviewStep);
+        if (PreparePage.IsVisible) StatusBar.Visibility = Visible(_enrollStep < ReviewStep || !string.IsNullOrEmpty(StatusText.Text));
         EnrollmentChooser.Visibility = Visible(_enrollStep == 0);
         TenantStep.Visibility = Visible(_enrollStep == TenantStepIndex); UserCard.Visibility = Visible(_enrollStep == UserStepIndex);
         ProfileStep.Visibility = Visible(!_addPasskey && _enrollStep == 1);
@@ -150,7 +153,9 @@ public partial class MainWindow
         ResetNext.Content = _resetStep == 2 ? "Reset another key" : "Review reset";
         ResetNext.ContentTemplate = _resetStep == 2 ? null : (DataTemplate)FindResource("ForwardContent");
         ResetNext.IsEnabled = !_busy && (_resetStep == 2 || CandidateReady);
-        SetBackAction(ResetBack, _resetStep == 1 ? "Back" : null);
+        SetBackAction(ResetBack, _resetStep == 1 ? "Back" : null, _resetStep == 2 ? "Home" : "Back to Home");
+        ResetDescription.Visibility = Visible(_resetStep != 2);
+        if (ResetPage.IsVisible) StatusBar.Visibility = Visible(_resetStep != 2);
         ResetTargetText.Text = _resetReviewTarget?.Label ?? "No target selected";
         KeyPinStatus.Text = _selectedKey is { } currentKey && currentKey.Key == _resetReviewTarget ? currentKey.PinLabel : "Target unavailable";
         ResetConnectionHelp.Text = _resetReviewTarget?.IsNfc == true
@@ -207,12 +212,14 @@ public partial class MainWindow
         if (selected?.Setup is { } reviewed)
         {
             ReviewWarningBox.Visibility = Visible(reviewed.Reset != false);
-            ReviewWarning.Text = reviewed.Reset == true ? "All existing FIDO credentials and the FIDO PIN on this key will be erased before enrollment." : "Reset behavior is unspecified. Choose an explicit profile before continuing.";
+            ReviewWarning.Text = reviewed.Reset == true ? $"Enrollment will erase all FIDO passkeys and the PIN on YubiKey {_selectedKey?.Key.Serial}." : "Reset behavior is unspecified. Choose an explicit profile before continuing.";
         }
     }
 
+    private string _nameBeforeEditing = "";
     private void SetNameEditing(bool editing)
     {
+        if (editing) _nameBeforeEditing = KeyName.Text;
         if (!editing) { KeyName.Text = KeyName.Text.Trim(); SuggestRegistrationName(); }
         KeyName.Visibility = Visible(editing); ReviewName.Visibility = Visible(!editing);
         EditNameButton.Content = editing ? "Done" : "Edit";
@@ -227,25 +234,35 @@ public partial class MainWindow
 
     private void RenderReviewSummary()
     {
-        ReviewSummary.Children.Clear();
-        void Row(string label, string value)
-        {
-            var row = new Grid { Margin = new Thickness(0, 6, 0, 6) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) }); row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.Children.Add(new TextBlock { Text = label, Foreground = (Brush)FindResource("Muted") });
-            var text = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
-            Grid.SetColumn(text, 1); row.Children.Add(text); ReviewSummary.Children.Add(row);
-        }
+        ReviewSummary.Children.Clear(); ReviewAccount.Children.Clear();
+        var group = ReviewSummary;
+        void Row(string label, string value) => SummaryRow(group, label, value, 78);
         var user = Users.SelectedItem as UserCandidate;
         Row("Key", _selectedKey?.Key.Model ?? "Unavailable"); Row("Serial number", _selectedKey?.Key.Serial ?? "—");
         Row("Connection", _selectedKey?.Key.ConnectionLabel ?? "—");
-        Row("Tenant", (Tenants.SelectedItem as Provider)?.Name ?? "—");
+        group = ReviewAccount; Row("Tenant", (Tenants.SelectedItem as Provider)?.Name ?? "—");
         Row("User", !string.IsNullOrWhiteSpace(user?.DisplayName) ? user.DisplayName : user?.Label ?? "—");
         if (!string.IsNullOrWhiteSpace(user?.UserPrincipalName)) Row("Sign-in name", user.UserPrincipalName);
         if (!string.IsNullOrWhiteSpace(user?.Email) && !string.Equals(user.Email, user.UserPrincipalName, StringComparison.OrdinalIgnoreCase)) Row("Email", user.Email);
         Row(_addPasskey ? "Action" : "Profile", _addPasskey ? "Add passkey · keep existing passkeys, PIN and key settings" : (Profiles.SelectedItem as ProfileChoice)?.Profile.Name ?? "—");
         ReviewRecipient.Text = user?.DisplayName ?? user?.Label ?? "";
     }
+    private void KeyName_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key is not (System.Windows.Input.Key.Enter or System.Windows.Input.Key.Escape)) return;
+        if (e.Key == System.Windows.Input.Key.Escape) KeyName.Text = _nameBeforeEditing;
+        SetNameEditing(false); EditNameButton.Focus(); e.Handled = true;
+    }
+
+    private void SummaryRow(StackPanel group, string label, string value, int width = 126)
+    {
+        var row = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) }); row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.Children.Add(new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("Muted") });
+        var text = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
+        Grid.SetColumn(text, 1); row.Children.Add(text); group.Children.Add(row);
+    }
+
     private async void EnrollNext_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
@@ -269,10 +286,10 @@ public partial class MainWindow
         if (_enrollStep == 0 || _enrollStep == EnrollmentResultStep) ShowPage(OverviewPage);
         else { _enrollStep--; StatusText.Text = ""; EnrollmentScroll.ScrollToTop(); UpdateSummary(); }
     }
-    private void ResetNext_Click(object sender, RoutedEventArgs e)
+    private async void ResetNext_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
-        if (_resetStep == 2) BeginNextKey();
+        if (_resetStep == 2) { BeginNextKey(); if (!_smokeTest) await RefreshOverviewAsync(); }
         else if (_resetStep == 0 && CommitTarget())
         {
             _resetReviewTarget = _selectedKey!.Key; ResetAcknowledged.IsChecked = false; _resetStep = 1;
@@ -289,6 +306,7 @@ public partial class MainWindow
     private void ResetAcknowledged_Changed(object sender, RoutedEventArgs e) => RenderWizard();
     private void BeginNextKey()
     {
+        StopPinRead(); _resultKey = null; ClearReceipt();
         _enrollStep = _resetStep = 0; _resetReviewTarget = null; ResetAcknowledged.IsChecked = false;
         ResetSelection(); Query.Clear(); KeyName.Clear(); _suggestedName = "";
         _selectedKey = null; _lastKnownKey = null; _selectionSerial = null; _choosingTarget = true;
@@ -297,8 +315,41 @@ public partial class MainWindow
         finally { _readingKeys = false; }
         UpdateSummary();
     }
+    private sealed record Receipt(ResetKey Key, Provider Tenant, UserCandidate User, ProfileSetup Profile, string Name, bool Adding);
+    private Receipt? _receipt;
+    private bool _receiptSuccess, _pinVisible;
+    private string? _receiptPin;
+    private void ClearReceipt()
+    {
+        _receipt = null; _receiptSuccess = false; _receiptPin = null; _pinVisible = false;
+        ReceiptPin.Text = ""; ReceiptPinPanel.Visibility = Visibility.Collapsed; ReceiptDetails.Children.Clear();
+        ReceiptNextStep.Text = ""; RevealPin.Content = "Show PIN";
+    }
+    private void RevealPin_Click(object sender, RoutedEventArgs e)
+    {
+        if (_receiptPin == null || !_receiptSuccess || _enrollStep != EnrollmentResultStep) return;
+        _pinVisible = !_pinVisible; ReceiptPin.Text = _pinVisible ? _receiptPin : "••••••";
+        RevealPin.Content = _pinVisible ? "Hide PIN" : "Show PIN";
+    }
     private void ShowEnrollmentResult(string message)
     {
-        _enrollStep = EnrollmentResultStep; EnrollmentResultText.Text = message; StatusText.Text = message; RenderWizard();
+        _enrollStep = EnrollmentResultStep; EnrollmentResultText.Text = message; StatusText.Text = "";
+        ReceiptDetails.Children.Clear(); ReceiptNextStep.Text = "";
+        if (_receipt is { } r)
+        {
+            SummaryRow(ReceiptDetails, "YubiKey", r.Key.Model + " · " + r.Key.Serial + " · " + r.Key.ConnectionLabel);
+            SummaryRow(ReceiptDetails, "Registration name", r.Name);
+            SummaryRow(ReceiptDetails, "Tenant", r.Tenant.Name);
+            SummaryRow(ReceiptDetails, "User", r.User.DisplayName + " · " + r.User.UserPrincipalName);
+            SummaryRow(ReceiptDetails, r.Adding ? "Action" : "Profile", r.Adding ? "Add a passkey" : r.Profile.Name);
+            SummaryRow(ReceiptDetails, "Finished", DateTimeOffset.Now.ToString("g"));
+            if (_receiptSuccess)
+                ReceiptNextStep.Text = (r.Profile.ForcePinChange == true ? "Change the temporary PIN before first use. " : "") + "Test sign-in with the new passkey.";
+            if (_receiptSuccess && !r.Adding && r.Profile.RandomPin == true && _receiptPin == null)
+                ReceiptNextStep.Text = "Temporary PIN unavailable in this summary. " + ReceiptNextStep.Text;
+        }
+        ReceiptPinPanel.Visibility = Visible(_receiptSuccess && _receiptPin != null);
+        _pinVisible = false; ReceiptPin.Text = _receiptPin == null ? "" : "••••••"; RevealPin.Content = "Show PIN";
+        EnrollmentScroll.ScrollToTop(); RenderWizard();
     }
 }

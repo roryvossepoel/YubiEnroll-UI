@@ -26,7 +26,7 @@ jobs:
           foreach ($name in 'PasskeyDesk.exe', 'PasskeyDesk.ConsoleHost.exe') {
             $file = Get-Item "$out/$name"
             $info = $file.VersionInfo
-            if ($info.ProductName -ne 'Passkey Desk for YubiKeys' -or $info.ProductVersion -notlike '0.11.0-policy.7*') {
+            if ($info.ProductName -ne 'Passkey Desk for YubiKeys' -or $info.ProductVersion -notlike '0.11.0-policy.8*') {
               throw "Unexpected executable metadata for $name"
             }
             Write-Output "$name $($info.ProductVersion) $($file.Length) bytes"
@@ -37,7 +37,7 @@ jobs:
           }
       - uses: actions/upload-artifact@v7
         with:
-          name: PasskeyDesk-0.11.0-policy.7-win-x64
+          name: PasskeyDesk-0.11.0-policy.8-win-x64
           path: artifacts/win-x64/app/
           if-no-files-found: error
           retention-days: 30

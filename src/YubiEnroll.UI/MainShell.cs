@@ -72,6 +72,9 @@ public partial class MainWindow
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage && _hostedWindow is SettingsWindow current && !current.ConfirmLeavePreferences()) return;
         if (page != HostedPage) LeaveHostedPage();
+        if (page.Visibility != Visibility.Visible) StatusText.Text = "";
+        if (page != PreparePage && PreparePage.IsVisible && _enrollStep == EnrollmentResultStep) BeginNextKey();
+        if (page != ResetPage && ResetPage.IsVisible && _resetStep == 2) { StopPinRead(); _resultKey = null; BeginNextKey(); }
         foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, BatchPage, ResetPage, LocalPage, ManagePage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
         foreach (var button in new[] { OverviewButton, PrepareButton, BulkNav, AddPasskeyButton, ResetButton, LocalButton, ManageButton, SettingsButton })
@@ -103,7 +106,7 @@ public partial class MainWindow
     private async void ResetPage_Click(object sender, RoutedEventArgs e)
     {
         ShowPage(ResetPage);
-        if (!RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
+        if (_resetStep != 2 && !RequirementsBlockTasks && (!_inventoryLoaded || _inventoryDirty) && !_busy) await RefreshOverviewAsync();
     }
     private void Details_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.ActivityTab);
     private void Prerequisites_Click(object sender, RoutedEventArgs e) => OpenSettings(s => s.AboutTab);
@@ -272,7 +275,9 @@ public partial class MainWindow
         if (EnrollmentTargetNotice == null) return;
         var message = _inventoryDirty ? "" :
             EnrollmentTargetGuard.Explain(_selectedKey?.Key, _knownKeys.Select(x => x.Key).ToArray(), _unavailableKeys, IsConnected);
-        EnrollmentTargetNotice.Text = ReviewTargetNotice.Text = message;
+        EnrollmentTargetNotice.Text = message;
+        ReviewTargetNotice.Text = !_inventoryDirty && _selectedKey?.Key is { IsNfc: true } key && _knownKeys.Any(k => k.Key == key)
+            ? $"Keep this key on {NfcReaderStatus.DisplayName(key.Reader!)}. Remove and replace it only when prompted." : message;
         RenderWizard();
     }
     private void InvalidateDeviceInventory()
@@ -306,7 +311,7 @@ public partial class MainWindow
             if (_busy || _checkingRequirements) return;
             _deviceRefresh.Stop();
             var needsKeys = PreparePage.IsVisible && _enrollStep != EnrollmentResultStep ||
-                ResetPage.IsVisible || LocalPage.IsVisible || BatchPage.IsVisible && _batchStage == BatchStage.Issue;
+                (ResetPage.IsVisible && _resetStep != 2) || LocalPage.IsVisible || BatchPage.IsVisible && _batchStage == BatchStage.Issue;
             if (needsKeys && _inventoryDirty && _inventoryLoaded) await RefreshOverviewAsync();
         };
         System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(DeviceMessage);
@@ -327,7 +332,7 @@ public partial class MainWindow
     private bool _closeAfterLogin;
     private bool _captureGeneratedPin;
     private string? _generatedPin;
-    private async Task<int> RunInteractiveAsync(string executable, string[] args, ResetKey? explicitTarget = null, Action? nativeFinished = null)
+    private async Task<int> RunInteractiveAsync(string executable, string[] args, ResetKey? explicitTarget = null, Action? nativeFinished = null, bool single = false, ProfileSetup? setup = null)
     {
         _lastInteractiveFailure = "";
         if (args.SequenceEqual(new[] { "login" }))
@@ -351,7 +356,7 @@ public partial class MainWindow
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
         var terminalTarget = explicitTarget ?? _selectedKey?.Key;
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true);
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, (_captureGeneratedPin || single && setup?.RandomPin == true && !_addPasskey) ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true, single, _captureGeneratedPin, setup?.Name);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         terminal.NativeFinished = nativeFinished;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }

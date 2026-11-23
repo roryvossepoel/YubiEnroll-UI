@@ -50,7 +50,7 @@ internal static class ManagementGraphTests
             catch (InvalidDataException) { check(calls == 1, "Graph does not follow a foreign, different-user or repeated continuation"); }
         }
 
-        foreach (var scenario in new[] {"removed","changed","unknown-model","phone-target","invalid-user","unsafe-id","duplicate-id","still-present",
+        foreach (var scenario in new[] {"removed","propagated","changed","unknown-model","phone-target","invalid-user","unsafe-id","duplicate-id","still-present",
                     "missing-phone","denied","timeout","post-list-failed","invalid-success"})
         {
             const string model = "YubiKey 5 Series";
@@ -71,7 +71,7 @@ internal static class ManagementGraphTests
                 var after = log.Contains("DELETE");
                 if (after && scenario == "post-list-failed") return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
                 var methods = new List<object>();
-                if (!after || scenario == "still-present")
+                if (!after || scenario == "still-present" || scenario == "propagated" && log.Count == 3)
                     methods.Add(new { id = "Key-1", displayName = scenario == "changed" ? "Renamed" : "Office", model });
                 if (scenario == "duplicate-id") methods.Add(new {id="Key-1", displayName="Other", model});
                 methods.Add(new {id="Key-10", displayName="Office", model});
@@ -94,8 +94,10 @@ internal static class ManagementGraphTests
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or InvalidDataException or HttpRequestException) { }
             var expected = scenario is "changed" or "duplicate-id" ? new[] {"GET"} :
                 scenario is "unsafe-id" or "phone-target" or "unknown-model" or "invalid-user" ? Array.Empty<string>() :
+                scenario == "propagated" ? new[] {"GET","DELETE","GET","GET"} :
+                scenario == "still-present" ? new[] {"GET","DELETE","GET","GET","GET","GET"} :
                 scenario is "denied" or "timeout" or "invalid-success" ? new[] {"GET","DELETE"} : new[] {"GET","DELETE","GET"};
-            check(verified == (scenario == "removed") && log.SequenceEqual(expected), "Exact deletion is checked and never replayed: " + scenario);
+            check(verified == (scenario is "removed" or "propagated") && log.SequenceEqual(expected), "Exact deletion is checked and never replayed: " + scenario);
         }
     }
 }

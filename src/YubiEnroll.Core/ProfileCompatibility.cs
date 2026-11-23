@@ -5,7 +5,7 @@ namespace YubiEnroll.Core;
 
 public sealed record FidoCapabilities(string Serial, string Firmware, bool ClientPin, bool ResidentKey,
     bool PinPolicy, bool AlwaysUvSupported, bool AlwaysUvEnabled, bool EnterpriseAttestation,
-    int MinimumPinLength, int MaximumPinLength, bool ResetBlocked, bool ResetOverUsb, bool AlwaysUvLocked, bool ForcePinChange = false, bool IsNfc = false, bool ResetOverNfc = false, bool? CanListPasskeys = null)
+    int MinimumPinLength, int MaximumPinLength, bool ResetBlocked, bool ResetOverUsb, bool AlwaysUvLocked, bool ForcePinChange = false, bool IsNfc = false, bool ResetOverNfc = false, bool? CanListPasskeys = null, bool? PinConfigured = null)
 {
     public bool ResetAllowed => !ResetBlocked && (IsNfc ? ResetOverNfc : ResetOverUsb);
 
@@ -44,7 +44,7 @@ public sealed record FidoCapabilities(string Serial, string Firmware, bool Clien
                 Present("ep"), minimum, maximum, root.GetProperty("resetBlocked").GetBoolean(),
                 root.GetProperty("resetOverUsb").GetBoolean(), root.GetProperty("alwaysUvLocked").GetBoolean(), root.GetProperty("forcePinChange").GetBoolean(), target.IsNfc,
                 root.TryGetProperty("resetOverNfc", out var nfcReset) && nfcReset.GetBoolean(),
-                root.TryGetProperty("canListPasskeys", out var listing) ? listing.GetBoolean() : null);
+                root.TryGetProperty("canListPasskeys", out var listing) ? listing.GetBoolean() : null, Present("clientPin") ? Enabled("clientPin") : null);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or InvalidDataException or FormatException or OverflowException)
         {
@@ -124,13 +124,13 @@ public static class FidoCapabilityProbe
         }
     }
 
-    public static async Task<FidoCapabilities> ReadAsync(CliRunner runner, ResetKey target)
+    public static async Task<FidoCapabilities> ReadAsync(CliRunner runner, ResetKey target, CancellationToken cancellation = default)
     {
         // Validate the serial with the existing strict validator; never use a shell or substitute the first key.
         _ = KeyResetService.Selector(target);
         // --force suppresses only ykman's script prompt for this fixed read-only resource.
         // It is never passed to enrollment, reset or any configuration operation.
-        var result = await runner.CaptureWithInputAsync(TimeSpan.FromSeconds(15), Script,
+        var result = await runner.CaptureWithInputAsync(TimeSpan.FromSeconds(15), Script, cancellation,
             "script", "--force", "-", target.Serial, target.Reader ?? "");
         if (result.ExitCode != 0) throw new InvalidOperationException("Could not read FIDO capabilities for the selected key. Reconnect it, close other key tools and Refresh.");
         return FidoCapabilities.Parse(result.Output, target);

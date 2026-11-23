@@ -27,20 +27,22 @@ internal sealed class TerminalPanel : Border
     private readonly string? _captureSerial;
     private readonly bool _enrollment, _addPasskey;
     internal int? CompletedExitCode { get; private set; }
-    private readonly bool _autoCloseOnSuccess;
-    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null, bool nfc = false)
+    private readonly bool _autoCloseOnSuccess, _maskPin;
+    internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null, bool nfc = false, bool single = false, bool savePin = false, string? profile = null)
     {
+        _done.Content = single ? "View registration summary" : enrollment ? "Continue" : autoCloseOnSuccess ? "Continue" : "View reset result";
+        _maskPin = single;
         _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
         Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
         var layout = new DockPanel(); Child = layout;
-        var heading = new TextBlock { Text = title, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
+        var heading = new TextBlock { Text = title + (enrollment && !string.IsNullOrEmpty(profile) ? " · " + (addPasskey ? "Add a passkey" : profile) : ""), TextWrapping = TextWrapping.Wrap, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(heading, Dock.Top); layout.Children.Add(heading);
         var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : nfc ? "Follow the Yubico prompts below. Click the terminal to type. Keep the key flat on the NFC reader; remove and replace it only when prompted." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
         var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
         footer.Children.Add(_status);
-        if (enrollment && !addPasskey) footer.Children.Add(new TextBlock { Text = captureSerial != null ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved." : "Record any generated PIN before returning. Terminal output is not saved to the activity log.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
+        if (enrollment && !addPasskey) footer.Children.Add(new TextBlock { Text = single && captureSerial != null ? (savePin ? "Your temporary PIN is available in the summary and will be saved in the registration log." : "Your temporary PIN is available in the summary for this session.") : savePin ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved." : "Record any generated PIN before returning. Terminal output is not saved to the activity log.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
         _cancel.Click += async (_, _) =>
@@ -68,6 +70,17 @@ internal sealed class TerminalPanel : Border
         DataObject.AddPastingHandler(Screen, (_, e) => e.CancelCommand());
         _screen.Reply += text => _session?.Write(text);
     }
+    internal static string MaskPin(string output) => System.Text.RegularExpressions.Regex.Replace(output,
+        @"(?m)^([ \t]*(?:Temporary PIN|Generated PIN):)[^\r\n]*", "$1 ••••••");
+    internal static string PromptStatus(string output)
+    {
+        var line = output.TrimEnd().Split('\n').LastOrDefault()?.Trim() ?? "";
+        if (line.EndsWith("[y/N]:", StringComparison.OrdinalIgnoreCase)) return "Waiting for your confirmation in the terminal";
+        if (line.StartsWith("Remove ", StringComparison.OrdinalIgnoreCase) && line.Contains("NFC reader", StringComparison.OrdinalIgnoreCase)) return "Remove this YubiKey from the NFC reader";
+        if (line.StartsWith("Place ", StringComparison.OrdinalIgnoreCase) && line.Contains("NFC reader", StringComparison.OrdinalIgnoreCase)) return "Place the same YubiKey back on the NFC reader";
+        return "Operation running";
+    }
+
     internal void SendInput(string text) { if (_running && !_cancelRequested) _session?.Write(text); }
     internal void DismissCompleted() { if (!_running) { _screen.Clear(); Screen.Clear(); _dismissed.TrySetResult(); } }
     internal Action? NativeFinished { get; set; }
@@ -76,7 +89,9 @@ internal sealed class TerminalPanel : Border
         using var session = new PseudoConsole(); _session = session;
         session.Output += text => Dispatcher.BeginInvoke(() =>
         {
-            _screen.Feed(text); Screen.Text = _screen.Text; Screen.CaretIndex = Screen.Text.Length; Screen.ScrollToEnd();
+            _screen.Feed(text); var output = _screen.Text;
+            Screen.Text = _maskPin ? MaskPin(output) : output;
+            if (_running && !_autoCloseOnSuccess && !_cancelRequested) _status.Text = PromptStatus(output); Screen.CaretIndex = Screen.Text.Length; Screen.ScrollToEnd();
         });
         _running = true; Screen.Focus(); _status.Text = _autoCloseOnSuccess ? "Connecting · complete browser sign-in when prompted" : "Operation running";
         int exit;
@@ -85,7 +100,7 @@ internal sealed class TerminalPanel : Border
             exit = await session.RunAsync(executable, args);
             // Process queued final output before enabling dismissal.
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
-            if (_captureSerial != null) GeneratedPin = GeneratedPinSummary.Read(_screen.Text, _captureSerial);
+            if (exit == 0 && !_cancelRequested && _captureSerial != null) GeneratedPin = GeneratedPinSummary.Read(_screen.Text, _captureSerial);
             if (exit != 0) FailureDetail = InteractiveFailure.Describe(_screen.Text);
             _status.Text = exit == 0 ? (_enrollment ? (_addPasskey ? "Passkey successfully registered (reported by YubiEnroll CLI)." : "Key successfully enrolled (reported by YubiEnroll CLI).") : "FIDO reset completed (reported by YubiKey Manager CLI).") : $"The tool finished with exit code {exit}. The operation may be incomplete. Inspect the result before retrying.";
         }

@@ -24,7 +24,9 @@ public sealed class CliRunner(string executable)
 
     public Task<CliResult> CaptureWithTimeoutAsync(TimeSpan maximumWait, params string[] arguments) => CaptureWithInputAsync(maximumWait, null, arguments);
 
-    public async Task<CliResult> CaptureWithInputAsync(TimeSpan maximumWait, string? input, params string[] arguments)
+    public Task<CliResult> CaptureWithInputAsync(TimeSpan maximumWait, string? input, params string[] arguments) => CaptureWithInputAsync(maximumWait, input, CancellationToken.None, arguments);
+
+    public async Task<CliResult> CaptureWithInputAsync(TimeSpan maximumWait, string? input, CancellationToken cancellation, params string[] arguments)
     {
         var info = StartInfo(Executable, arguments);
         info.CreateNoWindow = true;
@@ -34,7 +36,8 @@ public sealed class CliRunner(string executable)
         using var process = Process.Start(info) ?? throw new IOException("Cannot start the Yubico command-line tool.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(maximumWait);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        timeout.CancelAfter(maximumWait);
         try
         {
             if (input != null) await process.StandardInput.WriteAsync(input.AsMemory(), timeout.Token);
@@ -46,6 +49,7 @@ public sealed class CliRunner(string executable)
             try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
             await process.WaitForExitAsync();
             await Task.WhenAll(stdout, stderr);
+            cancellation.ThrowIfCancellationRequested();
             throw new TimeoutException($"The Yubico command-line tool did not respond within {maximumWait.TotalSeconds:0} seconds.");
         }
         return new(process.ExitCode, await stdout, await stderr);

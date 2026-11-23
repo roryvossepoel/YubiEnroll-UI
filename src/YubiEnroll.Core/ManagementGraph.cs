@@ -41,7 +41,7 @@ public sealed class ManagementGraph(HttpClient http, Func<CancellationToken, Tas
         return await ReadMethods(endpoint, await silentToken(ct), ct);
     }
 
-    public async Task<IReadOnlyList<RegistrationCard>> RemoveAsync(Guid user, RegisteredCredential target, CancellationToken ct)
+    public async Task<IReadOnlyList<RegistrationCard>> RemoveAsync(Guid user, RegisteredCredential target, CancellationToken ct, Action? refreshing = null)
     {
         var endpoint = Methods(user);
         if (!target.IsYubicoHardware || !Regex.IsMatch(target.Id, @"\A[A-Za-z0-9_+-]+={0,2}\z"))
@@ -64,7 +64,17 @@ public sealed class ManagementGraph(HttpClient http, Func<CancellationToken, Tas
         { throw new InvalidOperationException("Removal outcome unknown. Refresh before trying again.", ex); }
 
         IReadOnlyList<RegistrationCard> after;
-        try { after = await ReadMethods(endpoint, token, ct); }
+        refreshing?.Invoke();
+        try
+        {
+            after = await ReadMethods(endpoint, token, ct);
+            foreach (var delay in new[] { 350, 750, 1500 })
+            {
+                if (!after.Any(c => c.Id == target.Id)) break;
+                await Task.Delay(delay, ct);
+                after = await ReadMethods(endpoint, token, ct);
+            }
+        }
         catch (Exception ex) { throw new InvalidOperationException("The removal was submitted, but the updated list could not be verified. Refresh before trying again.", ex); }
         var remaining = after.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
         if (remaining.Contains(target.Id)) throw new InvalidOperationException("Removal has not been verified. Refresh to check the registration.");

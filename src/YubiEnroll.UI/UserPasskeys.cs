@@ -52,7 +52,7 @@ public partial class MainWindow
         var connected = _management != null && Equals(_management.Tenant, ManageTenants.SelectedItem);
         RenderProgress(ManageProgress, ["Tenant", "User", "Passkeys"], _manageStep);
         ManageTenantStep.Visibility = Visible(_manageStep == 0);
-        ManageUserStep.Visibility = Visible(_manageStep == 1);
+        ManageUserStep.Visibility = Visible(_manageStep == 1); ManageScroll.Visibility = Visible(_manageStep != 1);
         ManageListStep.Visibility = Visible(_manageStep == 2);
         ManageContext.Text = _manageStep == 0 ? "View or remove a user’s YubiKey registrations in Microsoft Entra. No connected key is required." :
             _manageStep == 1 ? $"Tenant · {_management?.Tenant.Name}" :
@@ -151,7 +151,7 @@ public partial class MainWindow
             ManageUsers.ItemsSource = users;
             Record($"Management user search completed · tenant {session.Tenant.Name} · {users.Count} result(s).");
             ManageSearchHint.Text = users.Count == 0 ? "No matching users found." : users.Count == ManagementGraph.SearchLimit ?
-                $"Showing the first {users.Count} users. Refine your search if needed." : "Select a user to view their passkeys.";
+                $"Showing the first {users.Count} users. Refine your search if needed." : $"{users.Count} found. Select a user to view their passkeys.";
         });
     }
 
@@ -230,16 +230,18 @@ public partial class MainWindow
         if (new RemoveRegistrationWindow(this, list.Tenant, list.User, card.Credential, card.DateLine).ShowDialog() != true)
         { Record($"Entra registration removal cancelled · tenant {list.Tenant.Name} · user {list.User.Id}."); return; }
         if (_busy || !ReferenceEquals(_managedList, list) || !Current(session, list.User)) return;
-        ClearManagedList(); ManageFeedback.Text = "Checking and removing the selected registration…";
+        ClearManagedList(); ManageFeedback.Text = "Removing the selected registration…";
+        ManageRefreshProgress.Visibility = Visibility.Visible;
         await ManagementOperationAsync(session, "Remove passkey registration", ManageFeedback, async ct =>
         {
             IReadOnlyList<RegistrationCard> updated;
-            try { updated = await session.Graph.RemoveAsync(Guid.Parse(list.User.Id), card.Credential, ct); }
+            try { updated = await session.Graph.RemoveAsync(Guid.Parse(list.User.Id), card.Credential, ct, () => ManageFeedback.Text = "Refreshing registrations from Entra…"); }
             catch
             {
                 Record($"Entra removal could not be verified · tenant {list.Tenant.Name} · user {list.User.Id}. Refresh to check.", "Warning");
                 throw;
             }
+            finally { ManageRefreshProgress.Visibility = Visibility.Collapsed; }
             Record($"Passkey registration removed from Entra · tenant {list.Tenant.Name} · user {list.User.Id}.");
             if (!Current(session, list.User)) return;
             SetManagedList(session, list.User, updated);

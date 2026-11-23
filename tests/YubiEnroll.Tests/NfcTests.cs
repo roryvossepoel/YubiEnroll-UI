@@ -53,6 +53,8 @@ internal static class NfcTests
         {"schema":1,"forcePinChange":false,"serial":"12345678","firmware":"5.7.1","reader":"HID Global OMNIKEY 5022 Smart Card Reader 0","options":{"clientPin":true,"rk":true,"authnrCfg":true,"setMinPINLength":true},"minimumPinLength":4,"maximumPinLength":63,"resetBlocked":false,"resetOverUsb":true,"resetOverNfc":false,"alwaysUvLocked":false}
         """;
         var caps = FidoCapabilities.Parse(capsJson, nfc);
+        check(caps.PinConfigured == true && FidoCapabilities.Parse(capsJson.Replace("\"clientPin\":true", "\"clientPin\":false"), nfc).PinConfigured == false &&
+            FidoCapabilities.Parse(capsJson.Replace("\"clientPin\":true,", ""), nfc).PinConfigured == null, "PIN readback distinguishes set, unset and unavailable");
         check(!caps.ResetAllowed && caps.IsNfc && !ProfileCompatibility.Evaluate(ProfileCompatibility.Basic("Basic") with { Reset = true }, caps).Compatible, "NFC reset restriction blocks a resetting profile even when USB reset is allowed");
         check(ProfileCompatibility.Evaluate(ProfileCompatibility.Basic("Basic"), caps).Compatible, "NFC reset restriction does not block a non-reset profile");
         check((caps with { ResetOverNfc = true }).ResetAllowed && !(caps with { ResetOverNfc = true, ResetBlocked = true }).ResetAllowed, "Transport and reset-blocked capability both apply");

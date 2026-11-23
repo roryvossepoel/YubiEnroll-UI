@@ -581,15 +581,22 @@ public partial class MainWindow
         Assert(_selectedKey == admin && Users.SelectedItem == null && KeyName.Text == admin.Key.RegistrationName,
             "Confirming a different target clears the previous recipient and name");
         Assert(_connectedProvider == tenant && ReferenceEquals(Profiles.SelectedItem, profile), "Changing target retains tenant login and profile");
-        ResetResultText.Text = "Synthetic result: reset reported successful. Read-back: target PIN is not set. Entra registrations remain.";
-        _resetStep = 2; RenderWizard(); CaptureWindow(this, "reset-result.png");
+        ShowResetResult(admin.Key, 0, true); InvalidateDeviceInventory(); ApplyInventory(new[] { target }, 0); UpdateLayout();
+        Assert(_resetStep == 2 && ResetResult.IsVisible && !ResetReview.IsVisible && !ResetTargetButton.IsVisible && Equals(ResetBack.Content, "Home")
+            && ResetResultTarget.Text.Contains(admin.Key.Serial) && ResetResultText.Text.Contains("successful"),
+            "The reset receipt is final and retains the original target when the NFC key goes away");
+        ApplyInventory(new[] { target, admin }, 0); CaptureWindow(this, "reset-result.png");
         ResetNext_Click(this, e);
         Assert(_resetStep == 0 && _selectedKey == null && !ResetNext.IsEnabled, "Reset another key requires a fresh explicit selection");
         ShowPage(PreparePage);
         EnrollmentKeys.SelectedIndex = 0; EnrollNext_Click(this, e); EnrollNext_Click(this, e);
         Users.ItemsSource = new[] { new UserCandidate("11111111-2222-3333-4444-555555555555", "Alex Example  alex@example.test  alex@example.test") { DisplayName = "Alex Example", UserPrincipalName = "alex@example.test", Email = "alex@example.test" } }; Users.SelectedIndex = 0;
         EnrollNext_Click(this, e); ApplyInventory(new[] { target }, 0);
+        _receipt = new(target.Key, SelectedProvider, SelectedUser, ProfileCompatibility.Managed("Temporary PIN"), "Office key", false);
+        _receiptSuccess = true; _receiptPin = "009876";
         ShowEnrollmentResult("Synthetic result: YubiEnroll reported success. Review registered keys and test sign-in.");
+        Assert(ReceiptPin.Text == "••••••" && _receiptPin != null, "Receipt masks the temporary PIN by default");
+        RevealPin_Click(this, e); Assert(ReceiptPin.Text == "009876", "Reveal only on request"); RevealPin_Click(this, e);
         CaptureWindow(this, "enroll-result.png");
         Assert(_enrollStep == 5 && !EnrollButton.IsVisible && EnrollNext.IsEnabled, "Enrollment result offers another key without repeating enrollment");
         AddPasskey_Click(this, e); UpdateLayout();
@@ -680,6 +687,11 @@ public partial class MainWindow
 
     private async Task TestEmbeddedTerminalAsync(string mockExecutable)
     {
+        Assert(TerminalPanel.PromptStatus("settings. Proceed? [y/N]:").Contains("confirmation") &&
+            TerminalPanel.PromptStatus("Remove your YubiKey from the NFC reader.").StartsWith("Remove") &&
+            TerminalPanel.PromptStatus("Remove the YubiKey from the NFC reader...\nPlace the YubiKey back on the NFC reader...").StartsWith("Place") &&
+            TerminalPanel.PromptStatus("Place your YubiKey back on the NFC reader now...\nFIDO application data reset.") == "Operation running",
+            "Terminal status follows the current prompt only");
         using var terminal = new PseudoConsole();
         var output = new System.Text.StringBuilder();
         var sent = false;
@@ -718,12 +730,12 @@ public partial class MainWindow
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
         foreach (var capture in new[] { false, true })
         {
-            var pinPanel = new TerminalPanel("Synthetic PIN summary", true, captureSerial: capture ? "00123456" : null);
+            var pinPanel = new TerminalPanel("Synthetic PIN summary", true, captureSerial: capture ? "00123456" : null, single: true);
             TerminalOverlay.Content = pinPanel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
             var pinRun = pinPanel.RunAsync(mockExecutable, ["--pin-summary-probe"]);
             var end = DateTime.UtcNow.AddSeconds(10);
             while (pinPanel.CompletedExitCode == null && DateTime.UtcNow < end) await Task.Delay(50);
-            Assert(pinPanel.CompletedExitCode == 0 && pinPanel.GeneratedPin == (capture ? "001234" : null),
+            Assert(pinPanel.CompletedExitCode == 0 && !pinPanel.Screen.Text.Contains("Temporary PIN: 001234") && pinPanel.GeneratedPin == (capture ? "001234" : null),
                 "Published terminal captures the generated summary PIN only with explicit opt-in: " + capture);
             pinPanel.DismissCompleted(); await pinRun;
         }
