@@ -16,12 +16,14 @@ public sealed record RegistrationRecord(
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? GeneratedPin { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? GeneratePinConfigured { get; init; }
-    [JsonIgnore] public string PinModeLabel => (GeneratePinConfigured ?? (GeneratedPin != null ? true : (bool?)null)) switch
+    [JsonIgnore] public string PinUnavailableLabel => GeneratePinConfigured switch
     {
-        true => "Generated initial PIN",
+        true => "Not saved",
         false => "Not generated",
         null => "Not recorded"
     };
+    // Size the numeric field without putting the PIN into the masked visual tree.
+    [JsonIgnore] public string PinLayoutSample => new('0', GeneratedPin?.Length ?? 0);
     [JsonIgnore] public string ChangePinLabel => ForcePinChangeOnFirstUse ? "Yes" : "No";
     [JsonIgnore] public DateTimeOffset RecordedAt => CompletedAt ?? StartedAt;
     [JsonIgnore] public string ListTimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);

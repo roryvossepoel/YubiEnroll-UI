@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Microsoft.Win32;
 using YubiEnroll.Core;
 
@@ -15,6 +16,7 @@ public partial class RegistrationLogView : UserControl
     private readonly RegistrationJournal _journal;
     private IReadOnlyList<RegistrationRecord> _records = [];
     private bool _loading;
+    private ToggleButton? _revealedPin;
 
     public RegistrationLogView(RegistrationJournal journal)
     {
@@ -55,6 +57,7 @@ public partial class RegistrationLogView : UserControl
     private void Clear_Click(object sender, RoutedEventArgs e) { _loading = true; Search.Clear(); TenantFilter.SelectedIndex = 0; FromDate.SelectedDate = ThroughDate.SelectedDate = null; ResultFilter.SelectedIndex = 0; _loading = false; ApplyFilter(); }
     private void ApplyFilter()
     {
+        HidePin();
         var invalidDates = FromDate.SelectedDate > ThroughDate.SelectedDate;
         IReadOnlyList<RegistrationRecord> visible = invalidDates ? [] : RegistrationJournal.Filter(_records, (TenantFilter.SelectedItem as TenantChoice)?.Id, FromDate.SelectedDate, ThroughDate.SelectedDate, ResultFilter.SelectedIndex == 1);
         if (ResultFilter.SelectedIndex >= 2) visible = visible.Where(r => r.Outcome == (ResultFilter.SelectedIndex == 2 ? RegistrationOutcome.FailedOrInterrupted : RegistrationOutcome.Unknown)).ToList();
@@ -95,10 +98,27 @@ public partial class RegistrationLogView : UserControl
         }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex) || ex is System.ComponentModel.Win32Exception) { Feedback.Text = "Could not open the log folder."; }
     }
+    private void HidePin()
+    {
+        if (_revealedPin is { } pin) pin.IsChecked = false;
+    }
+    private void ViewVisibility_Changed(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (!IsVisible) HidePin();
+    }
+    private void Pin_Checked(object sender, RoutedEventArgs e)
+    {
+        if (!ReferenceEquals(_revealedPin, sender)) HidePin();
+        _revealedPin = (ToggleButton)sender;
+    }
+    private void Pin_Unchecked(object sender, RoutedEventArgs e)
+    {
+        if (ReferenceEquals(_revealedPin, sender)) _revealedPin = null;
+    }
     private void PinContext_Changed(object sender, DependencyPropertyChangedEventArgs e) =>
-        ((System.Windows.Controls.Primitives.ToggleButton)sender).IsChecked = false;
+        ((ToggleButton)sender).IsChecked = false;
     private void Pin_Unloaded(object sender, RoutedEventArgs e) =>
-        ((System.Windows.Controls.Primitives.ToggleButton)sender).IsChecked = false;
+        ((ToggleButton)sender).IsChecked = false;
     private void CopyRow_Click(object sender, RoutedEventArgs e)
     {
         if (((Button)sender).DataContext is not RegistrationRecord record) return;

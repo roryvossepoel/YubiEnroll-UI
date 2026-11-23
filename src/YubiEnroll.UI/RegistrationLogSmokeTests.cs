@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using YubiEnroll.Core;
 
@@ -64,6 +65,30 @@ public partial class MainWindow
         view.RefreshRecords();
         view.TenantFilter.SelectedIndex = 0;
         view.Records.SelectedIndex = 2;
+        var sample = view.Records.Items.Cast<RegistrationRecord>().ToArray();
+        // Exercise real grid cells without modifying the journal or persisting any PIN.
+        var first = sample[0] with { GeneratedPin = "001234", GeneratePinConfigured = true };
+        var other = sample[1] with { GeneratedPin = new string('7', 63), GeneratePinConfigured = true };
+        view.Records.ItemsSource = new[] { first, other, sample[2] };
+        view.Records.ScrollIntoView(first, view.Records.Columns.Single(c => Equals(c.Header, "Initial PIN")));
+        settings.UpdateLayout();
+        var cells = VisualDescendants<ToggleButton>(view.Records).Where(b => b.Name == "Reveal" && b.IsVisible).ToArray();
+        var showFirst = cells.Single(b => ReferenceEquals(b.DataContext, first));
+        var showOther = cells.Single(b => ReferenceEquals(b.DataContext, other));
+        TextBlock Value(RegistrationRecord r) => VisualDescendants<TextBlock>(view.Records).Single(t => t.Name == "PinValue" && ReferenceEquals(t.DataContext, r));
+        var row = (DataGridRow)view.Records.ItemContainerGenerator.ContainerFromItem(other);
+        var originalHeight = row.ActualHeight;
+        var origin = showFirst.TranslatePoint(new Point(), view.Records);
+        Assert(cells.Length == 2 && Value(first).Text == "••••••", "Masked PIN by default; records without a saved PIN offer no reveal action");
+        showFirst.IsChecked = true; settings.UpdateLayout();
+        Assert(Value(first).Text == "001234" && showFirst.TranslatePoint(new Point(), view.Records) == origin,
+            "Reveal preserves leading zeroes and keeps the button in place");
+        showOther.IsChecked = true; settings.UpdateLayout();
+        Assert(showFirst.IsChecked == false && Value(first).Text == "••••••" && Value(other).Text == other.GeneratedPin && row.ActualHeight == originalHeight,
+            "Only one PIN is visible; a long PIN wraps without resizing its row");
+        view.Search.Text = "no matches";
+        Assert(showOther.IsChecked == false, "Filtering the log hides a revealed PIN");
+        view.Search.Clear(); view.RefreshRecords();
         CaptureWindow(settings, "settings-registration-log.png");
         var width = settings.Width; var height = settings.Height;
         settings.Width = 740; settings.Height = 600;
