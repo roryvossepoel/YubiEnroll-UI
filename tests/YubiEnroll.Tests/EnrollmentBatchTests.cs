@@ -71,13 +71,25 @@ internal static class EnrollmentBatchTests
             batch.ApplySavedPin(other);
         check(batch.Rows.All(row => row.GeneratedPin == null), "Only the matching successful saved attempt contributes a batch PIN");
         batch.ApplySavedPin(saved);
+        check(batch.Rows[0].GeneratedPin == saved.GeneratedPin, "The committed PIN reaches its own recipient");
         foreach (var separator in new[] { ";", "," })
         {
-            var plain = batch.Csv(separator);
-            var withPins = batch.Csv(separator, includeInitialPins: true).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-            check(!plain.Contains("004681") && !plain.Contains("Initial PIN") && withPins[0].EndsWith(separator + "Initial PIN") &&
-                withPins[1].EndsWith(separator + "\"'004681\"") && withPins[2].EndsWith(separator + "\"\""),
-                "Only an explicit export includes the saved PIN with leading zeroes, and missing PINs stay blank");
+            static List<string[]> Parse(string csv, string separator)
+            {
+                using var parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(new StringReader(csv));
+                parser.SetDelimiters(separator);
+                var rows = new List<string[]>();
+                while (!parser.EndOfData) rows.Add(parser.ReadFields()!);
+                return rows;
+            }
+            var plain = Parse(batch.Csv(separator), separator);
+            var withPins = Parse(batch.Csv(separator, includeInitialPins: true), separator);
+            check(plain.Count == 3 && plain.All(row => row.Length == 8) &&
+                plain.All(row => !row.Contains("Initial PIN") && !row.Contains("'004681")), "Default export omits the PIN field");
+            check(withPins.Count == 3 && withPins.All(row => row.Length == 9) && withPins[0][8] == "Initial PIN",
+                "Opt-in export adds one PIN column");
+            check(withPins[1][8] == "'004681", "Saved initial PIN is exported as spreadsheet text with leading zeroes");
+            check(withPins[2][8] == "", "Unverified recipient has an empty PIN field");
         }
         check(!batch.Rows[0].ToString().Contains("004681"), "Logging a row cannot reveal its initial PIN");
     }
