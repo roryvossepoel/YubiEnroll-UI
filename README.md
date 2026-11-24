@@ -2,6 +2,10 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
+## 0.11.1
+
+The registration log combines the PIN and its first-use change requirement in one column. The eye next to a saved temporary PIN reveals just that row. Additional passkey registrations show **Existing PIN** with no reveal action. **PIN not logged** means generation was configured but the record contains no PIN. The first-use note describes the profile at registration, not the current state of the key. Logging preferences, CSV columns and machine policy are unchanged.
+
 ## 0.11.0
 
 Both logs have subtle column separators and a labeled Copy column. The registration log aligns Clear filters with the date and result fields. The console executable uses the app’s two tiles with a terminal prompt. Both log tables scroll horizontally when columns exceed the available width. In the registration log, an eye icon reveals or hides one initial PIN at a time. In Settings, a hovered tab has a grey underline and the selected tab keeps its green underline. Help & About adapts the introduction to the available window width. Both registration flows show the same review layout. When a temporary PIN is available it stays masked inside the result card until revealed. A failed registration is distinguished from an interrupted or unknown outcome. The local passkey list shows its count in the heading, and selecting a credential keeps its ID on one line. The policy templates are unchanged.

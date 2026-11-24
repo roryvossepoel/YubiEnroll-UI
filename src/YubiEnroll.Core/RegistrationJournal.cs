@@ -18,13 +18,13 @@ public sealed record RegistrationRecord(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? GeneratePinConfigured { get; init; }
     [JsonIgnore] public string PinUnavailableLabel => GeneratePinConfigured switch
     {
-        true => "Not saved",
+        true => "PIN not logged",
+        false when ProfileName == PasskeyAddition.OperationName && !ResetBeforeEnrollment && !ForcePinChangeOnFirstUse => "Existing PIN",
         false => "Not generated",
         null => "Not recorded"
     };
     // Size the numeric field without putting the PIN into the masked visual tree.
-    [JsonIgnore] public string PinLayoutSample => new('0', GeneratedPin?.Length ?? 0);
-    [JsonIgnore] public string ChangePinLabel => ForcePinChangeOnFirstUse ? "Yes" : "No";
+    [JsonIgnore] public string PinLayoutSample => new('0', Math.Max(6, GeneratedPin?.Length ?? 0));
     [JsonIgnore] public DateTimeOffset RecordedAt => CompletedAt ?? StartedAt;
     [JsonIgnore] public string ListTimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
     [JsonIgnore] public string TimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
@@ -35,9 +35,11 @@ public sealed record RegistrationRecord(
         RegistrationOutcome.FailedOrInterrupted => "Failed / interrupted",
         _ => "Unknown — check Entra"
     };
-    public static RegistrationRecord Start(Provider tenant, UserCandidate user, ResetKey key, ProfileSetup profile, string registrationName) =>
+    public static RegistrationRecord Start(Provider tenant, UserCandidate user, ResetKey key, ProfileSetup profile, string registrationName, bool addingPasskey = false) =>
         new(1, Guid.NewGuid(), DateTimeOffset.Now, null, tenant.Name, tenant.TenantId, user.Id,
-            user.DisplayName, user.UserPrincipalName, user.Email, key.Model, key.Serial, profile.Name, registrationName.Trim(),
+            user.DisplayName, user.UserPrincipalName, user.Email, key.Model, key.Serial,
+            // v1 logs store the action in ProfileName for additions. Disambiguate a user profile with the same name.
+            !addingPasskey && profile.Name == PasskeyAddition.OperationName ? "Setup profile: " + profile.Name : profile.Name, registrationName.Trim(),
             profile.Reset ?? throw new InvalidOperationException("Choose an explicit reset setting."),
             profile.ForcePinChange ?? throw new InvalidOperationException("Choose an explicit first-use PIN setting."), RegistrationOutcome.Unknown, null) { GeneratePinConfigured = profile.RandomPin };
 

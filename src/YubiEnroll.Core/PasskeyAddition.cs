@@ -3,6 +3,7 @@ namespace YubiEnroll.Core;
 // Explicit operation-scoped settings prevent inheritance of a provider's destructive default.
 public static class PasskeyAddition
 {
+    public const string OperationName = "Add a passkey";
     public const string PinChangeIssue = "This key already requires a PIN change. Complete that change before using Add a passkey.";
     public static ProfileCompatibilityResult Evaluate(FidoCapabilities? key, FidoPinState pin)
     {
@@ -17,7 +18,7 @@ public static class PasskeyAddition
             "A working existing FIDO PIN is required. Use Set up a YubiKey for initial configuration.");
         return new(issues);
     }
-    public static ProfileSetup Settings(FidoCapabilities key) => new("Add a passkey", Reset: false,
+    public static ProfileSetup Settings(FidoCapabilities key) => new(OperationName, Reset: false,
         MinPinLength: key.MinimumPinLength, RequireAlwaysUv: key.AlwaysUvEnabled, RequireEa: false,
         ForcePinChange: false, RandomPin: false, RandomPinLength: key.MinimumPinLength);
 }

@@ -23,16 +23,16 @@
     <DataGridTextColumn Header="Tenant" Binding="{Binding TenantName}" Width="Auto"/>
     <DataGridTextColumn Header="User" Binding="{Binding UserLabel}" Width="Auto" MinWidth="120"/>
     <DataGridTemplateColumn Header="Key info" Width="Auto"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding KeyModel}"/><TextBlock Text="{Binding TargetSerial}" Foreground="{StaticResource Muted}"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-    <DataGridTemplateColumn Header="Initial PIN" Width="132" MinWidth="132" CanUserSort="False">
-     <DataGridTemplateColumn.CellTemplate><DataTemplate><Grid>
+    <DataGridTemplateColumn Header="PIN" Width="158" MinWidth="145" CanUserSort="False">
+     <DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel>
       <TextBlock x:Name="Unavailable" Visibility="Collapsed" Text="{Binding PinUnavailableLabel}" VerticalAlignment="Center" Foreground="{StaticResource Muted}"/>
-      <Grid x:Name="PinControls"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-       <Grid Margin="0,0,6,0" VerticalAlignment="Center" TextElement.FontFamily="Consolas" TextElement.FontSize="15">
+      <Grid x:Name="PinControls" HorizontalAlignment="Left"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+       <Grid MaxWidth="80" Margin="0,0,4,0" VerticalAlignment="Center" TextElement.FontFamily="Consolas" TextElement.FontSize="15">
         <TextBlock Text="{Binding PinLayoutSample}" Visibility="Hidden" TextWrapping="Wrap"/>
         <TextBlock x:Name="PinValue" Text="••••••" TextWrapping="Wrap" VerticalAlignment="Center"/>
        </Grid>
        <ToggleButton Grid.Column="1" x:Name="Reveal" Content="Show PIN" ToolTip="{Binding Content,RelativeSource={RelativeSource Self}}"
-         Width="32" Height="32" VerticalAlignment="Center" Cursor="Hand" AutomationProperties.Name="{Binding Content,RelativeSource={RelativeSource Self}}"
+         Width="32" Height="26" VerticalAlignment="Center" Cursor="Hand" AutomationProperties.Name="{Binding Content,RelativeSource={RelativeSource Self}}"
          Checked="Pin_Checked" Unchecked="Pin_Unchecked" DataContextChanged="PinContext_Changed" Unloaded="Pin_Unloaded">
         <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
          <Border x:Name="Chrome" Padding="4,2" BorderThickness="1" CornerRadius="5" Background="Transparent" BorderBrush="Transparent">
@@ -46,14 +46,17 @@
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Heading}"/></Trigger>
          </ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
        </ToggleButton>
-      </Grid></Grid><DataTemplate.Triggers>
+      </Grid>
+      <TextBlock x:Name="ChangeHint" Text="Change on first use" Foreground="{StaticResource Muted}" FontSize="13" Visibility="Collapsed"
+                 ToolTip="The profile required a PIN change at the time of registration."/>
+     </StackPanel><DataTemplate.Triggers>
+       <DataTrigger Binding="{Binding ForcePinChangeOnFirstUse}" Value="True"><Setter TargetName="ChangeHint" Property="Visibility" Value="Visible"/></DataTrigger>
        <Trigger SourceName="Reveal" Property="IsChecked" Value="True">
         <Setter TargetName="PinValue" Property="Text" Value="{Binding GeneratedPin}"/><Setter TargetName="Reveal" Property="Content" Value="Hide PIN"/>
        </Trigger>
        <DataTrigger Binding="{Binding GeneratedPin}" Value="{x:Null}"><Setter TargetName="PinControls" Property="Visibility" Value="Collapsed"/><Setter TargetName="Unavailable" Property="Visibility" Value="Visible"/></DataTrigger>
       </DataTemplate.Triggers></DataTemplate></DataGridTemplateColumn.CellTemplate>
     </DataGridTemplateColumn>
-    <DataGridTextColumn Header="Change on first use" Binding="{Binding ChangePinLabel}" Width="Auto"><DataGridTextColumn.HeaderStyle><Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource LogColumnHeader}"><Setter Property="ToolTip" Value="First-use PIN change configured in the profile"/></Style></DataGridTextColumn.HeaderStyle></DataGridTextColumn>
     <DataGridTemplateColumn Header="Result" Width="Auto"><DataGridTemplateColumn.CellTemplate><DataTemplate><Border HorizontalAlignment="Left" Padding="10,4" CornerRadius="12"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="#FFF2E1"/><Style.Triggers><DataTrigger Binding="{Binding Outcome}" Value="Succeeded"><Setter Property="Background" Value="#EAF4D6"/></DataTrigger><DataTrigger Binding="{Binding Outcome}" Value="FailedOrInterrupted"><Setter Property="Background" Value="#FBECEE"/></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{Binding OutcomeLabel}" Foreground="#263238" FontSize="12"/></Border></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
    <DataGridTemplateColumn Header="Copy" Width="Auto" CanUserSort="False"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Style="{StaticResource LogCopyButton}" ToolTip="Copy this registration as a CSV row" AutomationProperties.Name="Copy registration as CSV" Click="CopyRow_Click"><Path Width="15" Height="16" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round" Data="M6,5 H15 V17 H6 Z M3,13 H2 V1 H11 V2"/></Button></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn></DataGrid.Columns>
 
