@@ -56,7 +56,7 @@ internal static class EnrollmentBatchTests
         check(batch.Current?.User == a && batch.Current.Status == IssueStatus.Registered, "Reported success stays on the handoff row");
         batch.Advance();
         Reject(() => batch.Start(b, key with { Reader = "NFC 0" }, FidoPinState.NotSet, setup), "The same physical serial cannot be reused via NFC");
-        var spare = key with { Serial = "00098765" };
+        var spare = key with { Serial = "00046815" };
         batch.Start(b, spare, FidoPinState.NotSet, setup);
         batch.Complete(null);
         Reject(() => batch.Start(b, spare, FidoPinState.NotSet, setup), "An uncertain operation cannot be replayed");
@@ -64,7 +64,7 @@ internal static class EnrollmentBatchTests
         var csv = batch.Csv(";");
         check(batch.Current == null && csv.Contains("Check required") && csv.Contains("Registered") && csv.Contains("'0012345") && csv.Contains("'=Example") && !csv.Contains("PIN"),
             "The report preserves unknown outcomes and text serials and contains no PINs");
-        var saved = attempt.Complete(0) with { GeneratedPin = "009876" };
+        var saved = attempt.Complete(0) with { GeneratedPin = "004681" };
         foreach (var other in new[] { saved with { AttemptId = Guid.NewGuid() }, saved with { UserId = b.Id },
             saved with { TargetSerial = spare.Serial }, saved with { TenantId = Guid.NewGuid().ToString() },
             saved with { GeneratedPin = null }, saved with { Outcome = RegistrationOutcome.Unknown } })
@@ -75,10 +75,10 @@ internal static class EnrollmentBatchTests
         {
             var plain = batch.Csv(separator);
             var withPins = batch.Csv(separator, includeInitialPins: true).Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-            check(!plain.Contains("009876") && !plain.Contains("Initial PIN") && withPins[0].EndsWith(separator + "Initial PIN") &&
-                withPins[1].EndsWith(separator + "\"'009876\"") && withPins[2].EndsWith(separator + "\"\""),
+            check(!plain.Contains("004681") && !plain.Contains("Initial PIN") && withPins[0].EndsWith(separator + "Initial PIN") &&
+                withPins[1].EndsWith(separator + "\"'004681\"") && withPins[2].EndsWith(separator + "\"\""),
                 "Only an explicit export includes the saved PIN with leading zeroes, and missing PINs stay blank");
         }
-        check(!batch.Rows[0].ToString().Contains("009876"), "Logging a row cannot reveal its initial PIN");
+        check(!batch.Rows[0].ToString().Contains("004681"), "Logging a row cannot reveal its initial PIN");
     }
 }
