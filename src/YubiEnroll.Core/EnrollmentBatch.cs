@@ -8,7 +8,7 @@ public static class BatchRoster
     public const int Limit = 500;
     public const int MaxCharacters = 256_000;
 
-    public static string[] Import(string text)
+    public static string[] Import(string text, List<int>? sourceLines = null)
     {
         if (text.Length > MaxCharacters) throw new ArgumentException("The list is too large. Import at most 500 users at a time.");
         text = text.TrimStart('\uFEFF');
@@ -21,12 +21,15 @@ public static class BatchRoster
             else if (!quoted && ch is ',' or ';' or '\t') { delimiter = ch.ToString(); break; }
         }
         parser.SetDelimiters(delimiter);
+        var physicalLines = text.ReplaceLineEndings("\n").Split('\n');
         var upns = new List<string>();
         int? column = null; var columns = 1;
         try
         {
             while (!parser.EndOfData)
             {
+                var line = checked((int)parser.LineNumber);
+                while (line > 0 && line <= physicalLines.Length && string.IsNullOrWhiteSpace(physicalLines[line - 1])) line++;
                 var cells = parser.ReadFields() ?? [];
                 if (column == null)
                 {
@@ -39,6 +42,7 @@ public static class BatchRoster
                 var value = cells[column.Value].Trim();
                 if (value.Length == 0 || value.Any(char.IsControl)) throw new ArgumentException($"Missing or invalid sign-in name in entry {upns.Count + 1}.");
                 upns.Add(value);
+                sourceLines?.Add(line);
                 if (upns.Count > Limit) throw new ArgumentException("Split the list into batches of at most 500 users.");
             }
         }

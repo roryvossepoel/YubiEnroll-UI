@@ -18,6 +18,21 @@ internal static class EnrollmentBatchTests
         check(BatchRoster.Import("\uFEFFName;UserPrincipalName\r\n\"Example; A\";a@example.test\r\nB;b@example.test").SequenceEqual(new[] { a.UserPrincipalName, b.UserPrincipalName }),
             "Excel CSV with quoted cells imports the named column");
         check(BatchRoster.Import("a@example.test\r\nb@example.test").Length == 2, "A pasted UPN column needs no header");
+        var lines = new List<int>();
+        BatchRoster.Import("UserPrincipalName\n\na@example.test\n\nb@example.test", lines);
+        check(lines.SequenceEqual(new[] { 3, 5 }), "Input validation uses physical editor line numbers");
+        var nfc = key with { Reader = "OMNIKEY 0" };
+        var current = new KeyInventory([nfc], 0);
+        var transcript = $"The YubiKey has been reset.\nNew credential registered!\nYubiKey configuration summary:\nSerial number: {key.Serial}\nTemporary PIN: 012345";
+        var serial = GeneratedPinSummary.ResetReceiptSerial(transcript);
+        check(EnrollmentTargetGuard.ConfirmNfcReset(nfc, current, true, serial) &&
+            GeneratedPinSummary.Read(transcript, key.Serial) == "012345", "Same-key NFC reset keeps native success and the generated PIN");
+        check(!EnrollmentTargetGuard.ConfirmNfcReset(nfc, new([nfc with { Serial = "222" }], 0), true, serial) &&
+            !EnrollmentTargetGuard.ConfirmNfcReset(nfc, new([nfc with { Reader = "Different reader" }], 0), true, serial) &&
+            !EnrollmentTargetGuard.ConfirmNfcReset(nfc, new([], 0), true, serial) &&
+            !EnrollmentTargetGuard.ConfirmNfcReset(nfc, current, true, "222") &&
+            !EnrollmentTargetGuard.ConfirmNfcReset(nfc, current, true, null),
+            "Wrong card, reader, missing card or mismatched native summary stays uncertain");
         Reject(() => BatchRoster.Import("Name,Email\na,a@example.test"), "Unnamed identity columns cannot be guessed");
         Reject(() => BatchRoster.Import("Name,UserPrincipalName\na,b,c"), "Ragged rows cannot shift a recipient");
         check(BatchRoster.Exact(a.UserPrincipalName, [a with { UserPrincipalName = "", Email = a.UserPrincipalName }]) == null &&

@@ -48,8 +48,9 @@ internal sealed class TerminalPanel : Border
             _pinHint.Text = single ? "If a temporary PIN is generated, you can view it in the registration summary."
                 : savePin ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved."
                 : "Record any generated PIN before returning. Terminal output is not saved to the activity log.";
-            footer.Children.Add(_pinHint);
         }
+        else _pinHint.Visibility = Visibility.Collapsed;
+        footer.Children.Add(_pinHint);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
         _cancel.Click += async (_, _) =>
@@ -91,7 +92,7 @@ internal sealed class TerminalPanel : Border
 
     internal void SendInput(string text) { if (_running && !_cancelRequested) _session?.Write(text); }
     internal void DismissCompleted() { if (!_running) { _screen.Clear(); Screen.Clear(); _dismissed.TrySetResult(); } }
-    internal Action? NativeFinished { get; set; }
+    internal Func<int, string?, string?, Task<string?>>? NativeFinished { get; set; }
     internal async Task<int> RunAsync(string executable, string[] args)
     {
         using var session = new PseudoConsole(); _session = session;
@@ -117,7 +118,7 @@ internal sealed class TerminalPanel : Border
             exit = -1;
             _status.Text = session.HasStarted ? "The terminal connection failed after launch. The operation's outcome is unknown. No retry was started." : "The embedded terminal could not start. Choose external console in Settings before trying again.";
         }
-        finally { _running = false; _session = null; _done.IsEnabled = true; _done.Focus(); }
+        finally { _running = false; _session = null; }
         _cancel.Visibility = Visibility.Collapsed;
         if (_cancelRequested)
         {
@@ -130,7 +131,19 @@ internal sealed class TerminalPanel : Border
             _pinHint.Visibility = exit == 0 && GeneratedPin != null ? Visibility.Visible : Visibility.Collapsed;
             _pinHint.Text = "Your temporary PIN is available in the registration summary.";
         }
-        NativeFinished?.Invoke();
+        if (NativeFinished != null)
+        {
+            var notice = await NativeFinished(exit, GeneratedPin, GeneratedPinSummary.ResetReceiptSerial(_screen.Text));
+            if (notice != null)
+            {
+                _pinHint.Text = notice;
+                _pinHint.Visibility = Visibility.Visible;
+                // The operator must be able to record an unsaved PIN before dismissal.
+                if (_maskPin && GeneratedPin == null) Screen.Text = _screen.Text;
+            }
+        }
+        _done.IsEnabled = true;
+        _done.Focus();
         CompletedExitCode = exit;
         if (_autoCloseOnSuccess && exit == 0) { _screen.Clear(); Screen.Clear(); return exit; }
         await _dismissed.Task;
