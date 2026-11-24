@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.0" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.1" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.0\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.1\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)

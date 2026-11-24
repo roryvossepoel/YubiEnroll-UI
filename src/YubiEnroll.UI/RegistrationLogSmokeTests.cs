@@ -94,10 +94,12 @@ public partial class MainWindow
         view.Records.SelectedIndex = 2;
         var sample = view.Records.Items.Cast<RegistrationRecord>().ToArray();
         // Exercise real grid cells without modifying the journal or persisting any PIN.
-        var first = sample[0] with { GeneratedPin = "001234", GeneratePinConfigured = true };
+        var first = sample[0] with { GeneratedPin = "001234", GeneratePinConfigured = true, ForcePinChangeOnFirstUse = true };
         var other = sample[1] with { GeneratedPin = new string('7', 63), GeneratePinConfigured = true };
-        view.Records.ItemsSource = new[] { first, other, sample[2] };
-        view.Records.ScrollIntoView(first, view.Records.Columns.Single(c => Equals(c.Header, "Initial PIN")));
+        var existing = sample[2] with { GeneratedPin = null, GeneratePinConfigured = false, ForcePinChangeOnFirstUse = false,
+            ResetBeforeEnrollment = false, ProfileName = PasskeyAddition.OperationName };
+        view.Records.ItemsSource = new[] { first, other, existing };
+        view.Records.ScrollIntoView(first, view.Records.Columns.Single(c => Equals(c.Header, "PIN")));
         settings.UpdateLayout();
         var cells = VisualDescendants<ToggleButton>(view.Records).Where(b => b.Name == "Reveal" && b.IsVisible).ToArray();
         var showFirst = cells.Single(b => ReferenceEquals(b.DataContext, first));
@@ -106,6 +108,12 @@ public partial class MainWindow
         var row = (DataGridRow)view.Records.ItemContainerGenerator.ContainerFromItem(other);
         var originalHeight = row.ActualHeight;
         var origin = showFirst.TranslatePoint(new Point(), view.Records);
+        TextBlock TextFor(RegistrationRecord r, string name) => VisualDescendants<TextBlock>(view.Records).Single(t => t.Name == name && ReferenceEquals(t.DataContext, r));
+        Assert(TextFor(first, "ChangeHint").IsVisible && !TextFor(existing, "ChangeHint").IsVisible &&
+            TextFor(existing, "Unavailable").Text == "Existing PIN" && TextFor(existing, "Unavailable").IsVisible &&
+            !view.Records.Columns.Any(c => Equals(c.Header, "Change on first use")), "One PIN column shows the recorded first-use rule only when required");
+        var valueEnd = Value(first).TranslatePoint(new Point(Value(first).ActualWidth, 0), view.Records).X;
+        Assert(origin.X >= valueEnd && origin.X - valueEnd <= 6, "Eye sits immediately beside the PIN");
         Assert(cells.Length == 2 && Value(first).Text == "••••••", "Masked PIN by default; records without a saved PIN offer no reveal action");
         Assert(Equals(showFirst.ToolTip, "Show PIN") && System.Windows.Automation.AutomationProperties.GetName(showFirst) == "Show PIN" &&
             !VisualDescendants<TextBlock>(showFirst).Any(), "Icon-only reveal has an accessible label and tooltip");

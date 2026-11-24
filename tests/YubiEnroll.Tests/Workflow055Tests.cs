@@ -38,8 +38,13 @@ static class Workflow055Tests
             }
             var after = ConfigReader.Read(path);
             check(after.Profiles.Any(p => p.Name == "Concurrent edit") && after.Profiles.Any(p => p.Name == "Managed") && !after.Profiles.Any(p => p.Name == operationName) && after.Providers.Single().Profile == "Managed", "Operation cleanup preserves concurrent changes and legacy native defaults");
-            var record = RegistrationRecord.Start(after.Providers.Single(), new(tenant.TenantId, "Example"), new("12345678", "YubiKey"), settings, "Extra passkey");
+            var record = RegistrationRecord.Start(after.Providers.Single(), new(tenant.TenantId, "Example"), new("12345678", "YubiKey"), settings, "Extra passkey", addingPasskey: true);
             check(!record.ResetBeforeEnrollment && !record.ForcePinChangeOnFirstUse && record.ProfileName == "Add a passkey", "Registration log identifies the non-reset addition flow");
+            check(record.PinUnavailableLabel == "Existing PIN" && record.Complete(7).PinUnavailableLabel == "Existing PIN", "Additional passkeys use an existing PIN even when the attempt fails");
+            var custom = RegistrationRecord.Start(after.Providers.Single(), new(tenant.TenantId, "Example"), new("12345678", "YubiKey"), settings, "Setup");
+            check(custom.PinUnavailableLabel == "Not generated", "A custom setup profile named like the operation does not imply use of an existing PIN");
+            check((record with { GeneratePinConfigured = true }).PinUnavailableLabel == "PIN not logged" &&
+                (record with { GeneratePinConfigured = null }).PinUnavailableLabel == "Not recorded", "Absent values distinguish configured generation from missing historical data");
         }
         finally { Directory.Delete(dir, true); }
         check(new UserCandidate(tenant.TenantId, "Example  user@example.test  user@example.test").Label == "Example  ·  user@example.test", "Display deduplicates identical UPN and email");

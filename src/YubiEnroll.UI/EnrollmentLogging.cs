@@ -11,7 +11,7 @@ public partial class MainWindow
     private RegistrationAttempt? BeginRegistrationRecord(Provider tenant, UserCandidate user, ResetKey target, ProfileSetup profile, string name)
     {
         if (!_registrationJournal.Preferences.Enabled && _registrationJournal.SettingsError == null) return null;
-        try { return _registrationJournal.Begin(RegistrationRecord.Start(tenant, user, target, profile, name)); }
+        try { return _registrationJournal.Begin(RegistrationRecord.Start(tenant, user, target, profile, name, addingPasskey: _addPasskey)); }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
         {
             throw new InvalidOperationException("Enrollment has not started: the registration log could not be initialized. Check Settings → App settings, restore folder access or explicitly turn logging off.");
