@@ -56,7 +56,6 @@ public partial class MainWindow : Window
             _activityJournal = new ActivityJournal(policy: policy?.Activity);
             if (policy?.EmbeddedTerminal is bool embedded) EmbeddedTerminal = embedded;
         }
-        _registrationJournal.ResultSaved += record => _batch?.ApplySavedPin(record);
         InitializeComponent();
         Closed += (_, _) => EndManagementSession();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
@@ -441,7 +440,7 @@ public partial class MainWindow : Window
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, name);
         if (batch == null) _receipt = new(target, provider, user, setup, name, _addPasskey);
-        _captureGeneratedPin = registration?.SaveGeneratedPin == true && !_addPasskey && setup.RandomPin == true;
+        _captureGeneratedPin = !_addPasskey && setup.RandomPin == true && (batch != null || registration?.SaveGeneratedPin == true);
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · serial {target.Serial} · profile {setup.Name} · reset {reset}.");
         StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;
@@ -465,14 +464,16 @@ public partial class MainWindow : Window
                 if (batch != null && target.IsNfc && reset == true && nativeExit == 0)
                     targetChanged = !await VerifyReturnedNfcKeyAsync(target, EmbeddedTerminal || _captureGeneratedPin, receiptSerial);
                 int? verifiedExit = targetChanged ? null : nativeExit;
-                batch?.Complete(verifiedExit, registration?.Record.AttemptId);
+                batch?.Complete(verifiedExit, pin);
                 if (batch == null && verifiedExit == 0) _receiptPin = pin;
                 var storedPin = verifiedExit == 0 && registration?.SaveGeneratedPin == true ? pin : null;
                 var saved = CompleteRegistrationRecord(registration, verifiedExit, storedPin);
                 var notice = targetChanged ? "The selected YubiKey could not be verified. Check its registration in Entra." : null;
                 if (setup.RandomPin == true && !_addPasskey && (storedPin == null || !saved))
                 {
-                    var pinNotice = nativeExit == 0 ? "The temporary PIN has not been saved. Record it securely before continuing."
+                    var pinNotice = batch?.Current?.GeneratedPin != null
+                        ? "The initial PIN is available in this batch. Record it before leaving the batch."
+                        : nativeExit == 0 ? "The temporary PIN has not been saved. Record it securely before continuing."
                         : "If a temporary PIN was displayed, record it securely before continuing.";
                     notice = notice == null ? pinNotice : notice + " " + pinNotice;
                 }
@@ -536,6 +537,6 @@ public partial class MainWindow : Window
         else if (_registrationJournal.PendingCount > 0)
             e.Cancel = MessageBox.Show(this, $"{_registrationJournal.PendingCount} enrollment result(s) have not been saved. Closing loses their final outcomes; the on-disk attempts will remain unknown. Close anyway?", "Unsaved enrollment records", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes;
         if (!e.Cancel && _hostedWindow is SettingsWindow settings) e.Cancel = !settings.ConfirmLeavePreferences();
-        if (!e.Cancel) { StopPinRead(); ClearReceipt(); }
+        if (!e.Cancel) { StopPinRead(); ClearReceipt(); _batch?.ClearPins(); InitialPinCell.HidePin(); }
     }
 }

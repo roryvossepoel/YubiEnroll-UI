@@ -47,31 +47,34 @@ internal static class EnrollmentBatchTests
         Reject(() => resetBatch.Start(b, key, FidoPinState.Set, setup with { Reset = true }), "A reset profile cannot reuse the previous serial");
         resetBatch.Start(b, key with { Serial = "98765" }, FidoPinState.Set, setup with { Reset = true });
         check(resetBatch.Current?.Status == IssueStatus.InProgress, "Reset profile supports consecutive recipients and a fresh serial");
+        var handoff = new EnrollmentBatch(tenant, profile, [a, b]);
+        var generate = setup with { RandomPin = true };
+        handoff.Start(a, key, FidoPinState.NotSet, generate);
+        handoff.Complete(0, "012345");
+        handoff.Advance();
+        handoff.Start(b, key with { Serial = "321" }, FidoPinState.NotSet, generate);
+        handoff.Complete(0, "543210");
+        handoff.Advance();
+        check(handoff.Rows[0].GeneratedPin == "012345" && handoff.Rows[1].GeneratedPin == "543210",
+            "A multi-recipient batch keeps each verified PIN with its own recipient without a journal");
         foreach (var state in Enum.GetValues<FidoPinState>().Where(s => s != FidoPinState.NotSet))
             Reject(() => batch.Start(a, key, state, setup), "Only an explicit unset PIN is eligible");
-        batch.Start(a, key, FidoPinState.NotSet, setup);
+        batch.Start(a, key, FidoPinState.NotSet, setup with { RandomPin = true });
         Reject(batch.Advance, "A running row cannot advance");
-        var attempt = RegistrationRecord.Start(tenant, a, key, setup, "Test key");
-        batch.Complete(0, attempt.AttemptId);
+        batch.Complete(0, "004681");
         check(batch.Current?.User == a && batch.Current.Status == IssueStatus.Registered, "Reported success stays on the handoff row");
         batch.Advance();
         Reject(() => batch.Start(b, key with { Reader = "NFC 0" }, FidoPinState.NotSet, setup), "The same physical serial cannot be reused via NFC");
         var spare = key with { Serial = "00046815" };
-        batch.Start(b, spare, FidoPinState.NotSet, setup);
-        batch.Complete(null);
+        batch.Start(b, spare, FidoPinState.NotSet, setup with { RandomPin = true });
+        batch.Complete(null, "018457");
         Reject(() => batch.Start(b, spare, FidoPinState.NotSet, setup), "An uncertain operation cannot be replayed");
         batch.Advance();
         var csv = batch.Csv(";");
         check(batch.Current == null && csv.Contains("Check required") && csv.Contains("Registered") && csv.Contains("'0012345") && csv.Contains("'=Example") && !csv.Contains("PIN"),
             "The report preserves unknown outcomes and text serials and contains no PINs");
-        var saved = attempt.Complete(0) with { GeneratedPin = "004681" };
-        foreach (var other in new[] { saved with { AttemptId = Guid.NewGuid() }, saved with { UserId = b.Id },
-            saved with { TargetSerial = spare.Serial }, saved with { TenantId = Guid.NewGuid().ToString() },
-            saved with { GeneratedPin = null }, saved with { Outcome = RegistrationOutcome.Unknown } })
-            batch.ApplySavedPin(other);
-        check(batch.Rows.All(row => row.GeneratedPin == null), "Only the matching successful saved attempt contributes a batch PIN");
-        batch.ApplySavedPin(saved);
-        check(batch.Rows[0].GeneratedPin == saved.GeneratedPin, "The committed PIN reaches its own recipient");
+        check(batch.Rows[0].GeneratedPin == "004681" && batch.Rows[1].GeneratedPin == null,
+            "Only the verified successful recipient has a temporary batch PIN, without any journal");
         foreach (var separator in new[] { ";", "," })
         {
             static List<string[]> Parse(string csv, string separator)
@@ -82,15 +85,18 @@ internal static class EnrollmentBatchTests
                 while (!parser.EndOfData) rows.Add(parser.ReadFields()!);
                 return rows;
             }
-            var plain = Parse(batch.Csv(separator), separator);
+            var plain = Parse(batch.Csv(separator, includeInitialPins: false), separator);
             var withPins = Parse(batch.Csv(separator, includeInitialPins: true), separator);
             check(plain.Count == 3 && plain.All(row => row.Length == 8) &&
-                plain.All(row => !row.Contains("Initial PIN") && !row.Contains("'004681")), "Default export omits the PIN field");
+                plain.All(row => !row.Contains("Initial PIN") && !row.Contains("'004681")), "Clearing Include initial PINs omits the PIN field");
             check(withPins.Count == 3 && withPins.All(row => row.Length == 9) && withPins[0][8] == "Initial PIN",
-                "Opt-in export adds one PIN column");
+                "Including PINs adds one PIN column");
             check(withPins[1][8] == "'004681", "Saved initial PIN is exported as spreadsheet text with leading zeroes");
             check(withPins[2][8] == "", "Unverified recipient has an empty PIN field");
         }
         check(!batch.Rows[0].ToString().Contains("004681"), "Logging a row cannot reveal its initial PIN");
+        batch.ClearPins();
+        check(batch.Rows.All(row => row.GeneratedPin == null) && !batch.Csv(";", true).Contains("004681"),
+            "Leaving the batch releases its PINs");
     }
 }

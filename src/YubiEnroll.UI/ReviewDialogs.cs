@@ -22,9 +22,9 @@ public partial class MainWindow
         dialog.ResizeMode = ResizeMode.NoResize;
         var body = new StackPanel { Margin = new Thickness(24) };
         dialog.Content = body;
-        var pins = new CheckBox { Content = "Include initial PINs", IsChecked = false, Margin = new Thickness(0, 0, 0, 8) };
+        var pins = new CheckBox { Content = "Include initial PINs", IsChecked = true, Margin = new Thickness(0, 0, 0, 8) };
         body.Children.Add(pins);
-        body.Children.Add(ReviewText("If selected, the CSV will contain readable initial PINs for recipients in this batch."));
+        body.Children.Add(ReviewText("With this option selected, the CSV will contain readable initial PINs for recipients in this batch."));
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         var save = new Button { Content = "Choose file…", IsDefault = true, Style = (Style)FindResource("PrimaryButton") };

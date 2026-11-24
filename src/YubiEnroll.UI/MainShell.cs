@@ -362,7 +362,7 @@ public partial class MainWindow
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
         var terminalTarget = explicitTarget ?? _selectedKey?.Key;
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, (_captureGeneratedPin || single && setup?.RandomPin == true && !_addPasskey) ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true, single, _captureGeneratedPin, setup?.Name);
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, (_captureGeneratedPin || single && setup?.RandomPin == true && !_addPasskey) ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true, single, _captureGeneratedPin && InitialPinLogging, setup?.Name);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         terminal.NativeFinished = nativeFinished;
         try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; return code; }

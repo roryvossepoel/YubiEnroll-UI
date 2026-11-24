@@ -4,7 +4,7 @@ YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, mana
 
 ## 0.11.4
 
-The batch results table shows each saved initial PIN behind an eye button. Batch CSV exports omit the PIN column by default. Choose **Include initial PINs** during export to include the saved PINs from this batch.
+The batch results table shows each verified, generated initial PIN behind an eye button until you leave the batch, including when PIN logging is off. Batch CSV exports select **Include initial PINs** by default when PINs are available. Clear the checkbox to export only registration details. An export that includes PINs contains readable PINs. The registration log follows its own settings.
 
 ## 0.11.3
 
@@ -35,7 +35,7 @@ Local passkey management follows Key → Unlock → Passkeys. Empty discovery ca
 
 **Set up multiple YubiKeys** issues one new YubiKey per recipient. Sign in to one tenant, choose one configuration profile and paste sign-in names or import a CSV with a `UserPrincipalName` column (up to 500 recipients). Correct duplicate or unmatched rows before starting. The app requires one exact tenant user per row, checks the object ID again before issuance and verifies the selected key. Profiles without reset require an unset PIN; reset profiles explicitly confirm the recipient and serial before clearing FIDO passkeys and the PIN. Select the USB key or named NFC reader and confirm **Register YubiKey** for each user. Keep the key connected until the native command finishes; record any generated PIN in the native prompt before returning. USB uses the existing single-USB-target preflight.
 
-The handoff stays on the same user until **Next user**. Once a serial was attempted it cannot be reused in the batch, including through another connection. An interrupted or uncertain attempt is marked **Check required** and is never retried automatically. You can skip a recipient or cancel the remaining queue. When the batch is complete, export its results as a CSV, with an explicit option to include saved initial PINs. The queue is held in memory; the optional registration journal keeps its existing separate settings.
+The handoff stays on the same user until **Next user**. Once a serial was attempted it cannot be reused in the batch, including through another connection. An interrupted or uncertain attempt is marked **Check required** and is never retried automatically. You can skip a recipient or cancel the remaining queue. When the batch is complete, export its results as a CSV, with **Include initial PINs** selected when generated PINs are available. The queue is held in memory; the optional registration journal keeps its existing separate settings.
 
 NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
@@ -64,7 +64,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Starts on Home with Set up a YubiKey and Clear passkeys & PIN as separate guided tasks. Settings remains available in the same window.
-- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Opted-in generated-PIN logging uses the in-app terminal for setup.
+- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Batches that generate PINs and setup with generated-PIN logging use the in-app terminal.
 - Reports the enrollment outcome; cloud registrations are managed separately from enrollment.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.

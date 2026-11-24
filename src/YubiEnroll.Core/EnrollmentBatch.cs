@@ -64,10 +64,10 @@ public static class BatchRoster
 public enum IssueStatus { Pending, InProgress, Registered, Skipped, CheckRequired }
 public sealed record IssuanceRow(UserCandidate User, IssueStatus Status = IssueStatus.Pending, string Serial = "")
 {
-    public Guid? AttemptId { get; init; }
+    public bool? GeneratesPin { get; init; }
     public string? GeneratedPin { get; init; }
     public string PinLayoutSample => new('0', Math.Max(6, GeneratedPin?.Length ?? 0));
-    public string PinUnavailableLabel => Status == IssueStatus.Skipped ? "—" : "Not saved";
+    public string PinUnavailableLabel => Status == IssueStatus.Skipped ? "—" : GeneratesPin == false ? "Not generated" : "Unavailable";
     public override string ToString() => $"{User.UserPrincipalName} · {Serial} · {StatusLabel}";
     public string StatusLabel => Status switch { IssueStatus.Registered => "Registered", IssueStatus.Skipped => "Skipped",
         IssueStatus.CheckRequired => "Check required", IssueStatus.InProgress => "In progress", _ => "Not started" };
@@ -101,22 +101,22 @@ public sealed class EnrollmentBatch
         if (Current is not { Status: IssueStatus.Pending } row || row.User != user || !key.Serial.All(char.IsAsciiDigit) || key.Serial.Length == 0 ||
             setup.Name != Profile.Name || !AllowsPin(setup.Reset, pin) || !_attempted.Add(key.Serial))
             throw new InvalidOperationException("The recipient, key or profile is no longer eligible. Review this row again.");
-        _rows[Position] = row with { Serial = key.Serial, Status = IssueStatus.InProgress };
+        _rows[Position] = row with { Serial = key.Serial, Status = IssueStatus.InProgress, GeneratesPin = setup.RandomPin };
     }
-    public void Complete(int? exit, Guid? attemptId = null)
+    public void Complete(int? exit, string? generatedPin = null)
     {
         if (Current is not { Status: IssueStatus.InProgress } row) throw new InvalidOperationException("No enrollment is running.");
-        _rows[Position] = row with { Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired, AttemptId = attemptId };
+        _rows[Position] = row with
+        {
+            Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired,
+            GeneratedPin = exit == 0 && row.GeneratesPin == true && GeneratedPinSummary.IsValid(generatedPin) ? generatedPin : null
+        };
     }
 
-    // Only a committed journal entry for this exact attempt can supply its handoff PIN.
-    public void ApplySavedPin(RegistrationRecord record)
+    public void ClearPins()
     {
-        if (record.Outcome != RegistrationOutcome.Succeeded || !GeneratedPinSummary.IsValid(record.GeneratedPin) ||
-            !string.Equals(record.TenantId, Tenant.TenantId, StringComparison.OrdinalIgnoreCase)) return;
-        var index = Array.FindIndex(_rows, r => r.AttemptId == record.AttemptId && r.Status == IssueStatus.Registered &&
-            r.Serial == record.TargetSerial && string.Equals(r.User.Id, record.UserId, StringComparison.OrdinalIgnoreCase));
-        if (index >= 0) _rows[index] = _rows[index] with { GeneratedPin = record.GeneratedPin };
+        for (var i = 0; i < _rows.Length; i++)
+            if (_rows[i].GeneratedPin != null) _rows[i] = _rows[i] with { GeneratedPin = null };
     }
     public void Skip()
     {

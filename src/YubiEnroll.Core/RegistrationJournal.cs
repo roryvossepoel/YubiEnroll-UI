@@ -82,7 +82,6 @@ public sealed class RegistrationJournal
     public string? SettingsError { get; private set; }
     public int PendingCount => _pending.Count;
     public event Action? Changed;
-    public event Action<RegistrationRecord>? ResultSaved;
     public static string DefaultSettingsPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YubiEnroll.UI", "registration-log-settings.json");
 
     public bool IsManaged { get; }
@@ -198,20 +197,16 @@ public sealed class RegistrationJournal
         _pending[completed.Record.AttemptId] = completed;
         try { SaveRecord(completed); _pending.Remove(completed.Record.AttemptId); }
         catch (Exception ex) when (IsStorageError(ex)) { }
-        var saved = !_pending.ContainsKey(completed.Record.AttemptId);
-        if (saved) ResultSaved?.Invoke(completed.Record);
         Changed?.Invoke();
-        return saved;
+        return !_pending.ContainsKey(completed.Record.AttemptId);
     }
 
     public void RetryPending()
     {
         foreach (var pending in _pending.Values.ToArray())
         {
-            try { SaveRecord(pending); }
-            catch (Exception ex) when (IsStorageError(ex)) { continue; }
-            _pending.Remove(pending.Record.AttemptId);
-            ResultSaved?.Invoke(pending.Record);
+            try { SaveRecord(pending); _pending.Remove(pending.Record.AttemptId); }
+            catch (Exception ex) when (IsStorageError(ex)) { }
         }
         Changed?.Invoke();
     }

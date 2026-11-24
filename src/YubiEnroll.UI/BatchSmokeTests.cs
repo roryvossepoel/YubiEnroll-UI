@@ -50,17 +50,13 @@ public partial class MainWindow
         CaptureWindow(this, "batch-issue.png");
         // Exercise the real queue, handoff and device-change handlers without a native write or tenant.
         var preferences = _registrationJournal.Preferences;
-        _registrationJournal.Configure(true, preferences.Directory, true, preferences.RetentionDays);
-        batch.Start(a, key, status.Pin, _batchPolicy!);
+        _registrationJournal.Configure(true, preferences.Directory, false, preferences.RetentionDays);
+        batch.Start(a, key, status.Pin, _batchPolicy! with { RandomPin = true });
         var attempt = BeginRegistrationRecord(batch.Tenant, a, key, _batchPolicy!, key.RegistrationName)!;
-        batch.Complete(0, attempt.Record.AttemptId);
-        using (var locked = new System.IO.FileStream(System.IO.Path.Combine(attempt.Directory, ".journal.lock"),
-            System.IO.FileMode.Open, System.IO.FileAccess.ReadWrite, System.IO.FileShare.None))
-        {
-            Assert(!CompleteRegistrationRecord(attempt, 0, "004815") && batch.Rows[0].GeneratedPin == null,
-                "A failed log write does not expose a PIN in the batch");
-        }
-        _registrationJournal.RetryPending();
+        batch.Complete(0, "004815");
+        Assert(CompleteRegistrationRecord(attempt, 0) && _registrationJournal.Read()
+            .Single(record => record.AttemptId == attempt.Record.AttemptId).GeneratedPin == null,
+            "The journal omits the initial PIN when PIN logging is off");
         RenderBatch();
         Assert(BatchHandoff.IsVisible && !BatchRegister.IsVisible && BatchOutcome.Text.Contains(key.Serial), "Handoff stays on the completed recipient");
         BatchNext_Click(this, e); BatchKeys.SelectedValue = status;
@@ -77,14 +73,33 @@ public partial class MainWindow
         UpdateLayout();
         var eye = VisualDescendants<ToggleButton>(BatchRows).Single(button => button.Name == "Reveal" && button.IsVisible);
         var value = VisualDescendants<TextBlock>(BatchRows).Single(text => text.Name == "PinValue" && text.IsVisible);
-        Assert(value.Text == "••••••" && ReferenceEquals(eye.DataContext, batch.Rows[0]), "Only a saved PIN can be revealed in batch results");
+        Assert(value.Text == "••••••" && ReferenceEquals(eye.DataContext, batch.Rows[0]), "The verified session PIN is masked in batch results with PIN logging off");
         eye.IsChecked = true;
         UpdateLayout();
-        Assert(value.Text == "004815" && !batch.Csv(";").Contains(value.Text),
-            "Revealing the saved PIN after a retry leaves the default export PIN-free");
+        Assert(value.Text == "004815" && BatchResultPinNotice.IsVisible,
+            "The PIN remains available for handoff with a notice to record or export it before leaving");
+        bool? ChooseExport(bool keepPins)
+        {
+            bool wasChecked = false;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var dialog = OwnedWindows.Cast<Window>().Single(window => window.Title == "Export batch results");
+                var choice = VisualDescendants<CheckBox>(dialog).Single();
+                wasChecked = choice.IsChecked == true;
+                choice.IsChecked = keepPins;
+                dialog.DialogResult = true;
+            }));
+            var include = ChooseBatchPinExport();
+            Assert(wasChecked, "Each export dialog starts with Include initial PINs checked");
+            return include;
+        }
+        Assert(ChooseExport(false) == false && !batch.Csv(";", false).Contains("004815") &&
+            ChooseExport(true) == true && batch.Csv(";", true).Contains("004815"),
+            "The operator can export batch results with or without PINs while journal PIN logging is off");
         eye.IsChecked = false;
         CaptureWindow(this, "batch-results.png");
         BatchOpen_Click(this, e);
+        Assert(batch.Rows.All(row => row.GeneratedPin == null), "Navigation discards all PINs in the previous batch");
         Assert(_batch == null && _batchStage == BatchStage.Setup && BatchTenant.SelectedIndex == -1 && BatchText.Text == "",
             "Starting from the menu clears the completed batch");
         _registrationJournal.Configure(preferences.Enabled, preferences.Directory, preferences.SaveGeneratedPin, preferences.RetentionDays);

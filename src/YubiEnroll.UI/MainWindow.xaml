@@ -230,6 +230,7 @@
     </StackPanel>
     <StackPanel x:Name="BatchResults" Visibility="Collapsed">
      <TextBlock x:Name="BatchTotals" TextWrapping="Wrap" Margin="0,0,0,12"/>
+     <TextBlock x:Name="BatchResultPinNotice" TextWrapping="Wrap" Foreground="#75431C" Visibility="Collapsed" Margin="0,0,0,12"/>
      <DataGrid x:Name="BatchRows" Style="{StaticResource BatchTable}" MaxHeight="520" AutomationProperties.Name="Issuance results"><DataGrid.Columns>
        <DataGridTextColumn Header="Display name" Binding="{Binding User.DisplayName}" Width="1.1*" ElementStyle="{StaticResource BatchCellText}"/>
        <DataGridTextColumn Header="User principal name" Binding="{Binding User.UserPrincipalName}" Width="1.4*" ElementStyle="{StaticResource BatchCellText}"/>

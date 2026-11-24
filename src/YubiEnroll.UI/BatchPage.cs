@@ -19,6 +19,7 @@ public partial class MainWindow
     private ProfileSetup? _batchPolicy;
     private bool _batchLoading;
     private const string PinNotSavedWarning = "Temporary PINs are not saved. Record each PIN securely before continuing.";
+    private const string BatchPinNotice = "Initial PIN logging is off. You can view generated PINs in the batch results until you leave this batch.";
     private bool InitialPinLogging => _registrationJournal.Preferences.Enabled && _registrationJournal.Preferences.SaveGeneratedPin;
     private sealed record BatchKeyChoice(KeyStatus Device, string? Problem)
     {
@@ -76,7 +77,7 @@ public partial class MainWindow
     {
         var card = BatchProfile.SelectedItem as ProfileChoice;
         _batchPolicy = card is { Compatible: true } ? card.Setup : null;
-        BatchPolicy.Text = _batchPolicy?.RandomPin == true && !InitialPinLogging ? PinNotSavedWarning : "";
+        BatchPolicy.Text = _batchPolicy?.RandomPin == true && !InitialPinLogging ? BatchPinNotice : "";
     }
 
     private void BatchTenant_Changed(object sender, SelectionChangedEventArgs e)
@@ -309,7 +310,7 @@ public partial class MainWindow
     private void BatchExport_Click(object sender, RoutedEventArgs e)
     {
         if (_batch == null || _batchStage != BatchStage.Results) return;
-        var includePins = InitialPinLogging && _batch.Rows.Any(r => r.GeneratedPin != null)
+        var includePins = _batch.Rows.Any(r => r.GeneratedPin != null)
             ? ChooseBatchPinExport() : false;
         if (includePins == null) return;
         var dialog = new SaveFileDialog { Filter = "CSV file|*.csv", DefaultExt = ".csv", FileName = $"yubikey-batch-{DateTime.Now:yyyyMMdd-HHmmss}.csv" };
@@ -317,7 +318,7 @@ public partial class MainWindow
         try
         {
             var separator = CultureInfo.CurrentCulture.TextInfo.ListSeparator == ";" ? ";" : ",";
-            File.WriteAllText(dialog.FileName, _batch.Csv(separator, includePins.Value && InitialPinLogging), new UTF8Encoding(true));
+            File.WriteAllText(dialog.FileName, _batch.Csv(separator, includePins.Value), new UTF8Encoding(true));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, "Could not save this CSV. Check the destination and try again."); }
     }
@@ -328,6 +329,8 @@ public partial class MainWindow
             var finished = batch.Rows.All(row => row.Status is IssueStatus.Registered or IssueStatus.Skipped or IssueStatus.CheckRequired);
             Record(finished ? "Batch finished." : "Batch cancelled.");
         }
+        InitialPinCell.HidePin();
+        _batch?.ClearPins();
         _batch = null;
         _batchStage = BatchStage.Setup;
         _batchPolicy = null;
@@ -368,7 +371,7 @@ public partial class MainWindow
         BatchNext.Visibility = Visible(handoff);
         BatchBack.Visibility = Visible(!lastHandoff);
         BatchExport.Visibility = Visible(stage == BatchStage.Results);
-        BatchPinWarning.Text = _batchPolicy?.RandomPin == true && !InitialPinLogging ? PinNotSavedWarning : "";
+        BatchPinWarning.Text = _batchPolicy?.RandomPin == true && !InitialPinLogging ? BatchPinNotice : "";
         BatchPinWarning.Visibility = Visible(BatchPinWarning.Text.Length != 0);
         SetBackAction(BatchBack, stage is BatchStage.Profile or BatchStage.Users or BatchStage.Review ? "Back" : null,
             issuing ? "Cancel batch" : "Back to Home");
@@ -377,6 +380,8 @@ public partial class MainWindow
         if (stage == BatchStage.Results)
         {
             BatchRows.ItemsSource = batch.Rows;
+            BatchResultPinNotice.Visibility = Visible(!InitialPinLogging && batch.Rows.Any(r => r.GeneratedPin != null));
+            BatchResultPinNotice.Text = "Initial PIN logging is off. Record or export any PINs you need before leaving this page.";
             BatchTotals.Text = $"Batch complete · {batch.Rows.Count} of {batch.Rows.Count} recipients processed.  " + string.Join("  ·  ", batch.Rows.GroupBy(r => r.StatusLabel).Select(g => $"{g.Count()} {g.Key}"));
             return;
         }

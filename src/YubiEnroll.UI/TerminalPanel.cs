@@ -48,6 +48,7 @@ internal sealed class TerminalPanel : Border
         {
             _pinHint.Text = single ? "If a temporary PIN is generated, you can view it in the registration summary."
                 : savePin ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved."
+                : captureSerial != null ? "Initial PIN logging is off. Record the PIN from the batch results before leaving the batch."
                 : "Record any generated PIN before returning. Terminal output is not saved to the activity log.";
         }
         else _pinHint.Visibility = Visibility.Collapsed;
