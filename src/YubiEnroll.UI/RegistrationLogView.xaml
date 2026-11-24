@@ -21,7 +21,15 @@
    <DataGrid.Columns>
     <DataGridTextColumn Header="Date/time" Binding="{Binding ListTimeLabel}" Width="Auto"/>
     <DataGridTextColumn Header="Tenant" Binding="{Binding TenantName}" Width="Auto"/>
-    <DataGridTextColumn Header="User" Binding="{Binding UserLabel}" Width="Auto" MinWidth="120"/>
+    <DataGridTemplateColumn Header="User" SortMemberPath="UserLabel" Width="Auto" MinWidth="120">
+     <DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel>
+      <TextBlock Text="{Binding UserLabel}" TextTrimming="CharacterEllipsis" ToolTip="{Binding UserLabel}"/>
+      <TextBlock x:Name="UserAddress" Text="{Binding UserAddressLabel}" TextTrimming="CharacterEllipsis"
+                 ToolTip="{Binding UserAddressLabel}" Foreground="{StaticResource Muted}"/>
+     </StackPanel><DataTemplate.Triggers>
+      <DataTrigger Binding="{Binding UserAddressLabel}" Value=""><Setter TargetName="UserAddress" Property="Visibility" Value="Collapsed"/></DataTrigger>
+     </DataTemplate.Triggers></DataTemplate></DataGridTemplateColumn.CellTemplate>
+    </DataGridTemplateColumn>
     <DataGridTemplateColumn Header="Key info" Width="Auto"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding KeyModel}"/><TextBlock Text="{Binding TargetSerial}" Foreground="{StaticResource Muted}"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
     <DataGridTemplateColumn Header="PIN" Width="158" MinWidth="145" CanUserSort="False">
      <DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel>

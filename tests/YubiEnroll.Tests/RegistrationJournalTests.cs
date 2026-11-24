@@ -13,6 +13,12 @@ internal static class RegistrationJournalTests
         var user = UserSearch.Parse($"ID: {userId}\nDisplay Name: Alex Example\nUsername: alex@example.test\nEmail: different@example.test").Single();
         var key = new ResetKey("00123456", "YubiKey 5 NFC (5.7.1)");
         var record = RegistrationRecord.Start(tenant, user, key, new ProfileSetup("Basic", Reset: false, ForcePinChange: true), "Desk key");
+        var guest = record with { Email = "", UserPrincipalName = "alex_example.test#EXT#@tenant.example" };
+        var mailOnly = record with { DisplayName = "", UserPrincipalName = "" };
+        check(guest.UserAddressLabel == "UPN: " + guest.UserPrincipalName &&
+            (guest with { UserPrincipalName = "" }).UserAddressLabel == "", "Only a known sign-in name is labeled as a fallback UPN");
+        check(mailOnly.UserLabel == user.Email && mailOnly.UserAddressLabel == "" &&
+            (record with { DisplayName = user.Email.ToUpperInvariant() }).UserAddressLabel == "", "An address displayed as the primary user label is not repeated");
         try
         {
             var documents = Path.Combine(root, "Redirected documents");

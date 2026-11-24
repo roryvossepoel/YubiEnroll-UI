@@ -2,6 +2,10 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
+## 0.11.2
+
+In the registration log, the User column shows the recorded email beneath the display name. When no email was recorded, a distinct sign-in name is labeled **UPN**. Existing records use the same display without being rewritten; CSV still exports email and UPN separately.
+
 ## 0.11.1
 
 The registration log combines the PIN and its first-use change requirement in one column. The eye next to a saved temporary PIN reveals just that row. Additional passkey registrations show **Existing PIN** with no reveal action. **PIN not logged** means generation was configured but the record contains no PIN. The first-use note describes the profile at registration, not the current state of the key. Logging preferences, CSV columns and machine policy are unchanged.

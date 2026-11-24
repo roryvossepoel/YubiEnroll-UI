@@ -60,13 +60,18 @@ public partial class MainWindow
         RetryRegistrationLog_Click(this, new RoutedEventArgs());
         Assert(_registrationJournal.PendingCount == 0 && _registrationJournal.Read().Single().Outcome == RegistrationOutcome.Succeeded && RetryRegistrationLog.Visibility == Visibility.Collapsed,
             "Retry saving completes the same record without reenrollment");
-        var second = BeginRegistrationRecord(tenant, user with { DisplayName = "Robin Example", UserPrincipalName = "robin@example.test" }, target with { Serial = "00987654" }, profile with { Reset = false }, "Spare key");
+        var second = BeginRegistrationRecord(tenant, user with { DisplayName = "Robin Example", UserPrincipalName = "robin@example.test", Email = "robin.mail@example.test" }, target with { Serial = "00987654" }, profile with { Reset = false }, "Spare key");
         CompleteRegistrationRecord(second, 7);
         BeginRegistrationRecord(tenant, user with { DisplayName = "Sam Example", UserPrincipalName = "sam@example.test", Email = "" }, target with { Serial = "00456789" }, profile, "New key");
         var view = (RegistrationLogView)settings.RegistrationHost.Content;
         settings.RegistrationTab.IsSelected = true;
         settings.UpdateLayout();
         Assert(view.PreferenceStatus.Text.StartsWith("Logging on") && view.Records.Items.Count == 3 && view.ExportButton.IsEnabled, "Registration log shows successful, interrupted and unknown attempts");
+        view.Search.Text = "alex.mail@example.test";
+        settings.UpdateLayout();
+        var addressLine = VisualDescendants<TextBlock>(view.Records).Single(t => t.Name == "UserAddress" && t.IsVisible);
+        Assert(view.Records.Items.Count == 1 && addressLine.Text == "alex.mail@example.test", "Searching the recorded email finds the row and displays the actual mail even when its UPN differs");
+        view.Search.Clear();
         view.Filters.IsExpanded = true;
         settings.UpdateLayout();
         var resultOrigin = view.ResultFilter.TranslatePoint(new Point(), view);
