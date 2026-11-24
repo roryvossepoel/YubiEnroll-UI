@@ -77,7 +77,7 @@ public partial class MainWindow
         UpdateLayout();
         var eye = VisualDescendants<ToggleButton>(BatchRows).Single(button => button.Name == "Reveal" && button.IsVisible);
         var value = VisualDescendants<TextBlock>(BatchRows).Single(text => text.Name == "PinValue" && text.IsVisible);
-        Assert(value.Text == "••••••" && eye.DataContext == batch.Rows[0], "Only a saved PIN can be revealed in batch results");
+        Assert(value.Text == "••••••" && ReferenceEquals(eye.DataContext, batch.Rows[0]), "Only a saved PIN can be revealed in batch results");
         eye.IsChecked = true;
         UpdateLayout();
         Assert(value.Text == "004815" && !batch.Csv(";").Contains(value.Text),
