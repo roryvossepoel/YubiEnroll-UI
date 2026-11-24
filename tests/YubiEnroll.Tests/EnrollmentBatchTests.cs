@@ -2,6 +2,15 @@ using YubiEnroll.Core;
 
 internal static class EnrollmentBatchTests
 {
+    static List<string[]> Parse(string csv, string separator)
+    {
+        using var parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(new StringReader(csv));
+        parser.SetDelimiters(separator);
+        var rows = new List<string[]>();
+        while (!parser.EndOfData) rows.Add(parser.ReadFields()!);
+        return rows;
+    }
+
     internal static void Run(Action<bool, string> check)
     {
         void Reject(Action action, string why)
@@ -65,7 +74,7 @@ internal static class EnrollmentBatchTests
         check(batch.Current?.User == a && batch.Current.Status == IssueStatus.Registered, "Reported success stays on the handoff row");
         batch.Advance();
         Reject(() => batch.Start(b, key with { Reader = "NFC 0" }, FidoPinState.NotSet, setup), "The same physical serial cannot be reused via NFC");
-        var spare = key with { Serial = "00046815" };
+        var spare = key with { Serial = "00098765" };
         batch.Start(b, spare, FidoPinState.NotSet, setup with { RandomPin = true });
         batch.Complete(null, "018457");
         Reject(() => batch.Start(b, spare, FidoPinState.NotSet, setup), "An uncertain operation cannot be replayed");
@@ -77,14 +86,6 @@ internal static class EnrollmentBatchTests
             "Only the verified successful recipient has a temporary batch PIN, without any journal");
         foreach (var separator in new[] { ";", "," })
         {
-            static List<string[]> Parse(string csv, string separator)
-            {
-                using var parser = new Microsoft.VisualBasic.FileIO.TextFieldParser(new StringReader(csv));
-                parser.SetDelimiters(separator);
-                var rows = new List<string[]>();
-                while (!parser.EndOfData) rows.Add(parser.ReadFields()!);
-                return rows;
-            }
             var plain = Parse(batch.Csv(separator, includeInitialPins: false), separator);
             var withPins = Parse(batch.Csv(separator, includeInitialPins: true), separator);
             check(plain.Count == 3 && plain.All(row => row.Length == 8) &&
@@ -96,7 +97,7 @@ internal static class EnrollmentBatchTests
         }
         check(!batch.Rows[0].ToString().Contains("004681"), "Logging a row cannot reveal its initial PIN");
         batch.ClearPins();
-        check(batch.Rows.All(row => row.GeneratedPin == null) && !batch.Csv(";", true).Contains("004681"),
+        check(batch.Rows.All(row => row.GeneratedPin == null) && Parse(batch.Csv(";", true), ";").Skip(1).All(row => row[8] == ""),
             "Leaving the batch releases its PINs");
     }
 }
