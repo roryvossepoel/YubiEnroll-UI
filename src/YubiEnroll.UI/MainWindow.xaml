@@ -1,5 +1,5 @@
-<Window UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" x:Class="YubiEnroll.UI.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Icon="pack://application:,,,/Assets/App.ico" Title="Passkey Desk for YubiKeys — 0.11.3" Width="1180" Height="840" MinWidth="720" MinHeight="540" Background="White" FontFamily="Segoe UI" FontSize="14" Foreground="#222B30" Loaded="Window_Loaded" Closing="Window_Closing">
+<Window UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" x:Class="YubiEnroll.UI.MainWindow" xmlns:local="clr-namespace:YubiEnroll.UI" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Icon="pack://application:,,,/Assets/App.ico" Title="Passkey Desk for YubiKeys — 0.11.4" Width="1180" Height="840" MinWidth="720" MinHeight="540" Background="White" FontFamily="Segoe UI" FontSize="14" Foreground="#222B30" Loaded="Window_Loaded" Closing="Window_Closing">
  <Grid><Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="230"/><ColumnDefinition/></Grid.ColumnDefinitions>
  <Border Background="#F2F3F2" BorderBrush="#E5E8E5" BorderThickness="0,0,1,0"><DockPanel Margin="12,28,12,20">
   <Grid DockPanel.Dock="Top" Margin="10,0,0,34"><Grid.ColumnDefinitions><ColumnDefinition Width="46"/><ColumnDefinition/></Grid.ColumnDefinitions><Image Source="{StaticResource BrandMark}" Width="36" Height="36" VerticalAlignment="Top"/><StackPanel Grid.Column="1"><TextBlock x:Name="BrandTitle" Text="Passkey Desk" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/><TextBlock Text="for YubiKeys" Foreground="{StaticResource Heading}"/></StackPanel></Grid>
@@ -234,6 +234,9 @@
        <DataGridTextColumn Header="Display name" Binding="{Binding User.DisplayName}" Width="1.1*" ElementStyle="{StaticResource BatchCellText}"/>
        <DataGridTextColumn Header="User principal name" Binding="{Binding User.UserPrincipalName}" Width="1.4*" ElementStyle="{StaticResource BatchCellText}"/>
        <DataGridTextColumn Header="Serial number" Binding="{Binding Serial}" Width="110" ElementStyle="{StaticResource BatchCellText}"/>
+       <DataGridTemplateColumn Header="Initial PIN" Width="140" CanUserSort="False">
+        <DataGridTemplateColumn.CellTemplate><DataTemplate><local:InitialPinCell Margin="10,4" VerticalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+       </DataGridTemplateColumn>
        <DataGridTemplateColumn Header="Result" Width="140"><DataGridTemplateColumn.CellTemplate><DataTemplate>
         <Border Padding="8,3" Margin="8,3" CornerRadius="10" HorizontalAlignment="Left" VerticalAlignment="Center"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="#EDF1F2"/>
          <Style.Triggers><DataTrigger Binding="{Binding StatusLabel}" Value="Registered"><Setter Property="Background" Value="#EAF3D7"/></DataTrigger><DataTrigger Binding="{Binding StatusLabel}" Value="Check required"><Setter Property="Background" Value="#FFF1CE"/></DataTrigger></Style.Triggers></Style></Border.Style>

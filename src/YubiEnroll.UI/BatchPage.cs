@@ -309,9 +309,16 @@ public partial class MainWindow
     private void BatchExport_Click(object sender, RoutedEventArgs e)
     {
         if (_batch == null || _batchStage != BatchStage.Results) return;
+        var includePins = InitialPinLogging && _batch.Rows.Any(r => r.GeneratedPin != null)
+            ? ChooseBatchPinExport() : false;
+        if (includePins == null) return;
         var dialog = new SaveFileDialog { Filter = "CSV file|*.csv", DefaultExt = ".csv", FileName = $"yubikey-batch-{DateTime.Now:yyyyMMdd-HHmmss}.csv" };
         if (dialog.ShowDialog(this) != true) return;
-        try { File.WriteAllText(dialog.FileName, _batch.Csv(CultureInfo.CurrentCulture.TextInfo.ListSeparator == ";" ? ";" : ","), new UTF8Encoding(true)); }
+        try
+        {
+            var separator = CultureInfo.CurrentCulture.TextInfo.ListSeparator == ";" ? ";" : ",";
+            File.WriteAllText(dialog.FileName, _batch.Csv(separator, includePins.Value && InitialPinLogging), new UTF8Encoding(true));
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, "Could not save this CSV. Check the destination and try again."); }
     }
     private void ResetBatch()

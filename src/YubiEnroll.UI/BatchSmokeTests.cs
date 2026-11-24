@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using YubiEnroll.Core;
 
 namespace YubiEnroll.UI;
@@ -47,7 +49,19 @@ public partial class MainWindow
         BatchKeys.SelectedValue = status;
         CaptureWindow(this, "batch-issue.png");
         // Exercise the real queue, handoff and device-change handlers without a native write or tenant.
-        batch.Start(a, key, status.Pin, _batchPolicy!); batch.Complete(0); RenderBatch();
+        var preferences = _registrationJournal.Preferences;
+        _registrationJournal.Configure(true, preferences.Directory, true, preferences.RetentionDays);
+        batch.Start(a, key, status.Pin, _batchPolicy!);
+        var attempt = BeginRegistrationRecord(batch.Tenant, a, key, _batchPolicy!, key.RegistrationName)!;
+        batch.Complete(0, attempt.Record.AttemptId);
+        using (var locked = new System.IO.FileStream(System.IO.Path.Combine(attempt.Directory, ".journal.lock"),
+            System.IO.FileMode.Open, System.IO.FileAccess.ReadWrite, System.IO.FileShare.None))
+        {
+            Assert(!CompleteRegistrationRecord(attempt, 0, "004815") && batch.Rows[0].GeneratedPin == null,
+                "A failed log write does not expose a PIN in the batch");
+        }
+        _registrationJournal.RetryPending();
+        RenderBatch();
         Assert(BatchHandoff.IsVisible && !BatchRegister.IsVisible && BatchOutcome.Text.Contains(key.Serial), "Handoff stays on the completed recipient");
         BatchNext_Click(this, e); BatchKeys.SelectedValue = status;
         Assert(!BatchRegister.IsEnabled && BatchRecipient.Text == b.DisplayName && BatchKeyHint.Text.Contains("already attempted"),
@@ -60,10 +74,20 @@ public partial class MainWindow
         BatchSkip_Click(this, e);
         Assert(_batchStage == BatchStage.Results && BatchRows.Items.Count == 2 && BatchTotals.Text.Contains("Skipped"),
             "Results distinguish an issued YubiKey from a skipped user");
+        UpdateLayout();
+        var eye = VisualDescendants<ToggleButton>(BatchRows).Single(button => button.Name == "Reveal" && button.IsVisible);
+        var value = VisualDescendants<TextBlock>(BatchRows).Single(text => text.Name == "PinValue" && text.IsVisible);
+        Assert(value.Text == "••••••" && eye.DataContext == batch.Rows[0], "Only a saved PIN can be revealed in batch results");
+        eye.IsChecked = true;
+        UpdateLayout();
+        Assert(value.Text == "004815" && !batch.Csv(";").Contains(value.Text),
+            "Revealing the saved PIN after a retry leaves the default export PIN-free");
+        eye.IsChecked = false;
         CaptureWindow(this, "batch-results.png");
         BatchOpen_Click(this, e);
         Assert(_batch == null && _batchStage == BatchStage.Setup && BatchTenant.SelectedIndex == -1 && BatchText.Text == "",
             "Starting from the menu clears the completed batch");
+        _registrationJournal.Configure(preferences.Enabled, preferences.Directory, preferences.SaveGeneratedPin, preferences.RetentionDays);
         _connectedProvider = null;
         BatchRows.ItemsSource = null; BatchReviewUsers.ItemsSource = null; BatchText.Clear();
         ShowPage(OverviewPage); BeginNextKey();

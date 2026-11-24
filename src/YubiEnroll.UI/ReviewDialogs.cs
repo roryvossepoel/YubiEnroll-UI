@@ -14,6 +14,27 @@ public partial class MainWindow
             FontFamily = FontFamily, FontSize = 14, Background = Background, Foreground = Foreground, Icon = Icon };
     }
     private static TextBlock ReviewText(string text, double size = 14) => new() { Text = text, FontSize = size, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+    private bool? ChooseBatchPinExport()
+    {
+        var dialog = ReviewWindow("Export batch results", 460);
+        dialog.MinHeight = 0;
+        dialog.SizeToContent = SizeToContent.Height;
+        dialog.ResizeMode = ResizeMode.NoResize;
+        var body = new StackPanel { Margin = new Thickness(24) };
+        dialog.Content = body;
+        var pins = new CheckBox { Content = "Include initial PINs", IsChecked = false, Margin = new Thickness(0, 0, 0, 8) };
+        body.Children.Add(pins);
+        body.Children.Add(ReviewText("If selected, the CSV will contain readable initial PINs for recipients in this batch."));
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var save = new Button { Content = "Choose file…", IsDefault = true, Style = (Style)FindResource("PrimaryButton") };
+        save.Click += (_, _) => dialog.DialogResult = true;
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(save);
+        body.Children.Add(buttons);
+        return dialog.ShowDialog() == true ? pins.IsChecked == true : null;
+    }
+
     private bool ConfirmBatchReset(ResetKey target, UserCandidate user)
     {
         var dialog = ReviewWindow("Reset and register YubiKey", 515);

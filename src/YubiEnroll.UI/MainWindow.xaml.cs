@@ -56,6 +56,7 @@ public partial class MainWindow : Window
             _activityJournal = new ActivityJournal(policy: policy?.Activity);
             if (policy?.EmbeddedTerminal is bool embedded) EmbeddedTerminal = embedded;
         }
+        _registrationJournal.ResultSaved += record => _batch?.ApplySavedPin(record);
         InitializeComponent();
         Closed += (_, _) => EndManagementSession();
         Height = Math.Min(Height, SystemParameters.WorkArea.Height);
@@ -114,7 +115,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.3" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.4" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +264,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.3\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.4\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -464,7 +465,7 @@ public partial class MainWindow : Window
                 if (batch != null && target.IsNfc && reset == true && nativeExit == 0)
                     targetChanged = !await VerifyReturnedNfcKeyAsync(target, EmbeddedTerminal || _captureGeneratedPin, receiptSerial);
                 int? verifiedExit = targetChanged ? null : nativeExit;
-                batch?.Complete(verifiedExit);
+                batch?.Complete(verifiedExit, registration?.Record.AttemptId);
                 if (batch == null && verifiedExit == 0) _receiptPin = pin;
                 var storedPin = verifiedExit == 0 && registration?.SaveGeneratedPin == true ? pin : null;
                 var saved = CompleteRegistrationRecord(registration, verifiedExit, storedPin);

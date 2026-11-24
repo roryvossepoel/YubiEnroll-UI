@@ -125,6 +125,8 @@ public partial class MainWindow
         showFirst.IsChecked = true; settings.UpdateLayout();
         Assert(Equals(showFirst.ToolTip, "Hide PIN") && System.Windows.Automation.AutomationProperties.GetName(showFirst) == "Hide PIN" &&
             ((UIElement)showFirst.Template.FindName("Slash", showFirst)).IsVisible, "Revealed PIN offers the hide icon and label");
+        Assert(Value(first).FontFamily.Equals(TextFor(first, "UserAddress").FontFamily) &&
+            Value(first).FontSize == TextFor(first, "UserAddress").FontSize, "PIN uses the same typography as registration details");
         Assert(Value(first).Text == "001234" && showFirst.TranslatePoint(new Point(), view.Records) == origin,
             "Reveal preserves leading zeroes and keeps the button in place");
         CaptureWindow(settings, "registration-log-initial-pin.png");

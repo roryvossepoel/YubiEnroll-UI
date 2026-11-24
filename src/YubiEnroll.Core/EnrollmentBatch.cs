@@ -64,6 +64,11 @@ public static class BatchRoster
 public enum IssueStatus { Pending, InProgress, Registered, Skipped, CheckRequired }
 public sealed record IssuanceRow(UserCandidate User, IssueStatus Status = IssueStatus.Pending, string Serial = "")
 {
+    public Guid? AttemptId { get; init; }
+    public string? GeneratedPin { get; init; }
+    public string PinLayoutSample => new('0', Math.Max(6, GeneratedPin?.Length ?? 0));
+    public string PinUnavailableLabel => Status == IssueStatus.Skipped ? "—" : "Not saved";
+    public override string ToString() => $"{User.UserPrincipalName} · {Serial} · {StatusLabel}";
     public string StatusLabel => Status switch { IssueStatus.Registered => "Registered", IssueStatus.Skipped => "Skipped",
         IssueStatus.CheckRequired => "Check required", IssueStatus.InProgress => "In progress", _ => "Not started" };
 }
@@ -98,10 +103,20 @@ public sealed class EnrollmentBatch
             throw new InvalidOperationException("The recipient, key or profile is no longer eligible. Review this row again.");
         _rows[Position] = row with { Serial = key.Serial, Status = IssueStatus.InProgress };
     }
-    public void Complete(int? exit)
+    public void Complete(int? exit, Guid? attemptId = null)
     {
         if (Current is not { Status: IssueStatus.InProgress } row) throw new InvalidOperationException("No enrollment is running.");
-        _rows[Position] = row with { Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired };
+        _rows[Position] = row with { Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired, AttemptId = attemptId };
+    }
+
+    // Only a committed journal entry for this exact attempt can supply its handoff PIN.
+    public void ApplySavedPin(RegistrationRecord record)
+    {
+        if (record.Outcome != RegistrationOutcome.Succeeded || !GeneratedPinSummary.IsValid(record.GeneratedPin) ||
+            !string.Equals(record.TenantId, Tenant.TenantId, StringComparison.OrdinalIgnoreCase)) return;
+        var index = Array.FindIndex(_rows, r => r.AttemptId == record.AttemptId && r.Status == IssueStatus.Registered &&
+            r.Serial == record.TargetSerial && string.Equals(r.User.Id, record.UserId, StringComparison.OrdinalIgnoreCase));
+        if (index >= 0) _rows[index] = _rows[index] with { GeneratedPin = record.GeneratedPin };
     }
     public void Skip()
     {
@@ -116,7 +131,7 @@ public sealed class EnrollmentBatch
         Position++;
     }
 
-    public string Csv(string separator)
+    public string Csv(string separator, bool includeInitialPins = false)
     {
         static string Cell(string value, bool serial = false)
         {
@@ -124,10 +139,17 @@ public sealed class EnrollmentBatch
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
         var result = new StringBuilder();
-        void Line(params string[] cells) => result.AppendLine(string.Join(separator, cells));
-        Line("Tenant","TenantId","Profile","UserPrincipalName","UserId","DisplayName","Serial","Result");
-        foreach (var r in Rows) Line(Cell(Tenant.Name), Cell(Tenant.TenantId), Cell(Profile.Name), Cell(r.User.UserPrincipalName),
-            Cell(r.User.Id), Cell(r.User.DisplayName), Cell(r.Serial, true), Cell(r.StatusLabel));
+        var header = string.Join(separator, "Tenant", "TenantId", "Profile", "UserPrincipalName", "UserId", "DisplayName", "Serial", "Result");
+        result.Append(header);
+        if (includeInitialPins) result.Append(separator).Append("Initial PIN");
+        result.AppendLine();
+        foreach (var row in Rows)
+        {
+            result.Append(string.Join(separator, Cell(Tenant.Name), Cell(Tenant.TenantId), Cell(Profile.Name),
+                Cell(row.User.UserPrincipalName), Cell(row.User.Id), Cell(row.User.DisplayName), Cell(row.Serial, true), Cell(row.StatusLabel)));
+            if (includeInitialPins) result.Append(separator).Append(Cell(row.GeneratedPin ?? "", true));
+            result.AppendLine();
+        }
         return result.ToString();
     }
 }
