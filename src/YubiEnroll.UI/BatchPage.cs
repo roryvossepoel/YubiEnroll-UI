@@ -50,7 +50,6 @@ public partial class MainWindow
         ReadBatchProfile();
         BatchKeys.SelectedItem = null;
         ShowPage(BatchPage);
-
     }
 
     private ProfileChoice BatchProfileCard(EnrollmentProfile profile)
@@ -317,8 +316,11 @@ public partial class MainWindow
     }
     private void ResetBatch()
     {
-        if (_batch is { Current: not null } && _batchStage == BatchStage.Issue)
-            Record("Batch closed.");
+        if (_batch is { Current: not null } batch && _batchStage == BatchStage.Issue)
+        {
+            var finished = batch.Rows.All(row => row.Status is IssueStatus.Registered or IssueStatus.Skipped or IssueStatus.CheckRequired);
+            Record(finished ? "Batch finished." : "Batch cancelled.");
+        }
         _batch = null;
         _batchStage = BatchStage.Setup;
         _batchPolicy = null;

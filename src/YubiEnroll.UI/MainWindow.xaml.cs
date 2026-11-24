@@ -462,27 +462,20 @@ public partial class MainWindow : Window
             {
                 targetChanged = batch != null && generation != _deviceGeneration;
                 if (batch != null && target.IsNfc && reset == true && nativeExit == 0)
-                {
-                    var beforeRead = _deviceGeneration;
-                    try
-                    {
-                        var inventory = await NfcDiscovery.ReadAsync(new CliRunner(KeyResetService.FindExecutable()));
-                        targetChanged = beforeRead != _deviceGeneration ||
-                            !EnrollmentTargetGuard.ConfirmNfcReset(target, inventory, EmbeddedTerminal || _captureGeneratedPin, receiptSerial);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
-                    {
-                        targetChanged = true;
-                    }
-                }
+                    targetChanged = !await VerifyReturnedNfcKeyAsync(target, EmbeddedTerminal || _captureGeneratedPin, receiptSerial);
                 int? verifiedExit = targetChanged ? null : nativeExit;
                 batch?.Complete(verifiedExit);
                 if (batch == null && verifiedExit == 0) _receiptPin = pin;
                 var storedPin = verifiedExit == 0 && registration?.SaveGeneratedPin == true ? pin : null;
                 var saved = CompleteRegistrationRecord(registration, verifiedExit, storedPin);
+                var notice = targetChanged ? "The selected YubiKey could not be verified. Check its registration in Entra." : null;
                 if (setup.RandomPin == true && !_addPasskey && (storedPin == null || !saved))
-                    return "The temporary PIN has not been saved. Record it securely before continuing.";
-                return targetChanged ? "The selected YubiKey could not be verified. Check its registration in Entra." : null;
+                {
+                    var pinNotice = nativeExit == 0 ? "The temporary PIN has not been saved. Record it securely before continuing."
+                        : "If a temporary PIN was displayed, record it securely before continuing.";
+                    notice = notice == null ? pinNotice : notice + " " + pinNotice;
+                }
+                return notice;
             }
             code = await RunInteractiveAsync(_exePath, arguments, target, FinishEnrollment, batch == null, setup);
         }

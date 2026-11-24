@@ -4,6 +4,28 @@ namespace YubiEnroll.UI;
 
 public partial class MainWindow
 {
+    private async Task<bool> VerifyReturnedNfcKeyAsync(ResetKey target, bool hasTranscript, string? receiptSerial)
+    {
+        try
+        {
+            var runner = new CliRunner(KeyResetService.FindExecutable());
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                var generation = _deviceGeneration;
+                var inventory = await NfcDiscovery.ReadAsync(runner);
+                if (!EnrollmentTargetGuard.ConfirmNfcReset(target, inventory, hasTranscript, receiptSerial))
+                    return false;
+                if (generation == _deviceGeneration) return true;
+                // The reset notification can arrive during the read-back. Verify again on a stable snapshot.
+            }
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return false;
+        }
+        return false;
+    }
+
     private async Task<KeyStatus> CheckEnrollmentTargetAsync(ResetKey target, ProfileSetup profile, EnrollmentBatch? batch = null)
     {
         if (batch == null && (_choosingTarget || _selectedKey?.Key != target))

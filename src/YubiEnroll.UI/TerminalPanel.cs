@@ -16,6 +16,7 @@ internal sealed class TerminalPanel : Border
         VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(16), ContextMenu = new ContextMenu()
     };
     private readonly TextBlock _pinHint = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,12) };
+    private readonly Button _showUnsavedPin = new() { Content = "Show PIN", HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
     private readonly TerminalScreen _screen = new();
     private readonly Button _done = new() { Content = "Return", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Right };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
@@ -51,6 +52,13 @@ internal sealed class TerminalPanel : Border
         }
         else _pinHint.Visibility = Visibility.Collapsed;
         footer.Children.Add(_pinHint);
+        footer.Children.Add(_showUnsavedPin);
+        _showUnsavedPin.Click += (_, _) =>
+        {
+            var reveal = Equals(_showUnsavedPin.Content, "Show PIN");
+            Screen.Text = reveal ? _screen.Text : MaskPin(_screen.Text);
+            _showUnsavedPin.Content = reveal ? "Hide PIN" : "Show PIN";
+        };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
         _cancel.Click += async (_, _) =>
@@ -139,7 +147,7 @@ internal sealed class TerminalPanel : Border
                 _pinHint.Text = notice;
                 _pinHint.Visibility = Visibility.Visible;
                 // The operator must be able to record an unsaved PIN before dismissal.
-                if (_maskPin && GeneratedPin == null) Screen.Text = _screen.Text;
+                if (_maskPin && Screen.Text != _screen.Text) _showUnsavedPin.Visibility = Visibility.Visible;
             }
         }
         _done.IsEnabled = true;
