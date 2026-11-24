@@ -28,7 +28,18 @@ public sealed record RegistrationRecord(
     [JsonIgnore] public DateTimeOffset RecordedAt => CompletedAt ?? StartedAt;
     [JsonIgnore] public string ListTimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
     [JsonIgnore] public string TimeLabel => RecordedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
-    [JsonIgnore] public string UserLabel => string.IsNullOrEmpty(DisplayName) ? UserPrincipalName.Length > 0 ? UserPrincipalName : UserId : DisplayName;
+    [JsonIgnore] public string UserLabel => !string.IsNullOrWhiteSpace(DisplayName) ? DisplayName.Trim()
+        : !string.IsNullOrWhiteSpace(Email) ? Email.Trim() : !string.IsNullOrWhiteSpace(UserPrincipalName) ? UserPrincipalName.Trim() : UserId;
+    [JsonIgnore] public string UserAddressLabel
+    {
+        get
+        {
+            var hasMail = !string.IsNullOrWhiteSpace(Email);
+            var address = (hasMail ? Email : UserPrincipalName).Trim();
+            if (address.Length == 0 || address.Equals(UserLabel, StringComparison.OrdinalIgnoreCase)) return "";
+            return hasMail ? address : $"UPN: {address}";
+        }
+    }
     [JsonIgnore] public string OutcomeLabel => Outcome switch
     {
         RegistrationOutcome.Succeeded => "Succeeded (YubiEnroll)",

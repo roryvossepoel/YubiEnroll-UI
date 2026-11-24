@@ -28,5 +28,5 @@ try {
         & "$PSScriptRoot/scripts/Sign-App.ps1" -AppDirectory "$out/app" -CertificateThumbprint $SigningCertificateThumbprint -TimestampServer $TimestampServer
     }
     Copy-Item -Recurse -LiteralPath policy -Destination "$out/app/policy"
-    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.1-$Runtime.zip" -Force
+    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.2-$Runtime.zip" -Force
 } finally { Pop-Location }
