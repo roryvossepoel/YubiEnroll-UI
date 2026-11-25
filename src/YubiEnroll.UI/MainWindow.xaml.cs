@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.4" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.5" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.4\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.5\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -440,7 +440,7 @@ public partial class MainWindow : Window
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, name);
         if (batch == null) _receipt = new(target, provider, user, setup, name, _addPasskey);
-        _captureGeneratedPin = !_addPasskey && setup.RandomPin == true && (batch != null || registration?.SaveGeneratedPin == true);
+        _captureGeneratedPin = !_addPasskey && setup.RandomPin == true;
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · serial {target.Serial} · profile {setup.Name} · reset {reset}.");
         StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;

@@ -59,7 +59,14 @@ public partial class MainWindow
             "The journal omits the initial PIN when PIN logging is off");
         RenderBatch();
         Assert(BatchHandoff.IsVisible && !BatchRegister.IsVisible && BatchOutcome.Text.Contains(key.Serial), "Handoff stays on the completed recipient");
+        UpdateLayout();
+        var handoffValue = VisualDescendants<TextBlock>(BatchHandoffPin).Single(text => text.Name == "PinValue");
+        var handoffEye = VisualDescendants<ToggleButton>(BatchHandoffPin).Single(button => button.Name == "Reveal");
+        Assert(handoffValue.IsVisible && handoffValue.Text == "••••••", "The current recipient's handoff PIN starts masked");
+        handoffEye.IsChecked = true;
+        Assert(handoffValue.Text == "004815", "The handoff eye reveals the current recipient's PIN");
         BatchNext_Click(this, e); BatchKeys.SelectedValue = status;
+        Assert(!BatchHandoffPin.IsVisible && handoffEye.IsChecked == false, "The next recipient cannot see the previous PIN");
         Assert(!BatchRegister.IsEnabled && BatchRecipient.Text == b.DisplayName && BatchKeyHint.Text.Contains("already attempted"),
             "Leaving the first key on the reader cannot register it for the next person");
         var second = status with { Key = key with { Serial = "98765432", Reader = "Test NFC 0" }, Capabilities = status.Capabilities! with { Serial = "98765432", IsNfc = true } };

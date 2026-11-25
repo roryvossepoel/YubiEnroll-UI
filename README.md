@@ -2,6 +2,10 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
+## 0.11.5
+
+The embedded terminal displays the generated initial PIN during both single and batch setup. The registration summary, batch handoff and batch results mask the PIN until the operator uses the eye button.
+
 ## 0.11.4
 
 The batch results table shows each verified, generated initial PIN behind an eye button until you leave the batch, including when PIN logging is off. Batch CSV exports select **Include initial PINs** by default when PINs are available. Clear the checkbox to export only registration details. An export that includes PINs contains readable PINs. The registration log follows its own settings.
@@ -64,7 +68,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Starts on Home with Set up a YubiKey and Clear passkeys & PIN as separate guided tasks. Settings remains available in the same window.
-- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Batches that generate PINs and setup with generated-PIN logging use the in-app terminal.
+- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Single and batch setups that generate an initial PIN use the in-app terminal so the PIN is available in the summary, including when PIN logging is off.
 - Reports the enrollment outcome; cloud registrations are managed separately from enrollment.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.

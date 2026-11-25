@@ -16,7 +16,6 @@ internal sealed class TerminalPanel : Border
         VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(16), ContextMenu = new ContextMenu()
     };
     private readonly TextBlock _pinHint = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,12) };
-    private readonly Button _showUnsavedPin = new() { Content = "Show PIN", HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Collapsed };
     private readonly TerminalScreen _screen = new();
     private readonly Button _done = new() { Content = "Return", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Right };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
@@ -29,11 +28,11 @@ internal sealed class TerminalPanel : Border
     private readonly string? _captureSerial;
     private readonly bool _enrollment, _addPasskey;
     internal int? CompletedExitCode { get; private set; }
-    private readonly bool _autoCloseOnSuccess, _maskPin;
+    private readonly bool _autoCloseOnSuccess, _single;
     internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null, bool nfc = false, bool single = false, bool savePin = false, string? profile = null)
     {
         _done.Content = single ? "View registration summary" : enrollment ? "Continue" : autoCloseOnSuccess ? "Continue" : "View reset result";
-        _maskPin = single;
+        _single = single;
         _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
         Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
@@ -53,13 +52,6 @@ internal sealed class TerminalPanel : Border
         }
         else _pinHint.Visibility = Visibility.Collapsed;
         footer.Children.Add(_pinHint);
-        footer.Children.Add(_showUnsavedPin);
-        _showUnsavedPin.Click += (_, _) =>
-        {
-            var reveal = Equals(_showUnsavedPin.Content, "Show PIN");
-            Screen.Text = reveal ? _screen.Text : MaskPin(_screen.Text);
-            _showUnsavedPin.Content = reveal ? "Hide PIN" : "Show PIN";
-        };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
         _cancel.Click += async (_, _) =>
@@ -87,8 +79,6 @@ internal sealed class TerminalPanel : Border
         DataObject.AddPastingHandler(Screen, (_, e) => e.CancelCommand());
         _screen.Reply += text => _session?.Write(text);
     }
-    internal static string MaskPin(string output) => System.Text.RegularExpressions.Regex.Replace(output,
-        @"(?m)^([ \t]*(?:Temporary PIN|Generated PIN):)[^\r\n]*", "$1 ••••••");
     internal static string PromptStatus(string output)
     {
         var line = output.TrimEnd().Split('\n').LastOrDefault()?.Trim() ?? "";
@@ -108,7 +98,7 @@ internal sealed class TerminalPanel : Border
         session.Output += text => Dispatcher.BeginInvoke(() =>
         {
             _screen.Feed(text); var output = _screen.Text;
-            Screen.Text = _maskPin ? MaskPin(output) : output;
+            Screen.Text = output;
             if (_running && !_autoCloseOnSuccess && !_cancelRequested) _status.Text = PromptStatus(output); Screen.CaretIndex = Screen.Text.Length; Screen.ScrollToEnd();
         });
         _running = true; Screen.Focus(); _status.Text = _autoCloseOnSuccess ? "Connecting · complete browser sign-in when prompted" : "Operation running";
@@ -135,7 +125,7 @@ internal sealed class TerminalPanel : Border
             FailureDetail = InteractiveFailure.OperatorInterrupted;
             _status.Text = "Operation interrupted. Check the key and any Entra registration before retrying.";
         }
-        if (_maskPin)
+        if (_single)
         {
             _pinHint.Visibility = exit == 0 && GeneratedPin != null ? Visibility.Visible : Visibility.Collapsed;
             _pinHint.Text = "Your temporary PIN is available in the registration summary.";
@@ -147,8 +137,6 @@ internal sealed class TerminalPanel : Border
             {
                 _pinHint.Text = notice;
                 _pinHint.Visibility = Visibility.Visible;
-                // The operator must be able to record an unsaved PIN before dismissal.
-                if (_maskPin && Screen.Text != _screen.Text) _showUnsavedPin.Visibility = Visibility.Visible;
             }
         }
         _done.IsEnabled = true;

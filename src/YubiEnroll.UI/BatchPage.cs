@@ -295,6 +295,8 @@ public partial class MainWindow
     }
     private void BatchRowChanged()
     {
+        InitialPinCell.HidePin();
+        BatchHandoffPin.DataContext = null;
         BatchKeys.SelectedItem = null; _registrationResultMessage = ""; StatusText.Text = "";
         if (_batch?.Current == null) { Record("Batch finished."); Stage(BatchStage.Results); } else RenderBatch();
     }
@@ -330,6 +332,7 @@ public partial class MainWindow
             Record(finished ? "Batch finished." : "Batch cancelled.");
         }
         InitialPinCell.HidePin();
+        BatchHandoffPin.DataContext = null;
         _batch?.ClearPins();
         _batch = null;
         _batchStage = BatchStage.Setup;
@@ -391,6 +394,8 @@ public partial class MainWindow
         BatchRecipient.Text = string.IsNullOrWhiteSpace(row.User.DisplayName) ? row.User.UserPrincipalName : row.User.DisplayName;
         BatchUpn.Text = row.User.UserPrincipalName;
         var pending = row.Status == IssueStatus.Pending;
+        BatchHandoffPin.DataContext = row.GeneratedPin != null ? row : null;
+        BatchHandoffPin.Visibility = Visible(row.GeneratedPin != null);
         BatchChoose.Visibility = Visible(pending); BatchHandoff.Visibility = Visible(!pending);
         BatchLogNotice.Text = _registrationResultMessage;
         BatchRetryLog.Visibility = Visible(_registrationJournal.PendingCount > 0);
