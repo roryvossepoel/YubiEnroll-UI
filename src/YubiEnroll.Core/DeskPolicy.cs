@@ -12,6 +12,7 @@ public enum PolicySyncResult { Unmanaged, AppSettingsOnly, TomlCreated, TomlUpda
 public sealed class DeskPolicy
 {
     public const string RegistryPath = @"SOFTWARE\Policies\PasskeyDesk";
+    public const int TenantSlots = 10;
     public const int ProfileSlots = 5;
     public ActivityPreferences? Activity { get; }
     public RegistrationLogPreferences? Registration { get; }
@@ -65,30 +66,13 @@ public sealed class DeskPolicy
     {
         Section Open(string path) => new(path, readSection(path));
         var tenantSection = Open(@"YubiEnroll\Tenants");
-        var tenants = tenantSection.HasAny("TenantsJson") ? ParseTenants(tenantSection.Required("TenantsJson")) : null;
-        var profiles = new List<ProfileSetup>();
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 1; i <= ProfileSlots; i++)
-        {
-            var slot = Open($@"YubiEnroll\Profiles\Profile{i}");
-            if (!slot.HasAny(ProfileFields)) continue;
-            int? PinLength(string field)
-            {
-                var value = slot.Number(field, 0, 63);
-                if (value is > 0 and < 4) throw new InvalidDataException($"Profile {i}: {field} must be 0 (CLI default) or 4–63.");
-                return value == 0 ? null : value;
-            }
-            ProfileSetup p;
-            try
-            {
-                p = new ProfileSetup(slot.Required("Name"), slot.Flag("Reset"), PinLength("MinPinLength"),
-                    slot.Flag("AlwaysUv"), slot.Flag("RequireEa"), slot.Flag("ForcePinChange"),
-                    slot.Flag("RandomPin"), PinLength("RandomPinLength")).Validate();
-            }
-            catch (ArgumentException ex) { throw new InvalidDataException($"Configuration profile {i}: {ex.Message}", ex); }
-            if (!names.Add(p.Name)) throw new InvalidDataException($"Configuration profile {i} has a duplicate name.");
-            profiles.Add(p);
-        }
+        var tenants = tenantSection.HasAny("TenantsJson")
+            ? ParseTenants(tenantSection.Required("TenantsJson"))
+            : ReadTenantSlots(Open);
+        var profileSection = Open(@"YubiEnroll\Profiles");
+        var profiles = profileSection.HasAny("ProfilesJson")
+            ? ParseProfiles(profileSection.Required("ProfilesJson"))
+            : ReadProfileSlots(Open);
         var activitySection = Open(@"AppSettings\Logging\Activity");
         ActivityPreferences? activity = activitySection.HasAny("Enabled", "Folder", "RetentionDays")
             ? new(activitySection.Flag("Enabled"), activitySection.Folder(defaultActivity), activitySection.Number("RetentionDays", 1, 3650)) : null;
@@ -98,8 +82,96 @@ public sealed class DeskPolicy
                 registrationSection.Number("RetentionDays", 1, RegistrationJournal.MaxRetentionDays)) : null;
         var terminalSection = Open(@"AppSettings\Terminal");
         bool? terminal = terminalSection.HasAny("EmbeddedTerminal") ? terminalSection.Flag("EmbeddedTerminal") : null;
-        if (tenants == null && profiles.Count == 0 && activity == null && registration == null && terminal == null) return null;
-        return new(tenants, profiles.Count == 0 ? null : profiles.ToArray(), activity, registration, terminal);
+        if (tenants == null && profiles == null && activity == null && registration == null && terminal == null) return null;
+        return new(tenants, profiles, activity, registration, terminal);
+    }
+
+    private static TenantSetup[]? ReadTenantSlots(Func<string, Section> open)
+    {
+        var tenants = new List<TenantSetup>();
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 1; i <= TenantSlots; i++)
+        {
+            var slot = open($@"YubiEnroll\Tenants\Tenant{i}");
+            if (!slot.HasAny("Name", "TenantId", "ClientId", "RedirectUri")) continue;
+            try
+            {
+                var tenant = new TenantSetup(slot.Required("Name"), slot.Required("TenantId"), slot.Required("ClientId"),
+                    slot.Required("RedirectUri"), "", false).Validate();
+                if (!names.Add(tenant.Name)) throw new ArgumentException("Duplicate tenant name.");
+                tenants.Add(tenant);
+            }
+            catch (ArgumentException ex) { throw new InvalidDataException($"Tenant slot {i}: {ex.Message}", ex); }
+        }
+        return tenants.Count == 0 ? null : tenants.ToArray();
+    }
+
+    private static ProfileSetup ReadProfileFields(Section slot, string context)
+    {
+        int? Length(string field)
+        {
+            var value = slot.Number(field, 0, 63);
+            if (value is > 0 and < 4) throw new InvalidDataException($"{context}: {field} must be 0 or 4–63.");
+            return value == 0 ? null : value;
+        }
+        try
+        {
+            return new ProfileSetup(slot.Required("Name"), slot.Flag("Reset"), Length("MinPinLength"),
+                slot.Flag("AlwaysUv"), slot.Flag("RequireEa"), slot.Flag("ForcePinChange"),
+                slot.Flag("RandomPin"), Length("RandomPinLength")).Validate();
+        }
+        catch (ArgumentException ex) { throw new InvalidDataException($"{context}: {ex.Message}", ex); }
+    }
+
+    private static ProfileSetup[]? ReadProfileSlots(Func<string, Section> open)
+    {
+        var profiles = new List<ProfileSetup>();
+        for (var i = 1; i <= ProfileSlots; i++)
+        {
+            var slot = open($@"YubiEnroll\Profiles\Profile{i}");
+            if (slot.HasAny(ProfileFields)) AddProfile(profiles, slot, $"Configuration profile {i}");
+        }
+        return profiles.Count == 0 ? null : profiles.ToArray();
+    }
+
+    private static void AddProfile(List<ProfileSetup> profiles, Section slot, string context)
+    {
+        var profile = ReadProfileFields(slot, context);
+        if (profiles.Any(p => string.Equals(p.Name, profile.Name, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException($"{context}: duplicate profile name.");
+        profiles.Add(profile);
+    }
+
+    private static ProfileSetup[] ParseProfiles(string json)
+    {
+        var profiles = new List<ProfileSetup>();
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) throw new InvalidDataException("ProfilesJson must be an array.");
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var context = $"ProfilesJson item {profiles.Count + 1}";
+                if (item.ValueKind != JsonValueKind.Object) throw new InvalidDataException($"{context} must be an object.");
+                var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var field in item.EnumerateObject())
+                {
+                    object? value = field.Name switch
+                    {
+                        "name" when field.Value.ValueKind == JsonValueKind.String => field.Value.GetString(),
+                        "minPinLength" or "randomPinLength" when field.Value.ValueKind == JsonValueKind.Number &&
+                            field.Value.TryGetInt32(out var n) => n,
+                        "reset" or "alwaysUv" or "requireEa" or "forcePinChange" or "randomPin"
+                            when field.Value.ValueKind is JsonValueKind.True or JsonValueKind.False => field.Value.GetBoolean() ? 1 : 0,
+                        _ => throw new InvalidDataException($"{context}: unexpected field or value for {field.Name}.")
+                    };
+                    if (!values.TryAdd(field.Name, value)) throw new InvalidDataException($"{context}: duplicate {field.Name}.");
+                }
+                AddProfile(profiles, new Section(context, values), context);
+            }
+        }
+        catch (JsonException ex) { throw new InvalidDataException($"Invalid ProfilesJson near line {(ex.LineNumber ?? 0) + 1}.", ex); }
+        return profiles.ToArray();
     }
 
     private static TenantSetup[] ParseTenants(string json)

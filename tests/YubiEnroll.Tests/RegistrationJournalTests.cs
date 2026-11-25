@@ -21,6 +21,7 @@ internal static class RegistrationJournalTests
             (record with { DisplayName = user.Email.ToUpperInvariant() }).UserAddressLabel == "", "An address displayed as the primary user label is not repeated");
         try
         {
+            MeasureLogVolume(root + "-volume", record, check);
             var documents = Path.Combine(root, "Redirected documents");
             var journal = new RegistrationJournal(preferences, documents);
             check(journal.Preferences.Directory == Path.Combine(documents, "YubiKey Desk", "RegistrationLog") && !journal.Preferences.SaveGeneratedPin,
@@ -116,5 +117,45 @@ internal static class RegistrationJournalTests
             check(blankName.DisplayName == "" && blankName.UserPrincipalName == "upn@example.test" && blankName.Email == "mail@example.test", "Empty display-name column cannot shift UPN into the name field");
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+    }
+    private static void MeasureLogVolume(string root, RegistrationRecord sample, Action<bool, string> check)
+    {
+        Directory.CreateDirectory(root);
+        try
+        {
+            var registrations = Path.Combine(root, "registrations");
+            Directory.CreateDirectory(registrations);
+            var history = new RegistrationJournal(Path.Combine(root, "settings.json"), root, new(false, registrations));
+            var activity = new ActivityJournal(Path.Combine(root, "activity.json"), root, new(false, root, 30));
+            var now = DateTimeOffset.UtcNow;
+            var activityFile = Path.Combine(root, $"activity-{now:yyyy-MM-dd}-{Guid.NewGuid():N}.jsonl");
+            var options = new System.Text.Json.JsonSerializerOptions { IgnoreReadOnlyProperties = true,
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+            using var writer = new StreamWriter(new FileStream(activityFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite));
+            for (var i = 1; i <= 10_000; i++)
+            {
+                var stamp = now.AddSeconds(-i);
+                var record = sample with { AttemptId = Guid.NewGuid(), StartedAt = stamp, DisplayName = i % 2 == 0 ? "Even" : "Odd" };
+                File.WriteAllText(Path.Combine(registrations, record.AttemptId.ToString("N") + ".json"),
+                    System.Text.Json.JsonSerializer.Serialize(record, options));
+                writer.WriteLine(System.Text.Json.JsonSerializer.Serialize(new ActivityEvent(stamp, "Info", record.DisplayName, "")));
+                if (i is not (1000 or 10000)) continue;
+                writer.Flush();
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                var activities = activity.ReadAsync(default).GetAwaiter().GetResult().Events;
+                var activityMs = watch.ElapsedMilliseconds;
+                watch.Restart();
+                var rows = history.ReadAsync(default).GetAwaiter().GetResult();
+                var readMs = watch.ElapsedMilliseconds;
+                watch.Restart();
+                var filtered = rows.Where(r => r.UserLabel == "Even").ToArray();
+                var csv = RegistrationJournal.Csv(filtered);
+                check(rows.Count == i && activities.Count == i && activities.Count(e => e.Message == "Even") == i / 2 &&
+                    filtered[^1].AttemptId == record.AttemptId && csv.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length == 1 + i / 2,
+                    $"Both logs read {i} rows and a filtered CSV includes the oldest match");
+                Console.WriteLine($"Volume {i}: activity read {activityMs} ms, registration read {readMs} ms, filter and CSV {watch.ElapsedMilliseconds} ms");
+            }
+        }
+        finally { Directory.Delete(root, true); }
     }
 }

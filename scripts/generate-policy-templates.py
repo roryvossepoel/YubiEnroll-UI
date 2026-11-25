@@ -1,4 +1,4 @@
-"""Generate the English Administrative Templates from the same five profile form definitions."""
+"""Generate the English Administrative Templates for tenant and profile slots and their JSON overrides."""
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -7,11 +7,11 @@ NS = "http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions"
 KEY = r"Software\Policies\PasskeyDesk"
 sub = ET.SubElement
 def root(name):
-    return ET.Element(name, revision="1.4", schemaVersion="1.0", xmlns=NS)
+    return ET.Element(name, revision="1.5", schemaVersion="1.0", xmlns=NS)
 
 admx = root("policyDefinitions")
 sub(sub(admx, "policyNamespaces"), "target", prefix="pdesk", namespace="PasskeyDesk.Policies")
-sub(admx, "resources", minRequiredRevision="1.4")
+sub(admx, "resources", minRequiredRevision="1.5")
 support = sub(sub(admx, "supportedOn"), "definitions")
 cats = sub(admx, "categories")
 policies = sub(admx, "policies")
@@ -24,7 +24,7 @@ presentations = sub(resources, "presentationTable")
 def string(id_, value):
     sub(strings, "string", id=id_).text = value
     return "$(string." + id_ + ")"
-sub(support, "definition", name="PolicyPreview", displayName=string("SupportedVersion", "Passkey Desk 0.11.0 Policy Preview 6 or later"))
+sub(support, "definition", name="PolicyPreview", displayName=string("SupportedVersion", "Passkey Desk 0.11.7 or later"))
 sub(cats, "category", name="PasskeyDesk", displayName=string("CategoryName", "Passkey Desk for YubiKeys"))
 for name, label, parent in [
     ("CliConfig", "YubiEnroll CLI configuration (TOML)", "PasskeyDesk"),
@@ -65,8 +65,18 @@ def policy(name, label, explain, fields, category, subkey):
             sub(form, "dropdownList", refId=field_id, defaultItem=str(opts)).text = caption
 
 policy("Tenants", "Entra tenants (JSON)",
-       "Replaces the Entra tenants in the current user's yubienroll.toml when Passkey Desk starts. Profiles are managed separately. Supply a JSON array with name, tenantId, clientId and redirectUri for each tenant. An explicit [] clears the Entra list. There is no tenant slot count. Do not enter credentials.",
+       "Replaces the Entra tenants in the current user's yubienroll.toml when Passkey Desk starts. Profiles are managed separately. Supply a JSON array with name, tenantId, clientId and redirectUri for each tenant. An explicit [] clears the Entra list. This JSON replaces all ten tenant slots, including when empty. Remove the JSON policy to use the configured slots. Do not enter credentials.",
        [("TenantsJson", "Tenant list (single-line JSON)", "text", 1048576)], "TenantsCategory", r"YubiEnroll\Tenants")
+for i in range(1, 11):
+    name = f"Tenant{i}"
+    policy(name, f"Entra tenant {i}",
+           "Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.",
+           [("Name", "Tenant name", "text", 80), ("TenantId", "Tenant ID", "text", 36),
+            ("ClientId", "Client ID", "text", 36), ("RedirectUri", "Redirect URI", "text", 2048)],
+           "TenantsCategory", rf"YubiEnroll\Tenants\{name}")
+policy("ProfileList", "Configuration profiles (JSON)",
+       "Supply a JSON array with name, reset, minPinLength, alwaysUv, requireEa, forcePinChange, randomPin and randomPinLength. Flags are booleans. Use 0 for a default PIN length. JSON replaces all profile slots. An explicit [] clears profiles. Remove the JSON policy to use the configured slots.",
+       [("ProfilesJson", "Profile list (single-line JSON)", "text", 1048576)], "Profiles", r"YubiEnroll\Profiles")
 policy("Activity", "Activity logging",
        "App setting only; does not change yubienroll.toml. Choose whether to keep activity, the retention in days and the log folder. Leave the folder blank to use YubiKey Desk\\ActivityLog under the current user's Documents folder, including redirected Documents. Paths may contain environment variables.",
        [("Enabled", "Keep activity between sessions", "flag", 1), ("RetentionDays", "Retention (days)", "number", (1, 3650, 30)),
@@ -88,7 +98,7 @@ for i in range(1, 6):
               ("ForcePinChange", "Require PIN change at first use", "flag", 0),
               ("AlwaysUv", "Always require user verification", "flag", 0), ("RequireEa", "Require enterprise attestation", "flag", 0)]
     policy(name, "Configuration profile " + str(i),
-           "Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.",
+           "Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Configuration profiles (JSON) overrides all profile slots. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.",
            fields, "Profiles", rf"YubiEnroll\Profiles\{name}")
 
 for doc, target in [(admx, OUT / "PasskeyDesk.admx"), (adml, OUT / "en-US" / "PasskeyDesk.adml")]:

@@ -206,7 +206,7 @@ public partial class MainWindow
                 && bothView.ProfilePolicyBadge.Visibility == Visibility.Visible && bothView.TenantPolicyBadge.Visibility == Visibility.Visible, "Both managed lists show only their badge");
             bothView.Close();
             var settings = new SettingsWindow(path, mockExecutable, "Mock CLI", _registrationJournal) { Owner = this };
-            var settingsOperation = settings.Dispatcher.InvokeAsync(() =>
+            var settingsOperation = settings.Dispatcher.InvokeAsync(async () =>
             {
                 try
                 {
@@ -232,12 +232,12 @@ public partial class MainWindow
                     CaptureWindow(settings, "settings-transfer.png");
                     settings.AboutTab.IsSelected = true;
                     CaptureWindow(settings, "settings-about.png");
-                    TestRegistrationLogView(settings);
+                    await TestRegistrationLogView(settings);
                 }
                 finally { settings.Close(); }
             });
             settings.ShowDialog();
-            await settingsOperation.Task;
+            await settingsOperation.Task.Unwrap();
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
             await TestBatchPageAsync();
@@ -371,6 +371,7 @@ public partial class MainWindow
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
             _activityView.Add("Synthetic summary only.", "Info", "   ");
             OpenSettings(s => s.ActivityTab); UpdateLayout();
+            await _activityView.Loading;
             var activityGrid = VisualDescendants<DataGrid>(_activityView).Single();
             var diagnostic = activityGrid.Items.Cast<object>().Single(x => x.ToString()!.Contains("Synthetic operation failed."));
             activityGrid.ScrollIntoView(diagnostic);

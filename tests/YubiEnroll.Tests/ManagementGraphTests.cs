@@ -17,6 +17,29 @@ internal static class ManagementGraphTests
         var user = Guid.NewGuid();
         var endpoint = $"https://graph.microsoft.com/v1.0/users/{user:D}/authentication/fido2Methods";
         var token = (CancellationToken _) => Task.FromResult("mock");
+        var otherUser = Guid.NewGuid();
+        var blockedUser = Guid.NewGuid();
+        using (var tenant = new HttpClient(new Handler(req =>
+        {
+            var uri = req.RequestUri!;
+            if (uri.AbsolutePath == "/v1.0/users")
+                return uri.Query.Contains("skiptoken")
+                    ? Json($$"""{"value":[{"id":"{{blockedUser}}","displayName":"Blocked","userPrincipalName":"blocked@example.test"}]}""")
+                    : Json($$"""{"value":[{"id":"{{user}}","displayName":"First","userPrincipalName":"first@example.test"},{"id":"{{otherUser}}","displayName":"Second","userPrincipalName":"second@example.test"}],"@odata.nextLink":"https://graph.microsoft.com/v1.0/users?$skiptoken=two"}""");
+            if (uri.AbsolutePath.Contains(blockedUser.ToString())) return new(HttpStatusCode.Forbidden);
+            return Json("""{"value":[{"id":"test","displayName":"YubiKey 5C (00123456)","model":"YubiKey 5"},{"id":"custom","displayName":"YubiKey 5C NFC","model":"YubiKey 5"}]}""");
+        })))
+        {
+            var inventory = new List<TenantKeyRow>();
+            TenantSearchBatch? last = null;
+            await foreach (var group in new ManagementGraph(tenant, token).ScanTenantAsync(default))
+            { last = group; inventory.AddRange(group.Rows); }
+            check(last is { TotalUsers: 3, UsersChecked: 3, Unavailable: 1 } && inventory.Count == 4 &&
+                inventory.Count(r => r.Serial == "00123456" && r.SerialSource == "From registration name") == 2 &&
+                inventory.Count(r => r.SerialLabel == "Unknown") == 2 && inventory.Count(r => r.Matches("first@example")) == 2 &&
+                inventory.Count(r => r.Matches("00123456")) == 2,
+                "Tenant inventory follows user pages, counts inaccessible accounts and preserves serial provenance for all matching users");
+        }
         var calls = 0;
         using var search = new HttpClient(new Handler(req =>
         {

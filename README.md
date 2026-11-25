@@ -2,6 +2,14 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
+## 0.11.7
+
+**Search tenant passkeys** opens a read-only inventory for one Entra tenant. Choose a tenant, connect, then filter the registrations by user, UPN, registration name, model or serial. The serial column identifies numbers taken from a YubiKey registration name. Missing or ambiguous serials appear as Unknown. The inventory reads directory users and their FIDO2 methods with the signed-in operator’s delegated Graph access. You can filter while it loads, cancel or refresh. The view reports unreadable accounts and incomplete searches.
+
+The activity and registration logs load retained records in the background. Search and export use the complete filtered list. The installer uses a proportional font and reflows the license text.
+
+Machine policy revision 1.5 supports ten tenant slots and five profile slots. TenantsJson and ProfilesJson independently replace the complete list for their section. An explicit empty array clears that section. Removing the JSON policy restores the configured slots at the next start. The policy folder includes an example of each JSON schema.
+
 ## 0.11.6
 
 Windows x64 is available as a portable ZIP and a machine-wide MSI. Wizard actions stay at the bottom of the window as status text changes. A batch registration marked **Check required** explains the outcome and opens the recipient’s Entra registrations. Use **Back to batch** to resume the same queue.
@@ -36,7 +44,7 @@ Both logs have subtle column separators and a labeled Copy column. The registrat
 
 Machine policy support is now included in the standard Windows x64 build. With no recognized machine policy the normal local editing and CLI configuration remain in use. Only the configured section is read-only: tenants, profiles, activity logging, registration logging or terminal preference. A managed list shows a read-only policy badge in place of its transfer action. Under partial policy, only the editable list can be imported or exported. Policies are read at startup; only the declared tenant/profile collections are reconciled into the current account’s ordinary TOML. When policy is present, the startup screen shows its status beneath YubiEnroll CLI and the Activity log records the synchronization outcome once per launch. See [pilot instructions and rollback](policy/PILOT-NL.md). The templates are optional. Both logs have their own retention in days. For registration logging, App settings and the Registration logging policy accept 1–3650 days (default 30). While logging is enabled, expired registration records are deleted from the configured folder; exported CSVs are kept.
 
-Use the bundled ADMX/ADML revision 1.4 with this build. Below `HKLM\SOFTWARE\Policies\PasskeyDesk`, CLI configuration lives under `YubiEnroll\Tenants` and `YubiEnroll\Profiles\Profile1` through `Profile5`. App settings use `AppSettings\Logging\Activity`, `AppSettings\Logging\Registration` and, if explicitly configured, `AppSettings\Terminal`. Each managed settings group shows its own read-only badge. Leaving the terminal policy unconfigured keeps the choice editable. Flat registry values from previous pilots are ignored.
+Use the bundled ADMX/ADML revision 1.5 with 0.11.7. Below `HKLM\SOFTWARE\Policies\PasskeyDesk`, CLI configuration lives under `YubiEnroll\Tenants` and `YubiEnroll\Profiles\Profile1` through `Profile5`. App settings use `AppSettings\Logging\Activity`, `AppSettings\Logging\Registration` and, if explicitly configured, `AppSettings\Terminal`. Each managed settings group shows its own read-only badge. Leaving the terminal policy unconfigured keeps the choice editable. Flat registry values from previous pilots are ignored.
 
 
 ## Features inherited from preview 0.10.9
@@ -254,7 +262,7 @@ On Windows, install the .NET 10 SDK, then run:
 ./build.ps1 -Runtime win-x64
 ```
 
-Add `-IncludeMsi` on Windows to package the same files as a machine-wide installer in `artifacts/win-x64/installer/`. The MSI installs to `%ProgramFiles%\Passkey Desk`, adds **PassKey Desk** to the all-users Start menu and registers **Passkey Desk for YubiKeys** in Programs and Features. The .NET Desktop Runtime and the Yubico command-line tools are separate prerequisites.
+Add `-IncludeMsi` on Windows to package the same files as a machine-wide installer in `artifacts/win-x64/installer/`. The MSI installs to `%ProgramFiles%\Passkey Desk`, adds **Passkey Desk** to the all-users Start menu and registers **Passkey Desk for YubiKeys** in Programs and Features. The .NET Desktop Runtime and the Yubico command-line tools are separate prerequisites.
 
 The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with first-run setup, form validation/save/cancel, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. A separate Windows CI check downloads the signed official YubiEnroll 1.2.0 installer, verifies its publisher, and checks that the CLI reads a synthetic provider/profile generated by the GUI writer. A separate check verifies the signed ykman 5.9.2 installer, expected installation folder, version parser, empty device discovery and serial-targeted reset help. No login, tenant access, reset command or attached hardware is used; neither Yubico CLI is redistributed with the app.
 

@@ -59,36 +59,52 @@ public sealed class ActivityJournal
         Preferences = p; _lastPrune = null; Error = null; _canWrite = true; Changed?.Invoke();
     }
 
-    private IEnumerable<string> Files(DateOnly today, bool prune)
+    private static IEnumerable<string> Files(ActivityPreferences preferences, DateOnly today, bool prune)
     {
-        foreach (var path in Directory.EnumerateFiles(Preferences.Directory, "activity-*.jsonl"))
+        foreach (var path in Directory.EnumerateFiles(preferences.Directory, "activity-*.jsonl"))
         {
             var m = FilePattern.Match(Path.GetFileName(path));
             if (!m.Success || !DateOnly.TryParseExact(m.Groups[1].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out var day)) continue;
-            if (day > today.AddDays(-Preferences.RetentionDays)) yield return path;
+            if (day > today.AddDays(-preferences.RetentionDays)) yield return path;
             else if (prune) File.Delete(path);
         }
     }
 
     public IReadOnlyList<ActivityEvent> Read()
     {
+        var result = ReadFiles(Preferences, _canWrite, Preferences.Enabled, default);
+        if (result.Error != null) Error = result.Error;
+        return result.Events;
+    }
+
+    public Task<(IReadOnlyList<ActivityEvent> Events, string? Error)> ReadAsync(CancellationToken ct)
+    {
+        var preferences = Preferences;
+        var readable = _canWrite;
+        return Task.Run(() => ReadFiles(preferences, readable, false, ct), ct);
+    }
+
+    private static (IReadOnlyList<ActivityEvent> Events, string? Error) ReadFiles(ActivityPreferences preferences, bool readable, bool prune, CancellationToken ct)
+    {
         var entries = new List<ActivityEvent>();
+        string? error = null;
         try
         {
-            if (!_canWrite || !Path.IsPathFullyQualified(Preferences.Directory) || !Directory.Exists(Preferences.Directory)) return entries;
-            foreach (var path in Files(DateOnly.FromDateTime(DateTime.UtcNow), Preferences.Enabled))
+            if (!readable || !Path.IsPathFullyQualified(preferences.Directory) || !Directory.Exists(preferences.Directory)) return (entries, null);
+            foreach (var path in Files(preferences, DateOnly.FromDateTime(DateTime.UtcNow), prune))
             {
                 using var input = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
                 while (input.ReadLine() is { } line)
                 {
+                    ct.ThrowIfCancellationRequested();
                     try { if (JsonSerializer.Deserialize<ActivityEvent>(line) is { Message.Length: > 0, Level: not null, Detail: not null } e) entries.Add(e); }
                     catch (JsonException) { /* An interrupted last line must not hide earlier events. */ }
                 }
             }
         }
-        catch (Exception ex) when (RegistrationJournal.IsStorageError(ex)) { Error = "Some activity files could not be read. Check the log folder."; }
-        return entries.OrderByDescending(x => x.Time).ToArray();
+        catch (Exception ex) when (RegistrationJournal.IsStorageError(ex)) { error = "Some activity files could not be read. Check the log folder."; }
+        return (entries.OrderByDescending(x => x.Time).ToArray(), error);
     }
 
     public bool Append(ActivityEvent entry)
@@ -98,7 +114,7 @@ public sealed class ActivityJournal
         {
             Validate(Preferences); Directory.CreateDirectory(Preferences.Directory);
             var today = DateOnly.FromDateTime(entry.Time.UtcDateTime);
-            if (_lastPrune != today) { _ = Files(today, true).Count(); _lastPrune = today; }
+            if (_lastPrune != today) { _ = Files(Preferences, today, true).Count(); _lastPrune = today; }
             var date = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var path = Path.Combine(Preferences.Directory, $"activity-{date}-{_session:N}.jsonl");
             // Only persist known diagnostic fields. Native transcripts, verbose exceptions, paths and PINs stay out.

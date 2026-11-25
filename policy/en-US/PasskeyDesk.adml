@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
-<policyDefinitionResources revision="1.4" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+<policyDefinitionResources revision="1.5" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
   <displayName>Passkey Desk for YubiKeys</displayName>
   <description>Machine policy for the independent Passkey Desk application.</description>
   <resources>
     <stringTable>
-      <string id="SupportedVersion">Passkey Desk 0.11.0 Policy Preview 6 or later</string>
+      <string id="SupportedVersion">Passkey Desk 0.11.7 or later</string>
       <string id="CategoryName">Passkey Desk for YubiKeys</string>
       <string id="CliConfigLabelCategory">YubiEnroll CLI configuration (TOML)</string>
       <string id="TenantsCategoryLabelCategory">Tenants</string>
@@ -16,7 +16,29 @@
       <string id="Internal">In-app terminal</string>
       <string id="External">External console</string>
       <string id="TenantsLabel">Entra tenants (JSON)</string>
-      <string id="TenantsHelp">Replaces the Entra tenants in the current user's yubienroll.toml when Passkey Desk starts. Profiles are managed separately. Supply a JSON array with name, tenantId, clientId and redirectUri for each tenant. An explicit [] clears the Entra list. There is no tenant slot count. Do not enter credentials.</string>
+      <string id="TenantsHelp">Replaces the Entra tenants in the current user's yubienroll.toml when Passkey Desk starts. Profiles are managed separately. Supply a JSON array with name, tenantId, clientId and redirectUri for each tenant. An explicit [] clears the Entra list. This JSON replaces all ten tenant slots, including when empty. Remove the JSON policy to use the configured slots. Do not enter credentials.</string>
+      <string id="Tenant1Label">Entra tenant 1</string>
+      <string id="Tenant1Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant2Label">Entra tenant 2</string>
+      <string id="Tenant2Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant3Label">Entra tenant 3</string>
+      <string id="Tenant3Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant4Label">Entra tenant 4</string>
+      <string id="Tenant4Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant5Label">Entra tenant 5</string>
+      <string id="Tenant5Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant6Label">Entra tenant 6</string>
+      <string id="Tenant6Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant7Label">Entra tenant 7</string>
+      <string id="Tenant7Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant8Label">Entra tenant 8</string>
+      <string id="Tenant8Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant9Label">Entra tenant 9</string>
+      <string id="Tenant9Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="Tenant10Label">Entra tenant 10</string>
+      <string id="Tenant10Help">Configure an Entra tenant. Slots can be used in any order. Entra tenants (JSON) overrides all tenant slots.</string>
+      <string id="ProfileListLabel">Configuration profiles (JSON)</string>
+      <string id="ProfileListHelp">Supply a JSON array with name, reset, minPinLength, alwaysUv, requireEa, forcePinChange, randomPin and randomPinLength. Flags are booleans. Use 0 for a default PIN length. JSON replaces all profile slots. An explicit [] clears profiles. Remove the JSON policy to use the configured slots.</string>
       <string id="ActivityLabel">Activity logging</string>
       <string id="ActivityHelp">App setting only; does not change yubienroll.toml. Choose whether to keep activity, the retention in days and the log folder. Leave the folder blank to use YubiKey Desk\ActivityLog under the current user's Documents folder, including redirected Documents. Paths may contain environment variables.</string>
       <string id="RegistrationLabel">Registration logging</string>
@@ -24,20 +46,165 @@
       <string id="TerminalLabel">Terminal preference</string>
       <string id="TerminalHelp">App setting only; does not change yubienroll.toml. Choose the preferred terminal. Enrollment with generated PIN capture still uses the in-app terminal. Only the terminal preference becomes read-only. Other settings, tenants and profiles remain editable unless managed separately.</string>
       <string id="Profile1Label">Configuration profile 1</string>
-      <string id="Profile1Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile1Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Configuration profiles (JSON) overrides all profile slots. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
       <string id="Profile2Label">Configuration profile 2</string>
-      <string id="Profile2Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile2Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Configuration profiles (JSON) overrides all profile slots. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
       <string id="Profile3Label">Configuration profile 3</string>
-      <string id="Profile3Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile3Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Configuration profiles (JSON) overrides all profile slots. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
       <string id="Profile4Label">Configuration profile 4</string>
-      <string id="Profile4Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile4Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Configuration profiles (JSON) overrides all profile slots. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
       <string id="Profile5Label">Configuration profile 5</string>
-      <string id="Profile5Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
+      <string id="Profile5Help">Configure one reusable profile in the current user's yubienroll.toml. PIN generation and change on first use control key setup. Recording a generated PIN is a separate app setting under Logging. If any profile slot is configured, the configured slots together replace all profiles. Slots need not be consecutive. Configuration profiles (JSON) overrides all profile slots. Reset is applied only during an operator-initiated key setup, not when this policy is loaded.</string>
     </stringTable>
     <presentationTable>
       <presentation id="Tenants">
         <textBox refId="TenantsTenantsJson">
           <label>Tenant list (single-line JSON)</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant1">
+        <textBox refId="Tenant1Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant1TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant1ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant1RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant2">
+        <textBox refId="Tenant2Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant2TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant2ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant2RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant3">
+        <textBox refId="Tenant3Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant3TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant3ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant3RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant4">
+        <textBox refId="Tenant4Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant4TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant4ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant4RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant5">
+        <textBox refId="Tenant5Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant5TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant5ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant5RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant6">
+        <textBox refId="Tenant6Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant6TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant6ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant6RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant7">
+        <textBox refId="Tenant7Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant7TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant7ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant7RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant8">
+        <textBox refId="Tenant8Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant8TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant8ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant8RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant9">
+        <textBox refId="Tenant9Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant9TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant9ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant9RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="Tenant10">
+        <textBox refId="Tenant10Name">
+          <label>Tenant name</label>
+        </textBox>
+        <textBox refId="Tenant10TenantId">
+          <label>Tenant ID</label>
+        </textBox>
+        <textBox refId="Tenant10ClientId">
+          <label>Client ID</label>
+        </textBox>
+        <textBox refId="Tenant10RedirectUri">
+          <label>Redirect URI</label>
+        </textBox>
+      </presentation>
+      <presentation id="ProfileList">
+        <textBox refId="ProfileListProfilesJson">
+          <label>Profile list (single-line JSON)</label>
         </textBox>
       </presentation>
       <presentation id="Activity">

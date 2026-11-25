@@ -215,14 +215,29 @@ public sealed class RegistrationJournal
     {
         if (SettingsError != null) throw new InvalidOperationException(SettingsError);
         PruneExpired();
+        return ReadRecords(Preferences.Directory, _pending.Values.Select(p => p.Record).ToArray(), default);
+    }
+
+    public Task<IReadOnlyList<RegistrationRecord>> ReadAsync(CancellationToken ct)
+    {
+        if (SettingsError != null) throw new InvalidOperationException(SettingsError);
+        PruneExpired();
+        var directory = Preferences.Directory;
+        var pending = _pending.Values.Select(p => p.Record).ToArray();
+        return Task.Run(() => ReadRecords(directory, pending, ct), ct);
+    }
+
+    private static IReadOnlyList<RegistrationRecord> ReadRecords(string directory, RegistrationRecord[] pending, CancellationToken ct)
+    {
         var records = new Dictionary<Guid, RegistrationRecord>();
-        if (System.IO.Directory.Exists(Preferences.Directory))
-            foreach (var path in RecordFiles(Preferences.Directory))
+        if (System.IO.Directory.Exists(directory))
+            foreach (var path in RecordFiles(directory))
             {
+                ct.ThrowIfCancellationRequested();
                 var record = ReadRecord(path);
                 if (!records.TryAdd(record.AttemptId, record)) throw new InvalidDataException("Duplicate registration record.");
             }
-        foreach (var pending in _pending.Values) records[pending.Record.AttemptId] = pending.Record;
+        foreach (var record in pending) records[record.AttemptId] = record;
         return records.Values.OrderByDescending(r => r.RecordedAt).ToArray();
     }
 

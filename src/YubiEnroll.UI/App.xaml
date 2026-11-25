@@ -1,9 +1,10 @@
 <Application x:Class="YubiEnroll.UI.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Application.Resources>
-  <ResourceDictionary>
+ <ResourceDictionary>
    <ResourceDictionary.MergedDictionaries>
     <ResourceDictionary Source="Assets/BrandMark.xaml"/>
    </ResourceDictionary.MergedDictionaries>
+  <DrawingImage x:Key="TenantSearchGlyph"><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Geometry="M 2,2 L 22,2 22,22 2,22 Z" Brush="Transparent"/><GeometryDrawing Geometry="M 16,10 A 6,6 0 1 1 4,10 A 6,6 0 1 1 16,10 M 14.5,14.5 L 21,21"><GeometryDrawing.Pen><Pen Brush="#0B536F" Thickness="1.7"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage>
   <SolidColorBrush x:Key="Accent" Color="#84BD00"/>
   <SolidColorBrush x:Key="Heading" Color="#0B536F"/>
   <SolidColorBrush x:Key="Muted" Color="#52606B"/>

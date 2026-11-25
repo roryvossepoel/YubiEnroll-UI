@@ -2,7 +2,7 @@
 param([Parameter(Mandatory)][string]$Package)
 $ErrorActionPreference = 'Stop'
 $directory = Join-Path $env:ProgramFiles 'Passkey Desk'
-$shortcut = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'PassKey Desk.lnk'
+$shortcut = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'Passkey Desk.lnk'
 $uninstallKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
 $productName = 'Passkey Desk for YubiKeys'
 function Get-ProductRegistration {

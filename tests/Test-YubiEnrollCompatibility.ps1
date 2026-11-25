@@ -81,7 +81,7 @@ try {
     $policyProvider = & $exe providers show 'Pilot tenant'
     if ($LASTEXITCODE -ne 0 -or ($policyProvider -join ' ') -notmatch 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee') { throw 'Native CLI did not read policy tenant' }
     $policyProfiles = & $exe profiles list
-    if ($LASTEXITCODE -ne 0 -or ($policyProfiles -join ' ') -notmatch 'Profile5') { throw 'Native CLI did not read policy profiles' }
+    if ($LASTEXITCODE -ne 0 -or ($policyProfiles -join ' ') -notmatch 'Managed PIN') { throw 'Native CLI did not read policy profiles' }
     $fixture = './tests/YubiEnroll.Tests/bin/Release/net10.0/YubiEnroll.Tests.exe'
     $before = Join-Path $env:RUNNER_TEMP 'policy-before-activation.toml'
     & $fixture --activation-fixture prepare $before $legacy

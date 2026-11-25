@@ -25,5 +25,9 @@ try {
 } finally { $logo.Dispose() }
 
 $license = [System.IO.File]::ReadAllText((Join-Path $root 'LICENSE'))
-$escaped = $license.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}') -replace '\r?\n', '\par '
-[System.IO.File]::WriteAllText((Join-Path $Destination 'License.rtf'), ('{\rtf1\ansi ' + $escaped + '}'))
+$paragraphs = foreach ($paragraph in ($license.Trim() -split '\r?\n[ \t]*\r?\n')) {
+    $text = $paragraph -replace '\r?\n', ' '
+    $text.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}')
+}
+$rtf = '{\rtf1\ansi\deff0{\fonttbl{\f0\fswiss Segoe UI;}}\pard\plain\f0\fs20\sa100 ' + ($paragraphs -join '\par ') + '}'
+[System.IO.File]::WriteAllText((Join-Path $Destination 'License.rtf'), $rtf)

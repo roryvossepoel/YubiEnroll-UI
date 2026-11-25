@@ -54,6 +54,9 @@ internal static class PolicyTemplateFixture
                         scoped.Add(field, (int)selected.Descendants(ns+"decimal").Single().Attribute("value")!); break;
                     case "decimal": scoped.Add(field, (int)input.Attribute("defaultValue")!); break;
                     case "text" when field == "TenantsJson": scoped.Add(field, File.ReadAllText(Path.Combine(folder,"tenants.example.json"))); break;
+                    case "text" when field == "ProfilesJson": scoped.Add(field, File.ReadAllText(Path.Combine(folder,"profiles.example.json"))); break;
+                    case "text" when field is "TenantId" or "ClientId": scoped.Add(field, Guid.NewGuid().ToString()); break;
+                    case "text" when field == "RedirectUri": scoped.Add(field, "http://localhost/cb"); break;
                     case "text" when field.EndsWith("Name"): scoped.Add(field,A(p,"name")); break;
                     case "text" when A(f,"required") == "false": break;
                     default: throw new InvalidDataException("Unexpected template field " + field);
@@ -74,14 +77,39 @@ internal static class PolicyTemplateFixture
                     "CLI configuration policy does not supply app preferences: " + A(p,"name"));
             values.Add(relativeKey,scoped);
         }
-        check(policies.Length == 9, "Only concrete settings in template; no master switch");
+        check(policies.Length == 20, "Only concrete settings in template; no master switch");
         string target = Path.GetDirectoryName(path)!;
+        const string tenantJson = @"YubiEnroll\Tenants", profilesJson = @"YubiEnroll\Profiles";
+        var fallbackFile = path + ".slots";
+        DeskPolicy? ReadWith(params string[] omitted) => DeskPolicy.Read(k => omitted.Contains(k) ? null : values.GetValueOrDefault(k), target, target);
+        DeskPolicy.Synchronize(ReadWith(tenantJson, profilesJson), () => fallbackFile);
+        var slots = ConfigReader.Read(fallbackFile);
+        check(slots.Providers.Count == 10 && slots.Profiles.Count == 5, "All tenant and profile slots work after both JSON policies are removed");
+        DeskPolicy.Synchronize(ReadWith(profilesJson), () => fallbackFile);
+        check(ConfigReader.Read(fallbackFile).Providers.Single().Name == "Pilot tenant" && ConfigReader.Read(fallbackFile).Profiles.Count == 5,
+            "Tenant JSON coexists with profile slots");
+        DeskPolicy.Synchronize(ReadWith(tenantJson), () => fallbackFile);
+        check(ConfigReader.Read(fallbackFile).Providers.Count == 10 && ConfigReader.Read(fallbackFile).Profiles.Single().Name == "Managed PIN",
+            "Profile JSON coexists with tenant slots");
+        var savedJson = values[profilesJson]["ProfilesJson"];
+        values[profilesJson]["ProfilesJson"] = "[]";
+        DeskPolicy.Synchronize(ReadWith(), () => fallbackFile);
+        check(ConfigReader.Read(fallbackFile).Profiles.Count == 0, "Empty profile JSON overrides populated slots");
+        var before = File.ReadAllText(fallbackFile);
+        foreach (var invalid in new[] { "{", "[{}]", "[true]" })
+        {
+            values[profilesJson]["ProfilesJson"] = invalid;
+            try { DeskPolicy.Synchronize(ReadWith(), () => fallbackFile); throw new Exception("Invalid profile JSON was accepted"); }
+            catch (InvalidDataException ex) { check(ex.Message.Contains("ProfilesJson") && File.ReadAllText(fallbackFile) == before,
+                "Invalid active ProfilesJson identifies the section and preserves the existing TOML"); }
+        }
+        values[profilesJson]["ProfilesJson"] = savedJson;
         var snapshot = OperatingSystem.IsWindows() ? CheckRegistry(values, target, check) :
             DeskPolicy.Read(k => values.GetValueOrDefault(k),target,target);
         DeskPolicy.Synchronize(snapshot,()=>path);
         var result = ConfigReader.Read(path);
-        check(result.Providers.Single().Name == "Pilot tenant" && result.Profiles.Count == 5,
-            "All template defaults and the example JSON round-trip to the standard CLI format");
+        check(result.Providers.Single().Name == "Pilot tenant" && result.Profiles.Single().Name == "Managed PIN",
+            "Both JSON overrides take precedence over populated slots and round-trip to the standard CLI format");
     }
 
     [SupportedOSPlatform("windows")]
