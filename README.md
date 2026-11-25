@@ -4,7 +4,7 @@ YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, mana
 
 ## 0.11.5
 
-The embedded terminal displays the generated initial PIN during both single and batch setup. The registration summary, batch handoff and batch results mask the PIN until the operator uses the eye button.
+The embedded terminal displays the generated initial PIN during both single and batch setup. After a successful setup, the app opens the single registration summary or the current batch recipient’s handoff automatically. The operator chooses **Next user** after handing over the key. Errors, an unverified outcome, a missing expected PIN or a log write failure keep the terminal open for review. The PIN is masked in the summary, handoff and batch results until the operator uses the eye button.
 
 ## 0.11.4
 
@@ -121,7 +121,7 @@ Navigation preserves the target and task step without rediscovery. A different c
 
 The SDK remains deferred. YubiEnroll still performs enrollment and PIN handling. For USB enrollment, sign in with the administrator key, disconnect it, and keep only the chosen USB target connected during enrollment. For NFC, keep the selected target on the named reader; a separate USB admin key may remain connected. Fresh inventory checks do not bind the running CLI to a USB serial.
 
-The embedded terminal is enabled by default. Its toggle under Settings → App settings applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
+The embedded terminal is enabled by default. Its toggle under Settings → App settings applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion. After successful setup, use the eye in the summary to read the generated PIN for handoff. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
 Only standalone **FIDO reset** is currently available. Additional application-specific resets (issue #7), final product name/logo (#9), and optional batch handover (#19) remain separate follow-up work. No repository rename or full factory-reset claim is made in this preview.
 

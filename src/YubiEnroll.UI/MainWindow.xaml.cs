@@ -468,15 +468,16 @@ public partial class MainWindow : Window
                 if (batch == null && verifiedExit == 0) _receiptPin = pin;
                 var storedPin = verifiedExit == 0 && registration?.SaveGeneratedPin == true ? pin : null;
                 var saved = CompleteRegistrationRecord(registration, verifiedExit, storedPin);
-                var notice = targetChanged ? "The selected YubiKey could not be verified. Check its registration in Entra." : null;
-                if (setup.RandomPin == true && !_addPasskey && (storedPin == null || !saved))
+                if (verifiedExit == 0 && pin != null && registration?.SaveGeneratedPin != true)
                 {
-                    var pinNotice = batch?.Current?.GeneratedPin != null
-                        ? "The initial PIN is available in this batch. Record it before leaving the batch."
-                        : nativeExit == 0 ? "The temporary PIN has not been saved. Record it securely before continuing."
-                        : "If a temporary PIN was displayed, record it securely before continuing.";
-                    notice = notice == null ? pinNotice : notice + " " + pinNotice;
+                    _registrationResultMessage += batch == null
+                        ? " Initial PIN logging is off. Record the temporary PIN before leaving this summary."
+                        : " Initial PIN logging is off. Record or export the temporary PIN before leaving this batch.";
+                    RenderRegistrationLogStatus();
                 }
+                var notice = targetChanged ? "The selected YubiKey could not be verified. Check its registration in Entra." : null;
+                if (registration != null && !saved)
+                    notice = notice == null ? _registrationResultMessage : notice + " " + _registrationResultMessage;
                 return notice;
             }
             code = await RunInteractiveAsync(_exePath, arguments, target, FinishEnrollment, batch == null, setup);

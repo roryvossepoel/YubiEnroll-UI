@@ -130,19 +130,31 @@ internal sealed class TerminalPanel : Border
             _pinHint.Visibility = exit == 0 && GeneratedPin != null ? Visibility.Visible : Visibility.Collapsed;
             _pinHint.Text = "Your temporary PIN is available in the registration summary.";
         }
+        string? notice = null;
         if (NativeFinished != null)
         {
-            var notice = await NativeFinished(exit, GeneratedPin, GeneratedPinSummary.ResetReceiptSerial(_screen.Text));
-            if (notice != null)
-            {
-                _pinHint.Text = notice;
-                _pinHint.Visibility = Visibility.Visible;
-            }
+            notice = await NativeFinished(exit, GeneratedPin, GeneratedPinSummary.ResetReceiptSerial(_screen.Text));
+        }
+        if (_captureSerial != null && GeneratedPin == null && exit == 0)
+        {
+            const string missingPin = "The expected temporary PIN could not be collected. Check the terminal output before continuing.";
+            notice = notice == null ? missingPin : notice + " " + missingPin;
+        }
+        CompletedExitCode = exit;
+        var setupComplete = _enrollment && !_addPasskey && NativeFinished != null;
+        if (exit == 0 && notice == null && (_autoCloseOnSuccess || setupComplete))
+        {
+            _screen.Clear();
+            Screen.Clear();
+            return exit;
+        }
+        if (notice != null)
+        {
+            _pinHint.Text = notice;
+            _pinHint.Visibility = Visibility.Visible;
         }
         _done.IsEnabled = true;
         _done.Focus();
-        CompletedExitCode = exit;
-        if (_autoCloseOnSuccess && exit == 0) { _screen.Clear(); Screen.Clear(); return exit; }
         await _dismissed.Task;
         return exit;
     }
