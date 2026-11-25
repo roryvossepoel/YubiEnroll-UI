@@ -24,15 +24,13 @@
     </StandardDirectory>
 
     <Feature Id="Application" Title="$(ProductName)" Level="1">
-      <Component Directory="INSTALLFOLDER" Id="ApplicationExecutable" Guid="*">
+      <Component Directory="INSTALLFOLDER" Id="ApplicationExecutable" Guid="DFA02F2F-D0C7-41A8-BB4F-5BD21A555DD3" Bitness="always64">
         <File Id="PasskeyDeskExe" Source="$(PayloadDir)\PasskeyDesk.exe" KeyPath="yes">
           <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="PassKey Desk"
                     WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="PasskeyDesk.ico" />
         </File>
-      </Component>
-      <Component Id="ControlPanelIcon" Directory="INSTALLFOLDER" Guid="DFA02F2F-D0C7-41A8-BB4F-5BD21A555DD3" Bitness="always64">
         <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
-                       Name="DisplayIcon" Type="string" Value="&quot;[#PasskeyDeskExe]&quot;,0" KeyPath="yes" />
+                       Name="DisplayIcon" Type="string" Value="&quot;[#PasskeyDeskExe]&quot;,0" />
       </Component>
       <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\PasskeyDesk.ConsoleHost.exe" />
       <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\LICENSE" />
