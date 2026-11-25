@@ -8,7 +8,6 @@
 
     <Icon Id="PasskeyDesk.ico" SourceFile="$(AssetDir)\App.ico" />
     <Property Id="ARPPRODUCTICON" Value="PasskeyDesk.ico" />
-    <Property Id="ARPNOMODIFY" Value="1" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/roryvossepoel/PasskeyDesk" />
     <Property Id="ARPHELPLINK" Value="https://github.com/roryvossepoel/PasskeyDesk/issues" />
 
