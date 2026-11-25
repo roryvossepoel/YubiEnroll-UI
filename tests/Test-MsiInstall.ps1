@@ -23,10 +23,16 @@ try {
     }
     if (!(Test-Path -LiteralPath $shortcut)) { throw 'Missing all-users Start menu shortcut.' }
     $registration = @(Get-ProductRegistration)
-    if ($registration.Count -ne 1 -or $registration[0].Publisher -ne $exe.VersionInfo.CompanyName -or
-        $registration[0].DisplayVersion -ne ($exe.VersionInfo.ProductVersion -split '\+')[0] -or
+    [xml]$metadata = Get-Content -Raw (Join-Path $PSScriptRoot '../Directory.Build.props')
+    $expected = $metadata.Project.PropertyGroup
+    $visibleEntries = @(Get-ItemProperty "$uninstallKey\*" | Where-Object { $_.DisplayName -like '*Passkey*' } |
+        Select-Object DisplayName, Publisher, DisplayVersion, DisplayIcon, UninstallString)
+    Write-Host "Programs and Features: $(ConvertTo-Json -Compress -InputObject $visibleEntries)"
+    Write-Host "Expected: $($expected.Product), $($expected.Company), $($expected.Version)"
+    if ($registration.Count -ne 1 -or $registration[0].Publisher -ne $expected.Company -or
+        $registration[0].DisplayVersion -ne $expected.Version -or
         !$registration[0].UninstallString -or !$registration[0].DisplayIcon) {
-        throw 'Programs and Features metadata does not match the installed application.'
+        throw 'Programs and Features metadata does not match the application release metadata.'
     }
 } finally {
     Invoke-Installer '/x'
