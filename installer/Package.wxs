@@ -30,6 +30,10 @@
                     WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="PasskeyDesk.ico" />
         </File>
       </Component>
+      <Component Id="ControlPanelIcon" Directory="INSTALLFOLDER" Guid="DFA02F2F-D0C7-41A8-BB4F-5BD21A555DD3" Bitness="always64">
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                       Name="DisplayIcon" Type="string" Value="&quot;[#PasskeyDeskExe]&quot;,0" KeyPath="yes" />
+      </Component>
       <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\PasskeyDesk.ConsoleHost.exe" />
       <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\LICENSE" />
       <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\README.md" />

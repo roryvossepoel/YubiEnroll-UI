@@ -31,7 +31,7 @@ try {
     Write-Host "Expected: $($expected.Product), $($expected.Company), $($expected.Version)"
     if ($registration.Count -ne 1 -or $registration[0].Publisher -ne $expected.Company -or
         $registration[0].DisplayVersion -ne $expected.Version -or
-        !$registration[0].UninstallString -or !$registration[0].DisplayIcon) {
+        !$registration[0].UninstallString -or $registration[0].DisplayIcon -ne ('"{0}",0' -f $exe.FullName)) {
         throw 'Programs and Features metadata does not match the application release metadata.'
     }
 } finally {
