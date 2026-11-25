@@ -1,0 +1,41 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="$(ProductName)" Manufacturer="$(Publisher)" Version="$(AppVersion)"
+           Language="1033" Scope="perMachine" UpgradeCode="333AF6EB-EE56-40AE-A70A-7B757600EC65">
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="PasskeyDesk.ico" SourceFile="$(AssetDir)\App.ico" />
+    <Property Id="ARPPRODUCTICON" Value="PasskeyDesk.ico" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/roryvossepoel/PasskeyDesk" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/roryvossepoel/PasskeyDesk/issues" />
+
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(BrandDir)\Banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(BrandDir)\Dialog.bmp" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(BrandDir)\License.rtf" />
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Passkey Desk">
+        <Directory Id="PolicyFolder" Name="policy" />
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Application" Title="$(ProductName)" Level="1">
+      <Component Directory="INSTALLFOLDER" Id="ApplicationExecutable" Guid="*">
+        <File Id="PasskeyDeskExe" Source="$(PayloadDir)\PasskeyDesk.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="PassKey Desk"
+                    WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="PasskeyDesk.ico" />
+        </File>
+      </Component>
+      <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\PasskeyDesk.ConsoleHost.exe" />
+      <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\LICENSE" />
+      <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\README.md" />
+      <Files Directory="INSTALLFOLDER" Include="$(PayloadDir)\THIRD-PARTY-NOTICES.md" />
+      <Files Directory="PolicyFolder" Include="$(PayloadDir)\policy\**" />
+    </Feature>
+  </Package>
+</Wix>

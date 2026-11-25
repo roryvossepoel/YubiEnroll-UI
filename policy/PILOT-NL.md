@@ -1,10 +1,10 @@
-# Passkey Desk voor YubiKeys · 0.11.5
+# Passkey Desk voor YubiKeys · 0.11.6
 
 Vanaf **0.11.0** gebruik je dezelfde Windows x64-build met en zonder machinebeleid. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
 ## Indeling van de template (revisie 1.4)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.5 en de meegeleverde ADMX en ADML (revisie 1.4).
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.6 en de meegeleverde ADMX en ADML (revisie 1.4).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ Zijn alleen tenants beheerd, dan blijven de lokale profielen bewerkbaar en verva
 
 De CLI blijft de gewone TOML van het **Windows-account dat de app uitvoert** gebruiken, doorgaans `%APPDATA%\Yubico\yubienroll\yubienroll.toml`. De app respecteert ook haar bestaande alternatieve zoekpad. Start je verhoogd met een ander account, dan werk je in het profiel van dat account.
 
-De app valideert alle ontvangen instellingen voordat zij de TOML vervangt. Alleen bij een inhoudelijke wijziging wordt er geschreven; bij vervanging van een bestaand bestand komt er een exacte `.bak` naast. Een bestaande geldige actieve provider blijft behouden. Werk met één app/CLI-schrijver tegelijk. Bij invoer van een nieuwe versie van een policy: laat Intune eerst de synchronisatie afronden.
+De app valideert alle ontvangen instellingen voordat zij de TOML vervangt. Alleen bij een inhoudelijke wijziging wordt er geschreven; bij vervanging van een bestaand bestand komt er een exacte `.bak` naast. Per TOML bewaart Passkey Desk de tien nieuwste automatische back-ups. Een bestaande geldige actieve provider blijft behouden. Werk met één app/CLI-schrijver tegelijk. Bij invoer van een nieuwe versie van een policy: laat Intune eerst de synchronisatie afronden.
 
 Lockdown geldt **in Passkey Desk**; het bestand krijgt geen andere toegangsrechten. Je kunt het met de losse CLI blijven lezen en bewerken. Bij de volgende appstart worden afwijkende beheerde waarden opnieuw toegepast. Oudere versies zonder policyondersteuning gebruiken dezelfde per-user TOML en kennen deze vergrendeling niet.
 
@@ -67,5 +67,5 @@ Als je alle policies verwijdert, wordt de laatst toegepaste TOML je lokale uitga
 
 ## Volgende testronde
 
-1. Test 0.11.5 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
+1. Test 0.11.6 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
 2. Test daarna dezelfde build op een Windows-testapparaat zonder toegewezen policy. Controleer na opnieuw starten dat lokale instellingen bewerkbaar zijn en doorloop dezelfde registratie.

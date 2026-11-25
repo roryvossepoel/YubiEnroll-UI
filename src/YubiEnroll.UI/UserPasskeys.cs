@@ -54,21 +54,24 @@ public partial class MainWindow
         ManageTenantStep.Visibility = Visible(_manageStep == 0);
         ManageUserStep.Visibility = Visible(_manageStep == 1); ManageScroll.Visibility = Visible(_manageStep != 1);
         ManageListStep.Visibility = Visible(_manageStep == 2);
-        ManageContext.Text = _manageStep == 0 ? "View or remove a user’s YubiKey registrations in Microsoft Entra. No connected key is required." :
+        ManageContext.Text = _batchReviewRow != null && _manageStep == 0
+            ? $"Connect to {_batch?.Tenant.Name} to review registrations for {_batchReviewRow.User.UserPrincipalName}."
+            : _manageStep == 0 ? "View or remove a user’s YubiKey registrations in Microsoft Entra. No connected key is required." :
             _manageStep == 1 ? $"Tenant · {_management?.Tenant.Name}" :
             $"{_management?.Tenant.Name}  ·  {(ManageUsers.SelectedItem as UserCandidate)?.Label}";
         ManageTenantHint.Text = ManageTenants.Items.Count == 0 ? EmptyTenantGuidance :
             _managementLogin != null ? "Complete sign-in in your browser." :
             connected ? $"Connected to {_management!.Tenant.Name}" : "";
+        ManageTenants.IsEnabled = _batchReviewRow == null;
         ManageConnect.Visibility = Visible(_manageStep == 0);
-        ManageContinue.Visibility = Visible(_manageStep == 0);
+        ManageContinue.Visibility = Visible(_manageStep == 0 && _batchReviewRow == null);
         ManageContinue.IsEnabled = connected && _managementLogin == null;
         ManageConnect.IsEnabled = ManageTenants.SelectedItem is Provider && !connected;
         ManageConnect.Content = _managementLogin != null ? "Cancel sign-in" : connected ? "Connected" : "Connect";
         ManageTitle.Text = _manageStep switch { 0 => "Choose a tenant", 1 => "Choose a user", _ => "Review YubiKey registrations" };
         ManageView.Visibility = Visible(_manageStep == 1);
         ManageView.IsEnabled = connected && ManageUsers.SelectedItem is UserCandidate;
-        SetBackAction(ManageBack, _manageStep switch { 2 => "Choose another user", 1 => "Choose tenant", _ => null });
+        SetBackAction(ManageBack, _batchReviewRow != null ? "Back to batch" : _manageStep switch { 2 => "Choose another user", 1 => "Choose tenant", _ => null });
     }
 
     private void ManageContinue_Click(object sender, RoutedEventArgs e)
@@ -112,11 +115,20 @@ public partial class MainWindow
                 else ManageContinue.Focus();
             }
         }
+        if (failure == null && _batchReviewRow is { } row && _batch?.Tenant == provider &&
+            _management is { } session && Current(session) && _manageStep == 0)
+        {
+            _manageStep = 1;
+            ManageUsers.ItemsSource = new[] { row.User };
+            ManageUsers.SelectedItem = row.User;
+            await ReadManagedListAsync();
+        }
     }
 
     private void ManageBack_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
+        if (_batchReviewRow != null) { ShowPage(BatchPage); return; }
         if (_manageStep == 0) { ShowPage(OverviewPage); return; }
         if (_manageStep == 1) { ManageQuery.Clear(); ManageUsers.ItemsSource = null; ManageSearchHint.Text = ""; }
         ClearManagedList(); ManageUsers.SelectedItem = null;

@@ -1,0 +1,11 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <OutputName>PasskeyDesk-$(Version)-win-x64</OutputName>
+    <OutputType>Package</OutputType>
+    <DefineConstants>ProductName=$(Product);Publisher=$(Company);AppVersion=$(Version);PayloadDir=$(MSBuildProjectDirectory)\..\artifacts\win-x64\app;AssetDir=$(MSBuildProjectDirectory)\..\src\YubiEnroll.UI\Assets;BrandDir=$(MSBuildProjectDirectory)\..\artifacts\win-x64\installer-assets</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

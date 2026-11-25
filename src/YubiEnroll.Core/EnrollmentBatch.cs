@@ -64,6 +64,8 @@ public static class BatchRoster
 public enum IssueStatus { Pending, InProgress, Registered, Skipped, CheckRequired }
 public sealed record IssuanceRow(UserCandidate User, IssueStatus Status = IssueStatus.Pending, string Serial = "")
 {
+    public string ReviewReason { get; init; } = "";
+    public bool NeedsReview => Status == IssueStatus.CheckRequired;
     public bool? GeneratesPin { get; init; }
     public string? GeneratedPin { get; init; }
     public string PinLayoutSample => new('0', Math.Max(6, GeneratedPin?.Length ?? 0));
@@ -103,12 +105,18 @@ public sealed class EnrollmentBatch
             throw new InvalidOperationException("The recipient, key or profile is no longer eligible. Review this row again.");
         _rows[Position] = row with { Serial = key.Serial, Status = IssueStatus.InProgress, GeneratesPin = setup.RandomPin };
     }
-    public void Complete(int? exit, string? generatedPin = null)
+    public void Complete(int? exit, string? generatedPin = null, string? reason = null)
     {
         if (Current is not { Status: IssueStatus.InProgress } row) throw new InvalidOperationException("No enrollment is running.");
         _rows[Position] = row with
         {
             Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired,
+            ReviewReason = exit == 0 ? "" : reason ?? (exit switch
+            {
+                125 => "Registration was interrupted before the outcome could be confirmed.",
+                null or < 0 => "The application could not confirm the registration outcome.",
+                _ => $"YubiEnroll returned exit code {exit}."
+            }),
             GeneratedPin = exit == 0 && row.GeneratesPin == true && GeneratedPinSummary.IsValid(generatedPin) ? generatedPin : null
         };
     }

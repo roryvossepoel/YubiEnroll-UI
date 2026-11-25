@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Tomlyn;
 using Tomlyn.Model;
@@ -162,7 +163,7 @@ public static class TenantConfigWriter
 
 public static class ConfigFileWriter
 {
-    public static string? Save(ConfigSnapshot expected, string result)
+    public static string? Save(ConfigSnapshot expected, string result, bool keepBackup = true)
     {
         ConfigReader.Parse(result);
         var path = System.IO.Path.GetFullPath(expected.Path);
@@ -172,6 +173,7 @@ public static class ConfigFileWriter
         var current = ConfigSnapshot.Read(path);
         if (!string.Equals(current.Text, expected.Text, StringComparison.Ordinal))
             throw new InvalidOperationException("Configuration changed while this window was open. Cancel and reopen it before saving.");
+        if (current.Text != null && ConfigReader.SameSettings(current.Text, result)) return null;
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         string? backup = null;
         try
@@ -186,11 +188,43 @@ public static class ConfigFileWriter
                 File.Move(temporary, path); // Refuses to replace a file created in the meantime.
             else
             {
-                backup = path + "." + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + "." + Guid.NewGuid().ToString("N") + ".bak";
+                if (keepBackup)
+                    backup = path + "." + DateTime.UtcNow.ToString("yyyyMMddHHmmssfffffff", CultureInfo.InvariantCulture) + "." + Guid.NewGuid().ToString("N") + ".bak";
                 File.Replace(temporary, path, backup);
+                if (backup != null) TrimBackups(path, backup);
             }
             return backup;
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    private static void TrimBackups(string path, string newest)
+    {
+        const int limit = 10;
+        var directory = new DirectoryInfo(System.IO.Path.GetDirectoryName(path)!);
+        var prefix = System.IO.Path.GetFileName(path) + ".";
+        try
+        {
+            var backups = new List<(FileInfo File, DateTime Stamp)>();
+            foreach (var file in directory.EnumerateFiles("*.bak"))
+            {
+                if (string.Equals(file.FullName, newest, StringComparison.OrdinalIgnoreCase) ||
+                    !file.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                var parts = file.Name[prefix.Length..].Split('.');
+                if (parts.Length == 3 && Guid.TryParseExact(parts[1], "N", out _) &&
+                    DateTime.TryParseExact(parts[0], ["yyyyMMddHHmmss", "yyyyMMddHHmmssfffffff"],
+                        CultureInfo.InvariantCulture, DateTimeStyles.None, out var stamp))
+                    backups.Add((file, stamp));
+            }
+            foreach (var backup in backups.OrderByDescending(b => b.Stamp)
+                .ThenByDescending(b => b.File.LastWriteTimeUtc).ThenBy(b => b.File.Name, StringComparer.Ordinal).Skip(limit - 1))
+            {
+                try { backup.File.Delete(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { System.Diagnostics.Trace.TraceWarning("Could not remove an expired configuration backup: {0}", ex.Message); }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { System.Diagnostics.Trace.TraceWarning("Could not enumerate configuration backups: {0}", ex.Message); }
     }
 }

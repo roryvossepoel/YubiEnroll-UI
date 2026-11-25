@@ -2,6 +2,7 @@
 param(
     [ValidateSet('win-x64')][string]$Runtime = 'win-x64',
     [switch]$SkipTests,
+    [switch]$IncludeMsi,
     [string]$SigningCertificateThumbprint,
     [string]$TimestampServer
 )
@@ -28,5 +29,9 @@ try {
         & "$PSScriptRoot/scripts/Sign-App.ps1" -AppDirectory "$out/app" -CertificateThumbprint $SigningCertificateThumbprint -TimestampServer $TimestampServer
     }
     Copy-Item -Recurse -LiteralPath policy -Destination "$out/app/policy"
-    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.5-$Runtime.zip" -Force
+    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.6-$Runtime.zip" -Force
+    if ($IncludeMsi) {
+        & "$PSScriptRoot/installer/New-SetupArtwork.ps1" -Destination "$out/installer-assets"
+        Invoke-Dotnet build installer/PasskeyDesk.wixproj -c Release "-p:OutputPath=$out/installer"
+    }
 } finally { Pop-Location }

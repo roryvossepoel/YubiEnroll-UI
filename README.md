@@ -2,6 +2,12 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
+## 0.11.6
+
+Windows x64 is available as a portable ZIP and a machine-wide MSI. Wizard actions stay at the bottom of the window as status text changes. A batch registration marked **Check required** explains the outcome and opens the recipient’s Entra registrations. Use **Back to batch** to resume the same queue.
+
+Passkey Desk keeps the ten most recent automatic backups for each TOML file after a persistent configuration change, including policy updates and imports. Enrollment profiles and unchanged settings produce no backups. Previously generated backups count toward the same limit on the next change.
+
 ## 0.11.5
 
 The embedded terminal displays the generated initial PIN during both single and batch setup. After a successful setup, the app opens the single registration summary or the current batch recipient’s handoff automatically. The operator chooses **Next user** after handing over the key. Errors, an unverified outcome, a missing expected PIN or a log write failure keep the terminal open for review. The PIN is masked in the summary, handoff and batch results until the operator uses the eye button.
@@ -49,7 +55,7 @@ NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey 
 - Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
 - Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
 - Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
-- The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-enrollment-*` profile; it can be removed in Settings. Configuration backups retain the previous TOML, as for other edits. Basic setup profiles with an omitted PIN floor also use a temporary, complete native profile with the freshly detected floor: YubiEnroll 1.2.0 requires this field even when no policy change is intended. The reusable profile stays unchanged.
+- The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-enrollment-*` profile; it can be removed in Settings. Creating and removing this temporary profile does not create configuration backups. Basic setup profiles with an omitted PIN floor also use a temporary, complete native profile with the freshly detected floor: YubiEnroll 1.2.0 requires this field even when no policy change is intended. The reusable profile stays unchanged.
 - Both tasks support USB and NFC. USB retains the single-target USB preflight restriction because YubiEnroll has no USB serial selector. NFC uses an explicit reader; a separate USB administrator key can remain connected. Keep the selected target in place throughout the native operation.
 - Help & About includes a manual GitHub update check, including published previews. No release yet and network failures have separate messages. Updates open the release page; installation remains manual.
 - Prerequisites includes .NET Desktop Runtime 10 x64 alongside YubiEnroll CLI and YubiKey Manager CLI (ykman).
@@ -247,6 +253,8 @@ On Windows, install the .NET 10 SDK, then run:
 ```powershell
 ./build.ps1 -Runtime win-x64
 ```
+
+Add `-IncludeMsi` on Windows to package the same files as a machine-wide installer in `artifacts/win-x64/installer/`. The MSI installs to `%ProgramFiles%\Passkey Desk`, adds **PassKey Desk** to the all-users Start menu and registers **Passkey Desk for YubiKeys** in Programs and Features. The .NET Desktop Runtime and the Yubico command-line tools are separate prerequisites.
 
 The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with first-run setup, form validation/save/cancel, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. A separate Windows CI check downloads the signed official YubiEnroll 1.2.0 installer, verifies its publisher, and checks that the CLI reads a synthetic provider/profile generated by the GUI writer. A separate check verifies the signed ykman 5.9.2 installer, expected installation folder, version parser, empty device discovery and serial-targeted reset help. No login, tenant access, reset command or attached hardware is used; neither Yubico CLI is redistributed with the app.
 

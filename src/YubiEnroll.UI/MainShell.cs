@@ -72,7 +72,9 @@ public partial class MainWindow
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage && _hostedWindow is SettingsWindow current && !current.ConfirmLeavePreferences()) return;
         if (page != HostedPage) LeaveHostedPage();
-        if (page != BatchPage && BatchPage.IsVisible) ResetBatch();
+        if (_batchReviewRow != null && page == BatchPage) _batchReviewRow = null;
+        if (page != BatchPage && (BatchPage.IsVisible || _batchReviewRow != null) &&
+            !(page == ManagePage && _batchReviewRow != null)) ResetBatch();
         if (page.Visibility != Visibility.Visible) StatusText.Text = "";
         if (page != PreparePage && PreparePage.IsVisible && _enrollStep == EnrollmentResultStep) BeginNextKey();
         if (page != ResetPage && ResetPage.IsVisible && _resetStep == 2) { StopPinRead(); _resultKey = null; BeginNextKey(); }

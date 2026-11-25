@@ -15,6 +15,7 @@ public partial class MainWindow
     private enum BatchStage { Setup, Profile, Users, Review, Issue, Results }
     private BatchStage _batchStage;
     private EnrollmentBatch? _batch;
+    private IssuanceRow? _batchReviewRow;
     private IReadOnlyList<UserCandidate> _verified = [];
     private ProfileSetup? _batchPolicy;
     private bool _batchLoading;
@@ -36,6 +37,7 @@ public partial class MainWindow
     private void BatchOpen_Click(object sender, RoutedEventArgs e)
     {
         if (_busy) return;
+        if (_batchReviewRow != null && ManagePage.IsVisible) { ShowPage(BatchPage); return; }
         if (RequirementsBlockTasks) { ShowPage(StartupPage); return; }
         if (_addPasskey) { _addPasskey = false; BeginNextKey(); }
         ResetBatch();
@@ -324,6 +326,18 @@ public partial class MainWindow
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show(this, "Could not save this CSV. Check the destination and try again."); }
     }
+    private void BatchReviewEntra_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || !BatchPage.IsVisible || _batch is not { } batch) return;
+        var row = sender == BatchHandoffReview ? batch.Current : (sender as Button)?.DataContext as IssuanceRow;
+        if (row is not { NeedsReview: true } || !batch.Rows.Contains(row)) return;
+        InitialPinCell.HidePin();
+        _batchReviewRow = row;
+        ShowPage(ManagePage);
+        ManageTenants.SelectedItem = batch.Tenant;
+        ResetManagement();
+    }
+
     private void ResetBatch()
     {
         if (_batch is { Current: not null } batch && _batchStage == BatchStage.Issue)
@@ -334,6 +348,7 @@ public partial class MainWindow
         InitialPinCell.HidePin();
         BatchHandoffPin.DataContext = null;
         _batch?.ClearPins();
+        _batchReviewRow = null;
         _batch = null;
         _batchStage = BatchStage.Setup;
         _batchPolicy = null;
@@ -396,6 +411,7 @@ public partial class MainWindow
         var pending = row.Status == IssueStatus.Pending;
         BatchHandoffPin.DataContext = row.GeneratedPin != null ? row : null;
         BatchHandoffPin.Visibility = Visible(row.GeneratedPin != null);
+        BatchHandoffReview.Visibility = Visible(row.NeedsReview);
         BatchChoose.Visibility = Visible(pending); BatchHandoff.Visibility = Visible(!pending);
         BatchLogNotice.Text = _registrationResultMessage;
         BatchRetryLog.Visibility = Visible(_registrationJournal.PendingCount > 0);
@@ -411,7 +427,7 @@ public partial class MainWindow
         {
             BatchOutcome.Text = $"{row.StatusLabel} · Serial {row.Serial} · {row.User.UserPrincipalName}";
             BatchInstructions.Text = row.Status == IssueStatus.Registered ? "Label and hand over this YubiKey and its initial PIN before moving on." :
-                "Check the registration in Entra before attempting another enrollment. This serial cannot be reused in this batch.";
+                row.ReviewReason + " Check this user’s registrations in Entra before retrying.";
             BatchNext.Content = batch.Position + 1 == batch.Rows.Count ? "View results" : "Next user";
         }
     }

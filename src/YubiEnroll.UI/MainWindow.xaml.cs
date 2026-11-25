@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.5" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.6" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.5\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.6\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -464,7 +464,10 @@ public partial class MainWindow : Window
                 if (batch != null && target.IsNfc && reset == true && nativeExit == 0)
                     targetChanged = !await VerifyReturnedNfcKeyAsync(target, EmbeddedTerminal || _captureGeneratedPin, receiptSerial);
                 int? verifiedExit = targetChanged ? null : nativeExit;
-                batch?.Complete(verifiedExit, pin);
+                var notice = targetChanged ? (target.IsNfc && reset == true && nativeExit == 0
+                    ? "The selected YubiKey could not be verified after the NFC reset."
+                    : "The key connection changed during registration.") : null;
+                batch?.Complete(verifiedExit, pin, notice);
                 if (batch == null && verifiedExit == 0) _receiptPin = pin;
                 var storedPin = verifiedExit == 0 && registration?.SaveGeneratedPin == true ? pin : null;
                 var saved = CompleteRegistrationRecord(registration, verifiedExit, storedPin);
@@ -475,7 +478,7 @@ public partial class MainWindow : Window
                         : " Initial PIN logging is off. Record or export the temporary PIN before leaving this batch.";
                     RenderRegistrationLogStatus();
                 }
-                var notice = targetChanged ? "The selected YubiKey could not be verified. Check its registration in Entra." : null;
+                if (notice != null) notice += " Check the registration in Entra.";
                 if (registration != null && !saved)
                     notice = notice == null ? _registrationResultMessage : notice + " " + _registrationResultMessage;
                 return notice;

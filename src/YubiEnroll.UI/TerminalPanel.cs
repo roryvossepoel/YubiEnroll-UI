@@ -35,13 +35,17 @@ internal sealed class TerminalPanel : Border
         _single = single;
         _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
-        Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
-        var layout = new DockPanel(); Child = layout;
+        Background = new SolidColorBrush(Color.FromRgb(245, 247, 250));
+        var page = new DockPanel(); Child = page;
+        var layout = new DockPanel { Margin = new Thickness(24,24,24,0) };
         var heading = new TextBlock { Text = title + (enrollment && !addPasskey && !string.IsNullOrEmpty(profile) ? " · " + profile : ""), TextWrapping = TextWrapping.Wrap, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(heading, Dock.Top); layout.Children.Add(heading);
         var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : nfc ? "Follow the Yubico prompts below. Click the terminal to type. Keep the key flat on the NFC reader; remove and replace it only when prompted." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
-        var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
+        var footer = new StackPanel();
+        var actionBar = new Border { Style = (Style)FindResource("WizardActionBar"), Child = footer };
+        DockPanel.SetDock(actionBar, Dock.Bottom); page.Children.Add(actionBar); page.Children.Add(layout);
+        _done.Margin = new Thickness(0);
         footer.Children.Add(_status);
         if (enrollment && !addPasskey && (!single || captureSerial != null))
         {

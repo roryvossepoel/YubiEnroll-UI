@@ -7,6 +7,11 @@
   <SolidColorBrush x:Key="Accent" Color="#84BD00"/>
   <SolidColorBrush x:Key="Heading" Color="#0B536F"/>
   <SolidColorBrush x:Key="Muted" Color="#52606B"/>
+  <Thickness x:Key="WizardActionPadding">28,16,28,16</Thickness>
+  <Style x:Key="WizardActionBar" TargetType="Border">
+   <Setter Property="Padding" Value="{StaticResource WizardActionPadding}"/>
+   <Setter Property="BorderBrush" Value="#DDE2E4"/><Setter Property="BorderThickness" Value="0,1,0,0"/>
+  </Style>
   <Style x:Key="LogCopyButton" TargetType="Button">
    <Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Foreground" Value="#536874"/><Setter Property="Cursor" Value="Hand"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="HitArea" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="4"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HitArea" Property="Background" Value="#E6EDF0"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="HitArea" Property="BorderBrush" Value="#0B536F"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>

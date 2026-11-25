@@ -22,7 +22,7 @@ public partial class SettingsWindow
             for (var page = 1; page <= 10; page++)
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{ReleaseUpdates.Repository}/releases?per_page=100&page={page}");
-                request.Headers.UserAgent.ParseAdd("YubiEnroll-UI/" + CurrentVersion);
+                request.Headers.UserAgent.ParseAdd("PasskeyDesk/" + CurrentVersion);
                 request.Headers.Accept.ParseAdd("application/vnd.github+json");
                 request.Headers.Add("X-GitHub-Api-Version", "2026-03-10");
                 using var response = await UpdateClient.SendAsync(request, deadline.Token);

@@ -15,6 +15,16 @@ public partial class MainWindow
         BatchOpen_Click(this, e);
         UpdateLayout();
         Assert(BatchTenant.SelectedItem == null && !BatchConnect.IsEnabled && !BatchToProfile.IsEnabled, "New batch requires explicit tenant selection");
+        var expectedRight = WorkPanel.ActualWidth - 28;
+        var expectedBottom = WorkPanel.ActualHeight - 16;
+        foreach (var statusMessage in new[] { "", "Checking connected keys…" })
+        {
+            StatusText.Text = statusMessage; UpdateLayout();
+            var corner = BatchToProfile.TranslatePoint(new Point(BatchToProfile.ActualWidth, BatchToProfile.ActualHeight), WorkPanel);
+            Assert(Math.Abs(corner.X - expectedRight) <= 1 && Math.Abs(corner.Y - expectedBottom) <= 1,
+                "The primary action stays anchored with both empty and populated status text");
+        }
+        StatusText.Text = "";
         BatchTenant.SelectedItem = _config!.Providers.Single();
         _connectedProvider = SelectedProvider; UpdateSummary(); BatchToProfile_Click(this,e);
         UpdateLayout();
@@ -104,6 +114,21 @@ public partial class MainWindow
             ChooseExport(true) == true && batch.Csv(";", true).Contains("004815"),
             "The operator can export batch results with or without PINs while journal PIN logging is off");
         eye.IsChecked = false;
+        // A contextual Entra review must preserve other recipients' temporary PINs.
+        var reviewBatch = new EnrollmentBatch(batch.Tenant, batch.Profile, [a, b]);
+        reviewBatch.Start(a, key, status.Pin, _batchPolicy! with { RandomPin = true });
+        reviewBatch.Complete(0, "004815"); reviewBatch.Advance();
+        reviewBatch.Start(b, second.Key, status.Pin, _batchPolicy!);
+        reviewBatch.Complete(null, reason: "The selected YubiKey could not be verified after the NFC reset.");
+        _batch = reviewBatch; Stage(BatchStage.Issue);
+        BatchReviewEntra_Click(BatchHandoffReview, e);
+        Assert(ManagePage.IsVisible && Equals(ManageTenants.SelectedItem, batch.Tenant) &&
+            _batchReviewRow?.User == b && ManageContext.Text.Contains(b.UserPrincipalName),
+            "Check required opens the reviewed tenant and recipient");
+        ManageBack_Click(this, e);
+        Assert(BatchPage.IsVisible && ReferenceEquals(_batch, reviewBatch) && BatchInstructions.Text.Contains("NFC reset") &&
+            reviewBatch.Rows[0].GeneratedPin == "004815", "Returning to the batch preserves its queue and session PINs");
+        reviewBatch.ClearPins(); _batch = batch; Stage(BatchStage.Results);
         CaptureWindow(this, "batch-results.png");
         BatchOpen_Click(this, e);
         Assert(batch.Rows.All(row => row.GeneratedPin == null), "Navigation discards all PINs in the previous batch");

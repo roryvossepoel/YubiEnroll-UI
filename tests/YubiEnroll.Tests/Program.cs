@@ -351,6 +351,26 @@ try
     var after = File.ReadAllText(tempPath);
     Reject(() => TenantConfigWriter.Save(first, setup with { Name = "Stale", CreateProfile = false }), "Stale dialog cannot overwrite configuration");
     Check(File.ReadAllText(tempPath) == after, "Rejected stale save leaves file unchanged");
+    var beforeLease = Directory.GetFiles(Path.GetDirectoryName(tempPath)!, "*.bak").Length;
+    using (EnrollmentProfileLease.Create(tempPath, separate)) { }
+    Check(File.ReadAllText(tempPath) == after && Directory.GetFiles(Path.GetDirectoryName(tempPath)!, "*.bak").Length == beforeLease,
+        "An enrollment profile round trip preserves the original and creates no backups");
+    Check(ConfigFileWriter.Save(ConfigSnapshot.Read(tempPath), "# unchanged values\n" + after) == null &&
+        File.ReadAllText(tempPath) == after, "Saving unchanged settings preserves original formatting without a backup");
+    var legacy = tempPath + ".20010304112233." + Guid.NewGuid().ToString("N") + ".bak";
+    var manual = tempPath + ".manual.bak";
+    File.WriteAllText(legacy, "old app backup"); File.WriteAllText(manual, "manual backup");
+    var versions = new List<string>();
+    for (var revision = 0; revision < 12; revision++)
+    {
+        var before = ConfigSnapshot.Read(tempPath);
+        versions.Add(before.Text!);
+        ConfigFileWriter.Save(before, $"revision = {revision}\n" + after);
+    }
+    var retained = Directory.GetFiles(Path.GetDirectoryName(tempPath)!, "*.bak").Where(path => path != manual)
+        .Select(File.ReadAllText).ToArray();
+    Check(retained.Length == 10 && versions.TakeLast(10).All(v => retained.Contains(v)) &&
+        !File.Exists(legacy) && File.Exists(manual), "Ten newest owned backups retained, legacy names recognized, manual backups untouched");
 }
 finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true); }
 Check(KeyResetService.ParseVersion("YubiKey Manager (ykman) version: 5.9.2\r\n") == new Version(5, 9, 2), "Official ykman version format accepted");
