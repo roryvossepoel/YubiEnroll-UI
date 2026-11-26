@@ -1,5 +1,5 @@
 <Window UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" x:Class="YubiEnroll.UI.MainWindow" xmlns:local="clr-namespace:YubiEnroll.UI" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Icon="pack://application:,,,/Assets/App.ico" Title="Passkey Desk for YubiKeys — 0.11.7" Width="1180" Height="840" MinWidth="720" MinHeight="540" Background="White" FontFamily="Segoe UI" FontSize="14" Foreground="#222B30" Loaded="Window_Loaded" Closing="Window_Closing">
+ WindowStartupLocation="CenterScreen" ShowInTaskbar="True" Icon="pack://application:,,,/Assets/App.ico" Title="Passkey Desk for YubiKeys — 0.11.8" Width="1180" Height="840" MinWidth="720" MinHeight="540" Background="White" FontFamily="Segoe UI" FontSize="14" Foreground="#222B30" Loaded="Window_Loaded" Closing="Window_Closing">
  <Grid><Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="230"/><ColumnDefinition/></Grid.ColumnDefinitions>
  <Border Background="#F2F3F2" BorderBrush="#E5E8E5" BorderThickness="0,0,1,0"><DockPanel Margin="12,28,12,20">
   <Grid DockPanel.Dock="Top" Margin="10,0,0,34"><Grid.ColumnDefinitions><ColumnDefinition Width="46"/><ColumnDefinition/></Grid.ColumnDefinitions><Image Source="{StaticResource BrandMark}" Width="36" Height="36" VerticalAlignment="Top"/><StackPanel Grid.Column="1"><TextBlock x:Name="BrandTitle" Text="Passkey Desk" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource Heading}"/><TextBlock Text="for YubiKeys" Foreground="{StaticResource Heading}"/></StackPanel></Grid>
@@ -16,7 +16,6 @@
    <Button x:Name="AddPasskeyButton" Click="AddPasskey_Click"><DockPanel><Image DockPanel.Dock="Left" Source="{StaticResource PasskeyGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock TextWrapping="Wrap" Text="Add a passkey" VerticalAlignment="Center"/></DockPanel></Button>
    <Button x:Name="LocalButton" Click="Local_Click"><DockPanel><Image DockPanel.Dock="Left" Source="{StaticResource LocalGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock TextWrapping="Wrap" Text="Passkeys on a YubiKey" VerticalAlignment="Center"/></DockPanel></Button>
    <Button x:Name="ManageButton" Click="Manage_Click"><DockPanel><Image DockPanel.Dock="Left" Source="{StaticResource ManageGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock TextWrapping="Wrap" Text="Manage user passkeys" VerticalAlignment="Center"/></DockPanel></Button>
-   <Button x:Name="TenantSearchNav" Click="TenantSearch_Click"><DockPanel><Image DockPanel.Dock="Left" Source="{StaticResource TenantSearchGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock TextWrapping="Wrap" Text="Search tenant passkeys" VerticalAlignment="Center"/></DockPanel></Button>
    <Button x:Name="ResetButton" Click="ResetPage_Click"><DockPanel><Image DockPanel.Dock="Left" Source="{StaticResource ResetGlyph}" Width="24" Height="24" Margin="0,0,12,0"/><TextBlock TextWrapping="Wrap" Text="Clear passkeys &amp; PIN" VerticalAlignment="Center"/></DockPanel></Button>
   </StackPanel></ScrollViewer>
  </DockPanel></Border>
@@ -34,7 +33,6 @@
      <Button x:Name="LocalView" DockPanel.Dock="Right" Content="Continue to unlock" Click="LocalView_Click" ContentTemplate="{StaticResource ForwardContent}" Style="{StaticResource PrimaryButton}" Margin="16,0,0,0"/>
      <Button x:Name="LocalBack" Content="Back to Home" Click="LocalBack_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left"/>
     </DockPanel></Border>
-   <Border Visibility="{Binding Visibility, ElementName=TenantSearchPage}" Style="{StaticResource WizardActionBar}"><Button Content="Back to Home" Click="Overview_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left" Margin="0"/></Border>
    <Border Visibility="{Binding Visibility, ElementName=ManagePage}" Style="{StaticResource WizardActionBar}"><DockPanel><Button Margin="0" x:Name="ManageContinue" IsEnabled="False" DockPanel.Dock="Right" Content="Search users" ContentTemplate="{StaticResource ForwardContent}" Click="ManageContinue_Click" Style="{StaticResource PrimaryButton}"/><Button Margin="0" x:Name="ManageView" Content="View passkeys" Click="ManageView_Click" ContentTemplate="{StaticResource ForwardContent}" Style="{StaticResource PrimaryButton}" DockPanel.Dock="Right"/><Button x:Name="ManageBack" Content="Back to Home" Click="ManageBack_Click" Style="{StaticResource QuietButton}" HorizontalAlignment="Left" Margin="0"/></DockPanel></Border>
   </Grid>
   <Grid DockPanel.Dock="Bottom" x:Name="StatusBar" Visibility="Collapsed">
@@ -75,9 +73,6 @@
 </Grid></Button><Button x:Name="HomeManageCard" Click="Manage_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeManageLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Border x:Name="HomeManageIcon" Background="#F1F7E3" CornerRadius="12" Width="44" Height="44" HorizontalAlignment="Left" Margin="0,0,0,20"><Image Source="{StaticResource ManageGlyph}" Width="30" Height="30"/></Border>
 <StackPanel x:Name="HomeManageText" Grid.Row="1"><TextBlock Text="Manage user passkeys" TextWrapping="Wrap" Foreground="{StaticResource Heading}" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="View or remove a user’s YubiKey registrations in Microsoft Entra." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="14" Margin="0,3,0,0"/></StackPanel>
-</Grid></Button><Button x:Name="HomeSearchCard" Click="TenantSearch_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeSearchLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-<Border x:Name="HomeSearchIcon" Background="#F1F7E3" CornerRadius="12" Width="44" Height="44" HorizontalAlignment="Left" Margin="0,0,0,20"><Image Source="{StaticResource TenantSearchGlyph}" Width="30" Height="30"/></Border>
-<StackPanel x:Name="HomeSearchText" Grid.Row="1"><TextBlock Text="Search tenant passkeys" TextWrapping="Wrap" Foreground="{StaticResource Heading}" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Find FIDO2 registrations across the users of one Entra tenant." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="14" Margin="0,3,0,0"/></StackPanel>
 </Grid></Button><TextBlock Text="Reset FIDO on a YubiKey" Style="{StaticResource SectionTitle}" Margin="0,10,0,8"/><Button x:Name="HomeResetCard" Click="ResetPage_Click" Style="{StaticResource TaskCard}"><Grid x:Name="HomeResetLayout"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Border x:Name="HomeResetIcon" Background="#F1F7E3" CornerRadius="12" Width="44" Height="44" HorizontalAlignment="Left" Margin="0,0,0,20"><Image Source="{StaticResource ResetGlyph}" Width="30" Height="30"/></Border>
 <StackPanel x:Name="HomeResetText" Grid.Row="1"><TextBlock Text="Clear passkeys &amp; PIN" TextWrapping="Wrap" Foreground="{StaticResource Heading}" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Clears all passkeys and the FIDO PIN on this YubiKey. Registrations in Entra are kept." TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="14" Margin="0,3,0,0"/></StackPanel>
@@ -320,7 +315,10 @@
 
      <StackPanel x:Name="LocalUnlock" Visibility="Collapsed">
       <TextBlock Text="FIDO PIN for this YubiKey" Margin="0,8,0,5"/>
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <PasswordBox x:Name="LocalPin" MaxLength="63" PasswordChanged="LocalPin_Changed" KeyDown="LocalPin_KeyDown" Padding="8" AutomationProperties.Name="FIDO PIN for this YubiKey"/>
+       <Button x:Name="UnlockPinButton" Grid.Column="1" Content="Unlock" Click="UnlockPin_Click" Style="{StaticResource PrimaryButton}" Margin="12,0,0,0" IsEnabled="False"/>
+      </Grid>
      </StackPanel>
      <StackPanel x:Name="LocalList" Visibility="Collapsed">
       <DockPanel Margin="0,0,0,8"><Button DockPanel.Dock="Right" Content="Remove passkey…" Click="LocalRemove_Click"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource DangerButton}"><Style.Triggers><DataTrigger Binding="{Binding SelectedItem, ElementName=LocalRows}" Value="{x:Null}"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style></Button.Style></Button>
@@ -390,30 +388,6 @@
        </DataGrid>
        <TextBlock Grid.Row="2" x:Name="ManageSearchHint" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </Grid></Grid></DockPanel></DockPanel>
-   <DockPanel x:Name="TenantSearchPage" Visibility="Collapsed" Style="{StaticResource WizardFrame}">
-    <StackPanel DockPanel.Dock="Top">
-     <TextBlock Text="Search tenant passkeys" Style="{StaticResource PageTitle}"/>
-     <TextBlock Text="Choose a tenant to list its FIDO2 registrations." Style="{StaticResource WizardIntro}"/>
-     <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <ComboBox x:Name="SearchTenant" ItemsSource="{Binding ItemsSource, ElementName=Tenants}" IsSynchronizedWithCurrentItem="False" DisplayMemberPath="Name" SelectionChanged="SearchTenant_Changed" AutomationProperties.Name="Search tenant"/>
-      <Button x:Name="LoadTenantKeys" Grid.Column="1" Content="Connect and load" Click="LoadTenantKeys_Click" IsEnabled="False" Style="{StaticResource PrimaryButton}" Margin="12,0,0,0"/>
-     </Grid>
-     <TextBlock Text="Search by user, UPN, registration name, model or serial number" Margin="0,16,0,4"/>
-     <TextBox x:Name="InventoryFilter" TextChanged="InventoryFilter_Changed" AutomationProperties.Name="Filter tenant passkeys"/>
-     <TextBlock x:Name="InventoryStatus" Foreground="{StaticResource Muted}" Margin="0,8,0,8" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-    </StackPanel>
-    <DataGrid x:Name="InventoryTable" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" EnableRowVirtualization="True" HeadersVisibility="Column">
-     <DataGrid.Columns>
-      <DataGridTextColumn Header="User" Binding="{Binding User}" Width="150"/>
-      <DataGridTextColumn Header="UPN" Binding="{Binding Upn}" Width="190"/>
-      <DataGridTextColumn Header="Registration name" Binding="{Binding Credential.Name}" Width="180"/>
-      <DataGridTextColumn Header="Model" Binding="{Binding Credential.Model}" Width="155"/>
-      <DataGridTemplateColumn Header="Serial number" Width="155" SortMemberPath="Serial"><DataGridTemplateColumn.CellTemplate><DataTemplate>
-       <StackPanel Margin="6,3"><TextBlock Text="{Binding SerialLabel}"/><TextBlock Text="{Binding SerialSource}" FontSize="12" Foreground="{StaticResource Muted}"/></StackPanel>
-      </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
-     </DataGrid.Columns>
-    </DataGrid>
-   </DockPanel>
    <ContentControl x:Name="HostedPage" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Visibility="Collapsed"/>
   </Grid>
  </DockPanel><ContentControl x:Name="TerminalOverlay" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Visibility="Collapsed" Background="White"/></Grid>

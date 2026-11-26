@@ -35,10 +35,12 @@ public partial class MainWindow
         LocalUnlock.Visibility = Visible(_localStep == 1); LocalList.Visibility = Visible(_localStep == 2);
         LocalTitle.Text = _localStep switch { 0 => "Choose your YubiKey", 1 => "Unlock the passkey list", _ => "Passkeys on this YubiKey" };
         LocalIntro.Text = _localStep == 0 ? "Choose a connected YubiKey to view its stored passkeys. No tenant sign-in is required." : key?.Key.Label ?? "";
-        LocalView.Content = _localStep == 0 ? "Continue to unlock" : _localStep == 1 ? "Unlock" : "Done";
+        LocalView.Visibility = Visible(_localStep != 1);
+        LocalView.Content = _localStep == 0 ? "Continue to unlock" : "Done";
         LocalView.ContentTemplate = _localStep == 0 ? (DataTemplate)FindResource("ForwardContent") : null;
         using var secret = LocalPin.SecurePassword;
-        LocalView.IsEnabled = CanReadLocal(key) && (_localStep != 1 || secret.Length > 0);
+        LocalView.IsEnabled = _localStep != 1 && CanReadLocal(key);
+        UnlockPinButton.IsEnabled = _localStep == 1 && CanReadLocal(key) && secret.Length > 0;
         SetBackAction(LocalBack, _localStep switch { 0 => null, 1 => "Choose key", _ => "Choose another YubiKey" });
     }
     private bool CanReadLocal(KeyStatus? key) => !_inventoryDirty && key != null && !key.ListingUnsupported && _knownKeys.Contains(key) &&
@@ -54,8 +56,8 @@ public partial class MainWindow
     }
     private void LocalPin_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == System.Windows.Input.Key.Enter && _localStep == 1 && LocalView.IsEnabled)
-        { e.Handled = true; LocalView_Click(LocalView, new RoutedEventArgs()); }
+        if (e.Key == System.Windows.Input.Key.Enter && _localStep == 1 && UnlockPinButton.IsEnabled)
+        { e.Handled = true; UnlockPin_Click(UnlockPinButton, e); }
     }
     private void LocalSelection_Changed(object sender, SelectionChangedEventArgs e)
     {
@@ -78,11 +80,16 @@ public partial class MainWindow
         return row == null ? LocalPasskeys.ListAsync(runner, key, pin) : LocalPasskeys.RemoveAsync(runner, key, pin, row);
     }
 
-    private async void LocalView_Click(object sender, RoutedEventArgs e)
+    private void LocalView_Click(object sender, RoutedEventArgs e)
     {
         if (_busy || !LocalPage.IsVisible || !LocalView.IsEnabled) return;
         if (_localStep == 0) { _localStep = 1; LocalFeedback.Text = ""; RenderLocalPage(); LocalPin.Focus(); return; }
         if (_localStep == 2) { ShowPage(OverviewPage); return; }
+    }
+
+    private async void UnlockPin_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || !LocalPage.IsVisible || _localStep != 1 || !UnlockPinButton.IsEnabled) return;
         await LocalOperationAsync(null, (_, _) => { var pin = LocalPin.Password; LocalPin.Clear(); return pin; }, RunLocalTool);
     }
     private async void LocalRemove_Click(object sender, RoutedEventArgs e)

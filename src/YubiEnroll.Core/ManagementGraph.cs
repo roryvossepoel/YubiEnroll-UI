@@ -1,5 +1,4 @@
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -40,43 +39,6 @@ public sealed class ManagementGraph(HttpClient http, Func<CancellationToken, Tas
     {
         var endpoint = Methods(user);
         return await ReadMethods(endpoint, await silentToken(ct), ct);
-    }
-
-    public async IAsyncEnumerable<TenantSearchBatch> ScanTenantAsync([EnumeratorCancellation] CancellationToken ct)
-    {
-        var users = new Dictionary<Guid, UserCandidate>();
-        var first = new Uri($"{Users}?$select=id,displayName,userPrincipalName&$top=999");
-        await ReadPages(first, await silentToken(ct).ConfigureAwait(false), ct, row =>
-        {
-            if (!Guid.TryParse(Text(row, "id"), out var id) || id == Guid.Empty)
-                throw new InvalidDataException("A directory user has no valid ID. Refresh the tenant search.");
-            users.TryAdd(id, new(id.ToString(), Text(row, "displayName")) { UserPrincipalName = Text(row, "userPrincipalName") });
-            return true;
-        }).ConfigureAwait(false);
-        var completed = 0;
-        var unavailable = 0;
-        yield return new(users.Count, completed, unavailable, []);
-        foreach (var group in users.Chunk(4))
-        {
-            ct.ThrowIfCancellationRequested();
-            var token = await silentToken(ct).ConfigureAwait(false);
-            async Task<TenantKeyRow[]?> ReadUser(KeyValuePair<Guid, UserCandidate> user)
-            {
-                try
-                {
-                    var cards = await ReadMethods(Methods(user.Key), token, ct).ConfigureAwait(false);
-                    return cards.Select(card => new TenantKeyRow(user.Value.Details, user.Value.UserPrincipalName, card.Credential)).ToArray();
-                }
-                catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
-                {
-                    return null;
-                }
-            }
-            var results = await Task.WhenAll(group.Select(ReadUser)).ConfigureAwait(false);
-            completed += group.Length;
-            unavailable += results.Count(rows => rows == null);
-            yield return new(users.Count, completed, unavailable, results.OfType<TenantKeyRow[]>().SelectMany(rows => rows).ToArray());
-        }
     }
 
     public async Task<IReadOnlyList<RegistrationCard>> RemoveAsync(Guid user, RegisteredCredential target, CancellationToken ct, Action? refreshing = null)
@@ -147,8 +109,9 @@ public sealed class ManagementGraph(HttpClient http, Func<CancellationToken, Tas
         var seen = new HashSet<string>(StringComparer.Ordinal);
         while (true)
         {
-            if (!seen.Add(url.AbsoluteUri)) throw new InvalidDataException("Invalid Graph pagination.");
-            using var response = await GetPage(url, token, ct).ConfigureAwait(false);
+            if (!seen.Add(url.AbsoluteUri) || seen.Count > 20) throw new InvalidDataException("Invalid Graph pagination.");
+            using var request = Request(HttpMethod.Get, url, token);
+            using var response = await http.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             using var json = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(ct));
             foreach (var item in json.RootElement.GetProperty("value").EnumerateArray()) if (!visit(item)) return;
@@ -158,20 +121,6 @@ public sealed class ManagementGraph(HttpClient http, Func<CancellationToken, Tas
                 nextUri.UserInfo.Length != 0 || nextUri.Fragment.Length != 0 || nextUri.AbsolutePath != first.AbsolutePath)
                 throw new InvalidDataException("Unexpected Graph continuation address.");
             url = nextUri;
-        }
-    }
-
-    private async Task<HttpResponseMessage> GetPage(Uri url, string token, CancellationToken ct)
-    {
-        for (var attempt = 0; ; attempt++)
-        {
-            using var request = Request(HttpMethod.Get, url, token);
-            var response = await http.SendAsync(request, ct).ConfigureAwait(false);
-            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt >= 3) return response;
-            var retry = response.Headers.RetryAfter;
-            var delay = retry?.Delta ?? (retry?.Date - DateTimeOffset.UtcNow) ?? TimeSpan.FromSeconds(1 << attempt);
-            response.Dispose();
-            await Task.Delay(delay > TimeSpan.Zero ? delay : TimeSpan.Zero, ct).ConfigureAwait(false);
         }
     }
 

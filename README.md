@@ -2,9 +2,11 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
-## 0.11.7
+## 0.11.8
 
-**Search tenant passkeys** opens a read-only inventory for one Entra tenant. Choose a tenant, connect, then filter the registrations by user, UPN, registration name, model or serial. The serial column identifies numbers taken from a YubiKey registration name. Missing or ambiguous serials appear as Unknown. The inventory reads directory users and their FIDO2 methods with the signed-in operator’s delegated Graph access. You can filter while it loads, cancel or refresh. The view reports unreadable accounts and incomplete searches.
+Unlock the local passkey list using the button beside the FIDO PIN field or by pressing Enter. Use Manage user passkeys to find a user and review their Entra registrations. The tenant-wide scan was removed.
+
+## 0.11.7
 
 The activity and registration logs load retained records in the background. Search and export use the complete filtered list. The installer uses a proportional font and reflows the license text.
 

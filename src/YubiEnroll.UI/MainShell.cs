@@ -33,10 +33,10 @@ public partial class MainWindow
         BrandTitle.FontSize = compact ? 13 : 19;
         var stackedCards = ActualWidth < 1100;
         HomeTasks.Columns = stackedCards ? 1 : 2;
-        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeLocalCard, HomeManageCard, HomeResetCard, HomeBulkCard, HomeSearchCard };
-        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeLocalLayout, HomeManageLayout, HomeResetLayout, HomeBulkLayout, HomeSearchLayout };
-        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeLocalIcon, HomeManageIcon, HomeResetIcon, HomeBulkIcon, HomeSearchIcon };
-        var labels = new[] { HomeSetupText, HomeAdditionText, HomeLocalText, HomeManageText, HomeResetText, HomeBulkText, HomeSearchText };
+        var cards = new[] { HomeSetupCard, HomeAdditionCard, HomeLocalCard, HomeManageCard, HomeResetCard, HomeBulkCard };
+        var layouts = new[] { HomeSetupLayout, HomeAdditionLayout, HomeLocalLayout, HomeManageLayout, HomeResetLayout, HomeBulkLayout };
+        var icons = new[] { HomeSetupIcon, HomeAdditionIcon, HomeLocalIcon, HomeManageIcon, HomeResetIcon, HomeBulkIcon };
+        var labels = new[] { HomeSetupText, HomeAdditionText, HomeLocalText, HomeManageText, HomeResetText, HomeBulkText };
         for (var i = 0; i < cards.Length; i++)
         {
             bool setup = i == 0 || i == 5;
@@ -68,7 +68,6 @@ public partial class MainWindow
         if ((page == OverviewPage || page == PreparePage || page == ResetPage || page == BatchPage) && RequirementsBlockTasks) page = StartupPage;
         if (page == LocalPage && (!_smokeTest || _startupChecksComplete) &&
             (_requirements?.Administrator != true || !_requirements.Manager.Ready)) page = StartupPage;
-        if (TenantSearchPage.Visibility == Visibility.Visible && page != TenantSearchPage) ClearTenantSearch();
         if (LocalPage.Visibility == Visibility.Visible && page != LocalPage) ResetLocalPage();
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage && _hostedWindow is SettingsWindow current && !current.ConfirmLeavePreferences()) return;
@@ -79,17 +78,17 @@ public partial class MainWindow
         if (page.Visibility != Visibility.Visible) StatusText.Text = "";
         if (page != PreparePage && PreparePage.IsVisible && _enrollStep == EnrollmentResultStep) BeginNextKey();
         if (page != ResetPage && ResetPage.IsVisible && _resetStep == 2) { StopPinRead(); _resultKey = null; BeginNextKey(); }
-        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, BatchPage, ResetPage, LocalPage, ManagePage, TenantSearchPage, HostedPage, StartupPage })
+        foreach (var item in new FrameworkElement[] { OverviewPage, PreparePage, BatchPage, ResetPage, LocalPage, ManagePage, HostedPage, StartupPage })
             item.Visibility = item == page ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var button in new[] { OverviewButton, PrepareButton, BulkNav, AddPasskeyButton, ResetButton, LocalButton, ManageButton, TenantSearchNav, SettingsButton })
+        foreach (var button in new[] { OverviewButton, PrepareButton, BulkNav, AddPasskeyButton, ResetButton, LocalButton, ManageButton, SettingsButton })
         {
             var active = button == OverviewButton && page == OverviewPage || button == PrepareButton && page == PreparePage && !_addPasskey || button == BulkNav && page == BatchPage ||
                 button == AddPasskeyButton && page == PreparePage && _addPasskey ||
-                button == TenantSearchNav && page == TenantSearchPage || button == LocalButton && page == LocalPage || button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
+                button == LocalButton && page == LocalPage || button == ManageButton && page == ManagePage || button == ResetButton && page == ResetPage || button == SettingsButton && page == HostedPage;
             button.Tag = active ? "active" : null;
         }
         // A clean Home has no technical footer. Errors/requirements remain discoverable in Settings.
-        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage || page == ManagePage || page == TenantSearchPage ? Visibility.Collapsed : Visibility.Visible;
+        StatusBar.Visibility = page == OverviewPage || page == HostedPage || page == StartupPage || page == ManagePage ? Visibility.Collapsed : Visibility.Visible;
         RenderWizard();
     }
     private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(OverviewPage);

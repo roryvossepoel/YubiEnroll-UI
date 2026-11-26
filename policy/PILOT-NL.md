@@ -1,10 +1,10 @@
-# Passkey Desk voor YubiKeys · 0.11.7
+# Passkey Desk voor YubiKeys · 0.11.8
 
 Vanaf **0.11.0** gebruik je dezelfde Windows x64-build met en zonder machinebeleid. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
 ## Indeling van de template (revisie 1.5)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.7 en de meegeleverde ADMX en ADML (revisie 1.5).
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.8 en de meegeleverde ADMX en ADML (revisie 1.5).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
@@ -71,5 +71,5 @@ Als je alle policies verwijdert, wordt de laatst toegepaste TOML je lokale uitga
 
 ## Volgende testronde
 
-1. Test 0.11.7 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
+1. Test 0.11.8 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
 2. Test daarna dezelfde build op een Windows-testapparaat zonder toegewezen policy. Controleer na opnieuw starten dat lokale instellingen bewerkbaar zijn en doorloop dezelfde registratie.

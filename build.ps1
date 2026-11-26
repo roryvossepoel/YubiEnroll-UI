@@ -29,7 +29,7 @@ try {
         & "$PSScriptRoot/scripts/Sign-App.ps1" -AppDirectory "$out/app" -CertificateThumbprint $SigningCertificateThumbprint -TimestampServer $TimestampServer
     }
     Copy-Item -Recurse -LiteralPath policy -Destination "$out/app/policy"
-    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.7-$Runtime.zip" -Force
+    Compress-Archive -Path "$out/app/*" -DestinationPath "$out/PasskeyDesk-for-YubiKeys-0.11.8-$Runtime.zip" -Force
     if ($IncludeMsi) {
         & "$PSScriptRoot/installer/New-SetupArtwork.ps1" -Destination "$out/installer-assets"
         Invoke-Dotnet build installer/PasskeyDesk.wixproj -c Release "-p:OutputPath=$out/installer"
