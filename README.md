@@ -2,6 +2,36 @@
 
 YubiKey setup & passkey management. Inspect passkeys on a physical YubiKey, manage YubiKey registrations in Microsoft Entra, or set up a key for a user.
 
+## 0.11.8
+
+Unlock the local passkey list using the button beside the FIDO PIN field or by pressing Enter. Use Manage user passkeys to find a user and review their Entra registrations. The tenant-wide scan was removed.
+
+## 0.11.7
+
+The activity and registration logs load retained records in the background. Search and export use the complete filtered list. The installer uses a proportional font and reflows the license text.
+
+Machine policy revision 1.5 supports ten tenant slots and five profile slots. TenantsJson and ProfilesJson independently replace the complete list for their section. An explicit empty array clears that section. Removing the JSON policy restores the configured slots at the next start. The policy folder includes an example of each JSON schema.
+
+## 0.11.6
+
+Windows x64 is available as a portable ZIP and a machine-wide MSI. Wizard actions stay at the bottom of the window as status text changes. A batch registration marked **Check required** explains the outcome and opens the recipient’s Entra registrations. Use **Back to batch** to resume the same queue.
+
+Passkey Desk keeps the ten most recent automatic backups for each TOML file after a persistent configuration change, including policy updates and imports. Enrollment profiles and unchanged settings produce no backups. Previously generated backups count toward the same limit on the next change.
+
+## 0.11.5
+
+The embedded terminal displays the generated initial PIN during both single and batch setup. After a successful setup, the app opens the single registration summary or the current batch recipient’s handoff automatically. The operator chooses **Next user** after handing over the key. Errors, an unverified outcome, a missing expected PIN or a log write failure keep the terminal open for review. The PIN is masked in the summary, handoff and batch results until the operator uses the eye button.
+
+## 0.11.4
+
+The batch results table shows each verified, generated initial PIN behind an eye button until you leave the batch, including when PIN logging is off. Batch CSV exports select **Include initial PINs** by default when PINs are available. Clear the checkbox to export only registration details. An export that includes PINs contains readable PINs. The registration log follows its own settings.
+
+## 0.11.3
+
+Batch issuance verifies the serial on the selected NFC reader after a FIDO reset. The embedded terminal also checks the serial in the successful native reset summary. A missing or mismatched key requires verification in Entra. The registration log is finalized before leaving the embedded terminal. If a generated PIN was not saved, record it before continuing.
+
+The batch wizard shows profile cards, key compatibility, numbered input, recipient and result tables, and fixed footer actions. Leaving the running batch cancels the remaining queue. Completed registrations remain recorded according to the logging settings.
+
 ## 0.11.2
 
 In the registration log, the User column shows the recorded email beneath the display name. When no email was recorded, a distinct sign-in name is labeled **UPN**. Existing records use the same display without being rewritten; CSV still exports email and UPN separately.
@@ -16,7 +46,7 @@ Both logs have subtle column separators and a labeled Copy column. The registrat
 
 Machine policy support is now included in the standard Windows x64 build. With no recognized machine policy the normal local editing and CLI configuration remain in use. Only the configured section is read-only: tenants, profiles, activity logging, registration logging or terminal preference. A managed list shows a read-only policy badge in place of its transfer action. Under partial policy, only the editable list can be imported or exported. Policies are read at startup; only the declared tenant/profile collections are reconciled into the current account’s ordinary TOML. When policy is present, the startup screen shows its status beneath YubiEnroll CLI and the Activity log records the synchronization outcome once per launch. See [pilot instructions and rollback](policy/PILOT-NL.md). The templates are optional. Both logs have their own retention in days. For registration logging, App settings and the Registration logging policy accept 1–3650 days (default 30). While logging is enabled, expired registration records are deleted from the configured folder; exported CSVs are kept.
 
-Use the bundled ADMX/ADML revision 1.4 with this build. Below `HKLM\SOFTWARE\Policies\PasskeyDesk`, CLI configuration lives under `YubiEnroll\Tenants` and `YubiEnroll\Profiles\Profile1` through `Profile5`. App settings use `AppSettings\Logging\Activity`, `AppSettings\Logging\Registration` and, if explicitly configured, `AppSettings\Terminal`. Each managed settings group shows its own read-only badge. Leaving the terminal policy unconfigured keeps the choice editable. Flat registry values from previous pilots are ignored.
+Use the bundled ADMX/ADML revision 1.5 with 0.11.7. Below `HKLM\SOFTWARE\Policies\PasskeyDesk`, CLI configuration lives under `YubiEnroll\Tenants` and `YubiEnroll\Profiles\Profile1` through `Profile5`. App settings use `AppSettings\Logging\Activity`, `AppSettings\Logging\Registration` and, if explicitly configured, `AppSettings\Terminal`. Each managed settings group shows its own read-only badge. Leaving the terminal policy unconfigured keeps the choice editable. Flat registry values from previous pilots are ignored.
 
 
 ## Features inherited from preview 0.10.9
@@ -25,7 +55,7 @@ Local passkey management follows Key → Unlock → Passkeys. Empty discovery ca
 
 **Set up multiple YubiKeys** issues one new YubiKey per recipient. Sign in to one tenant, choose one configuration profile and paste sign-in names or import a CSV with a `UserPrincipalName` column (up to 500 recipients). Correct duplicate or unmatched rows before starting. The app requires one exact tenant user per row, checks the object ID again before issuance and verifies the selected key. Profiles without reset require an unset PIN; reset profiles explicitly confirm the recipient and serial before clearing FIDO passkeys and the PIN. Select the USB key or named NFC reader and confirm **Register YubiKey** for each user. Keep the key connected until the native command finishes; record any generated PIN in the native prompt before returning. USB uses the existing single-USB-target preflight.
 
-The handoff stays on the same user until **Next user**. Once a serial was attempted it cannot be reused in the batch, including through another connection. An interrupted or uncertain attempt is marked **Check required** and is never retried automatically. You can skip a recipient, pause and return to the batch while the app remains open, or end early and export a CSV (no PINs). The queue is held in memory; the optional registration journal keeps its existing separate settings.
+The handoff stays on the same user until **Next user**. Once a serial was attempted it cannot be reused in the batch, including through another connection. An interrupted or uncertain attempt is marked **Check required** and is never retried automatically. You can skip a recipient or cancel the remaining queue. When the batch is complete, export its results as a CSV, with **Include initial PINs** selected when generated PINs are available. The queue is held in memory; the optional registration journal keeps its existing separate settings.
 
 NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey and Clear passkeys & PIN. Each target shows its connection and full reader name. Connected NFC readers have their own named status even when empty; without a reader the NFC status is hidden and USB stays available. PC/SC presence monitoring refreshes the list when a key is placed or lifted. Native reader selection and transport-aware profile checks are covered by automated tests; physical HID OMNIKEY 5022 acceptance is still required. See [NFC behavior and test checklist](docs/NFC.md).
 
@@ -35,7 +65,7 @@ NFC readers are now supported alongside USB for Set up a YubiKey, Add a passkey 
 - Setup follows **Key → Profile → Tenant → User → Review**. Profiles are independent of tenants; incompatible choices show their reasons and cannot advance to review.
 - Tenant forms no longer assign or create a profile. Existing TOML provider defaults remain readable for native CLI compatibility, but the UI never selects or inherits them. Editing a tenant removes its old default; removing a profile clears legacy references.
 - Add a passkey uses the existing FIDO PIN and does not request reset, random PIN, or forced PIN change. It carries forward the detected minimum PIN length and Always UV setting. Missing/blocked PINs, pending forced PIN changes, and unreadable capabilities block this action. Existing enterprise attestation is not requested for the new credential.
-- The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-enrollment-*` profile; it can be removed in Settings. Configuration backups retain the previous TOML, as for other edits. Basic setup profiles with an omitted PIN floor also use a temporary, complete native profile with the freshly detected floor: YubiEnroll 1.2.0 requires this field even when no policy change is intended. The reusable profile stays unchanged.
+- The native CLI receives a unique, temporary explicit profile, so a destructive provider default cannot leak into an addition. Cleanup removes only that unchanged profile, preserving concurrent edits. A crash can leave a harmless `UI-enrollment-*` profile; it can be removed in Settings. Creating and removing this temporary profile does not create configuration backups. Basic setup profiles with an omitted PIN floor also use a temporary, complete native profile with the freshly detected floor: YubiEnroll 1.2.0 requires this field even when no policy change is intended. The reusable profile stays unchanged.
 - Both tasks support USB and NFC. USB retains the single-target USB preflight restriction because YubiEnroll has no USB serial selector. NFC uses an explicit reader; a separate USB administrator key can remain connected. Keep the selected target in place throughout the native operation.
 - Help & About includes a manual GitHub update check, including published previews. No release yet and network failures have separate messages. Updates open the release page; installation remains manual.
 - Prerequisites includes .NET Desktop Runtime 10 x64 alongside YubiEnroll CLI and YubiKey Manager CLI (ykman).
@@ -54,7 +84,7 @@ An independent community Windows application for registering YubiKeys on behalf 
 - Activates the selected tenant using the official CLI and preserves your explicitly chosen profile.
 - Searches users and uses their Entra object ID, avoiding confusion between email addresses and usernames.
 - Starts on Home with Set up a YubiKey and Clear passkeys & PIN as separate guided tasks. Settings remains available in the same window.
-- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Opted-in generated-PIN logging uses the in-app terminal for setup.
+- Provides a dedicated cancellable sign-in screen. Enrollment uses an embedded terminal, with an external-console option under Settings → App settings. Single and batch setups that generate an initial PIN use the in-app terminal so the PIN is available in the summary, including when PIN logging is off.
 - Reports the enrollment outcome; cloud registrations are managed separately from enrollment.
 - Keeps the UI responsive and prevents another key operation while one is active.
 - Uses the selected profile for reset and PIN settings. Shows a destructive-reset warning and asks for confirmation before enrollment.
@@ -107,7 +137,7 @@ Navigation preserves the target and task step without rediscovery. A different c
 
 The SDK remains deferred. YubiEnroll still performs enrollment and PIN handling. For USB enrollment, sign in with the administrator key, disconnect it, and keep only the chosen USB target connected during enrollment. For NFC, keep the selected target on the named reader; a separate USB admin key may remain connected. Fresh inventory checks do not bind the running CLI to a USB serial.
 
-The embedded terminal is enabled by default. Its toggle under Settings → App settings applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion, record any generated PIN securely, then choose Return. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
+The embedded terminal is enabled by default. Its toggle under Settings → App settings applies **for the current session only**. It runs the same CLI commands and native confirmations, has a fixed 100-column screen with scrolling, does not support clipboard paste, and is not a general-purpose terminal emulator. Keep the app open until completion. After successful setup, use the eye in the summary to read the generated PIN for handoff. On a launch/connection failure it never automatically reruns a command in the external console. Physical PIN/touch/reinsertion, UAC and browser login require manual acceptance with test hardware before relying on this mode operationally.
 
 Only standalone **FIDO reset** is currently available. Additional application-specific resets (issue #7), final product name/logo (#9), and optional batch handover (#19) remain separate follow-up work. No repository rename or full factory-reset claim is made in this preview.
 
@@ -233,6 +263,8 @@ On Windows, install the .NET 10 SDK, then run:
 ```powershell
 ./build.ps1 -Runtime win-x64
 ```
+
+Add `-IncludeMsi` on Windows to package the same files as a machine-wide installer in `artifacts/win-x64/installer/`. The MSI installs to `%ProgramFiles%\Passkey Desk`, adds **Passkey Desk** to the all-users Start menu and registers **Passkey Desk for YubiKeys** in Programs and Features. The .NET Desktop Runtime and the Yubico command-line tools are separate prerequisites.
 
 The script runs the core checks and publishes a framework-dependent x64 app with its console helper. The ZIP is written to `artifacts/<runtime>/`. The published WPF app is startup-tested on the x64 GitHub runner with first-run setup, form validation/save/cancel, malformed configuration, an invalid executable, and a mock CLI. The published console helper is also started. A separate Windows CI check downloads the signed official YubiEnroll 1.2.0 installer, verifies its publisher, and checks that the CLI reads a synthetic provider/profile generated by the GUI writer. A separate check verifies the signed ykman 5.9.2 installer, expected installation folder, version parser, empty device discovery and serial-targeted reset help. No login, tenant access, reset command or attached hardware is used; neither Yubico CLI is redistributed with the app.
 

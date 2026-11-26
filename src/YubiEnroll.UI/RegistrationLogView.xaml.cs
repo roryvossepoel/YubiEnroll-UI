@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using Microsoft.Win32;
 using YubiEnroll.Core;
 
@@ -16,7 +15,6 @@ public partial class RegistrationLogView : UserControl
     private readonly RegistrationJournal _journal;
     private IReadOnlyList<RegistrationRecord> _records = [];
     private bool _loading;
-    private ToggleButton? _revealedPin;
 
     public RegistrationLogView(RegistrationJournal journal)
     {
@@ -24,11 +22,23 @@ public partial class RegistrationLogView : UserControl
         InitializeComponent();
     }
     private void Search_Changed(object sender, TextChangedEventArgs e) { if (!_loading && Records != null) ApplyFilter(); }
-    internal void RefreshRecords()
+    private CancellationTokenSource? _read;
+    internal Task Loading { get; private set; } = Task.CompletedTask;
+    internal Task RefreshRecords() => Loading = LoadRecordsAsync();
+    private async Task LoadRecordsAsync()
     {
+        _read?.Cancel();
+        using var request = new CancellationTokenSource();
+        _read = request;
         _loading = true;
+        InitialPinCell.HidePin();
+        ExportButton.IsEnabled = false;
+        _records = [];
+        Records.ItemsSource = null;
+        CountText.Visibility = EmptyMessage.Visibility = Visibility.Collapsed;
+        TenantFilter.IsEnabled = false;
         var selected = TenantFilter.SelectedItem as TenantChoice;
-        Feedback.Text = "";
+        Feedback.Text = "Loading registrations…";
         PreferenceStatus.Text = _journal.Preferences.Enabled ? "Logging on" : "Logging is off";
         var pins = _journal.Preferences.Enabled && _journal.Preferences.SaveGeneratedPin;
         PinStatus.Text = pins ? "Initial PIN logging on" : "Initial PIN logging off";
@@ -36,7 +46,9 @@ public partial class RegistrationLogView : UserControl
         RetryButton.Visibility = _journal.PendingCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         try
         {
-            _records = _journal.Read();
+            var records = await _journal.ReadAsync(request.Token);
+            if (request.IsCancellationRequested) return;
+            _records = records;
             Feedback.Text = _journal.RetentionError ?? "";
             var tenants = new[] { new TenantChoice(null, "All tenants") }.Concat(_records.GroupBy(r => r.TenantId)
                 .Select(g => new TenantChoice(g.Key, g.First().TenantName)).OrderBy(t => t.Label)).ToList();
@@ -46,18 +58,20 @@ public partial class RegistrationLogView : UserControl
             TenantFilter.SelectedItem = tenants.FirstOrDefault(t => t.Id == selected?.Id) ?? tenants[0];
             if (_journal.PendingCount > 0) Feedback.Text = $"{_journal.PendingCount} result(s) are not saved. Keep the app open and retry saving. CSV export includes these in-memory results.";
         }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        catch (Exception ex) when (request.IsCancellationRequested && RegistrationJournal.IsStorageError(ex)) { }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex))
         {
             _records = [];
             Feedback.Text = _journal.SettingsError ?? "Could not read the complete registration log. Check folder access and record files, then reopen this tab. Export is unavailable until the log can be read.";
         }
-        finally { _loading = false; ApplyFilter(); }
+        finally { if (ReferenceEquals(_read, request)) { _read = null; _loading = false; TenantFilter.IsEnabled = true; ApplyFilter(); } }
     }
     private void Filter_Changed(object? sender, SelectionChangedEventArgs e) { if (!_loading && Records != null) ApplyFilter(); }
     private void Clear_Click(object sender, RoutedEventArgs e) { _loading = true; Search.Clear(); TenantFilter.SelectedIndex = 0; FromDate.SelectedDate = ThroughDate.SelectedDate = null; ResultFilter.SelectedIndex = 0; _loading = false; ApplyFilter(); }
     private void ApplyFilter()
     {
-        HidePin();
+        InitialPinCell.HidePin();
         var invalidDates = FromDate.SelectedDate > ThroughDate.SelectedDate;
         IReadOnlyList<RegistrationRecord> visible = invalidDates ? [] : RegistrationJournal.Filter(_records, (TenantFilter.SelectedItem as TenantChoice)?.Id, FromDate.SelectedDate, ThroughDate.SelectedDate, ResultFilter.SelectedIndex == 1);
         if (ResultFilter.SelectedIndex >= 2) visible = visible.Where(r => r.Outcome == (ResultFilter.SelectedIndex == 2 ? RegistrationOutcome.FailedOrInterrupted : RegistrationOutcome.Unknown)).ToList();
@@ -72,11 +86,12 @@ public partial class RegistrationLogView : UserControl
         CountText.Text = $"{visible.Count} enrollment record(s) · export uses these filters";
         ExportButton.IsEnabled = visible.Count > 0;
     }
-    private void Export_Click(object sender, RoutedEventArgs e)
+    private async void Export_Click(object sender, RoutedEventArgs e)
     {
         // Refresh before export so the file matches the currently displayed, complete filtered data.
-        RefreshRecords();
-        if (!ExportButton.IsEnabled) return;
+        var refresh = RefreshRecords();
+        await refresh;
+        if (!ReferenceEquals(refresh, Loading) || !IsVisible || !ExportButton.IsEnabled) return;
         if (Records.Items.Cast<RegistrationRecord>().Any(r => !string.IsNullOrEmpty(r.GeneratedPin)) && MessageBox.Show(Window.GetWindow(this), "These results contain generated initial PINs. Include them in the CSV?", "Export registration log", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         var picker = new SaveFileDialog { Filter = "CSV file|*.csv", DefaultExt = ".csv", AddExtension = true, FileName = $"yubienroll-registrations-{DateTime.Now:yyyyMMdd-HHmmss}.csv" };
         if (picker.ShowDialog(Window.GetWindow(this)) != true) return;
@@ -98,27 +113,16 @@ public partial class RegistrationLogView : UserControl
         }
         catch (Exception ex) when (RegistrationJournal.IsStorageError(ex) || ex is System.ComponentModel.Win32Exception) { Feedback.Text = "Could not open the log folder."; }
     }
-    private void HidePin()
-    {
-        if (_revealedPin is { } pin) pin.IsChecked = false;
-    }
     private void ViewVisibility_Changed(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (!IsVisible) HidePin();
+        if (!IsVisible)
+        {
+            _read?.Cancel();
+            _read = null;
+            _loading = false;
+            InitialPinCell.HidePin();
+        }
     }
-    private void Pin_Checked(object sender, RoutedEventArgs e)
-    {
-        if (!ReferenceEquals(_revealedPin, sender)) HidePin();
-        _revealedPin = (ToggleButton)sender;
-    }
-    private void Pin_Unchecked(object sender, RoutedEventArgs e)
-    {
-        if (ReferenceEquals(_revealedPin, sender)) _revealedPin = null;
-    }
-    private void PinContext_Changed(object sender, DependencyPropertyChangedEventArgs e) =>
-        ((ToggleButton)sender).IsChecked = false;
-    private void Pin_Unloaded(object sender, RoutedEventArgs e) =>
-        ((ToggleButton)sender).IsChecked = false;
     private void CopyRow_Click(object sender, RoutedEventArgs e)
     {
         if (((Button)sender).DataContext is not RegistrationRecord record) return;
@@ -132,5 +136,5 @@ public partial class RegistrationLogView : UserControl
         try { Clipboard.SetText(RegistrationJournal.Csv([record], separator, includeHeader: false)); }
         catch (System.Runtime.InteropServices.ExternalException) { Feedback.Text = "Clipboard unavailable. Try copying again."; }
     }
-    private void Retry_Click(object sender, RoutedEventArgs e) { _journal.RetryPending(); RefreshRecords(); }
+    private async void Retry_Click(object sender, RoutedEventArgs e) { _journal.RetryPending(); await RefreshRecords(); }
 }

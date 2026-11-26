@@ -72,6 +72,9 @@ public partial class MainWindow
         if (ManagePage.Visibility == Visibility.Visible && page != ManagePage) ResetManagement();
         if (page != HostedPage && _hostedWindow is SettingsWindow current && !current.ConfirmLeavePreferences()) return;
         if (page != HostedPage) LeaveHostedPage();
+        if (_batchReviewRow != null && page == BatchPage) _batchReviewRow = null;
+        if (page != BatchPage && (BatchPage.IsVisible || _batchReviewRow != null) &&
+            !(page == ManagePage && _batchReviewRow != null)) ResetBatch();
         if (page.Visibility != Visibility.Visible) StatusText.Text = "";
         if (page != PreparePage && PreparePage.IsVisible && _enrollStep == EnrollmentResultStep) BeginNextKey();
         if (page != ResetPage && ResetPage.IsVisible && _resetStep == 2) { StopPinRead(); _resultKey = null; BeginNextKey(); }
@@ -118,7 +121,7 @@ public partial class MainWindow
         ShowPage(HostedPage);
     }
     private KeyStatus? ProfileKeyForSettings() => LocalPage.IsVisible ? LocalKeys.SelectedItem as KeyStatus :
-        BatchPage.IsVisible ? BatchKeys.SelectedItem as KeyStatus : EnrollmentKeys.SelectedItem as KeyStatus ?? _selectedKey;
+        BatchPage.IsVisible ? BatchKeys.SelectedValue as KeyStatus : EnrollmentKeys.SelectedItem as KeyStatus ?? _selectedKey;
     private void OpenSettings(Func<SettingsWindow, TabItem>? initialTab = null)
     {
         if (_busy) return;
@@ -228,9 +231,7 @@ public partial class MainWindow
             OverviewKeys.SelectedItem = EnrollmentKeys.SelectedItem = entries.FirstOrDefault(x => x.Key == candidate);
         }
         finally { _readingKeys = false; }
-        var reviewed = (BatchKeys.SelectedItem as KeyStatus)?.Key;
-        BatchKeys.ItemsSource = entries;
-        BatchKeys.SelectedItem = entries.FirstOrDefault(k => k.Key == reviewed);
+        UpdateBatchKeyCards();
         LocalKeys.ItemsSource = entries;
         RenderReaderInventory(readers ?? Array.Empty<NfcReaderStatus>());
         SetInventoryMessage(unavailable > 0 ? "Some USB devices could not be identified. Check device access and FIDO support." :
@@ -334,8 +335,7 @@ public partial class MainWindow
     private LoginPanel? _activeLogin;
     private bool _closeAfterLogin;
     private bool _captureGeneratedPin;
-    private string? _generatedPin;
-    private async Task<int> RunInteractiveAsync(string executable, string[] args, ResetKey? explicitTarget = null, Action? nativeFinished = null, bool single = false, ProfileSetup? setup = null)
+    private async Task<int> RunInteractiveAsync(string executable, string[] args, ResetKey? explicitTarget = null, Func<int, string?, string?, Task<string?>>? nativeFinished = null, bool single = false, ProfileSetup? setup = null)
     {
         _lastInteractiveFailure = "";
         if (args.SequenceEqual(new[] { "login" }))
@@ -355,14 +355,19 @@ public partial class MainWindow
             try { var result = await loginPanel.RunAsync(executable, tenant); _lastInteractiveFailure = result == 0 ? "" : loginPanel.FailureDetail; return result; }
             finally { _activeLogin = null; TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
         }
-        if (!EmbeddedTerminal && !_captureGeneratedPin) return await new CliRunner(executable).InteractiveAsync(args);
+        if (!EmbeddedTerminal && !_captureGeneratedPin)
+        {
+            var exit = await new CliRunner(executable).InteractiveAsync(args);
+            if (nativeFinished != null) await nativeFinished(exit, null, null);
+            return exit;
+        }
         var enrollment = Path.GetFileName(executable).Equals("yubienroll.exe", StringComparison.OrdinalIgnoreCase) && args.Take(2).SequenceEqual(new[] { "credentials", "add" });
         var login = args.SequenceEqual(new[] { "login" });
         var terminalTarget = explicitTarget ?? _selectedKey?.Key;
-        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, (_captureGeneratedPin || single && setup?.RandomPin == true && !_addPasskey) ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true, single, _captureGeneratedPin, setup?.Name);
+        var terminal = new TerminalPanel(enrollment ? (_addPasskey ? "Add a passkey · serial " : "Set up a YubiKey · serial ") + terminalTarget?.Serial : "Clear passkeys & PIN · serial " + terminalTarget?.Serial, enrollment, login, _addPasskey, _captureGeneratedPin ? terminalTarget?.Serial : null, terminalTarget?.IsNfc == true, single, _captureGeneratedPin && InitialPinLogging, setup?.Name);
         TerminalOverlay.Content = terminal; TerminalOverlay.Visibility = Visibility.Visible;
         terminal.NativeFinished = nativeFinished;
-        try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; _generatedPin = terminal.GeneratedPin; return code; }
+        try { var code = await terminal.RunAsync(executable, args); _lastInteractiveFailure = terminal.FailureDetail; return code; }
         finally { TerminalOverlay.Content = null; TerminalOverlay.Visibility = Visibility.Collapsed; }
     }
 }

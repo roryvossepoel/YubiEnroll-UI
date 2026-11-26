@@ -26,8 +26,10 @@ public static class PasskeyAddition
 public sealed class EnrollmentProfileLease : IDisposable
 {
     private readonly string _path;
+    private readonly string _original, _leased;
     public EnrollmentProfile Profile { get; }
-    private EnrollmentProfileLease(string path, EnrollmentProfile profile) { _path = path; Profile = profile; }
+    private EnrollmentProfileLease(string path, string original, string leased, EnrollmentProfile profile)
+    { _path = path; _original = original; _leased = leased; Profile = profile; }
     // YubiEnroll 1.2.0 indexes min_pin_length directly. Supply the freshly read
     // floor when a basic profile leaves it unset; never substitute a policy default.
     public static ProfileSetup Resolve(ProfileSetup setup, FidoCapabilities key) => setup with
@@ -40,8 +42,8 @@ public sealed class EnrollmentProfileLease : IDisposable
         var snapshot = ConfigSnapshot.Read(path);
         var name = "UI-enrollment-" + Guid.NewGuid().ToString("N");
         var content = ProfileConfigWriter.Build(snapshot.Text, setup with { Name = name });
-        ConfigFileWriter.Save(snapshot, content);
-        return new(path, ConfigReader.Parse(content).Profiles.Single(p => p.Name == name));
+        ConfigFileWriter.Save(snapshot, content, keepBackup: false);
+        return new(path, snapshot.Text ?? "", content, ConfigReader.Parse(content).Profiles.Single(p => p.Name == name));
     }
     public void Dispose()
     {
@@ -49,6 +51,7 @@ public sealed class EnrollmentProfileLease : IDisposable
         var snapshot = ConfigSnapshot.Read(_path);
         var current = ConfigReader.Parse(snapshot.Text ?? "");
         if (!current.Profiles.Any(p => p.Name == Profile.Name && p.Fingerprint == Profile.Fingerprint)) return;
-        ConfigFileWriter.Save(snapshot, ProfileConfigWriter.Remove(snapshot.Text!, Profile.Name));
+        var restored = snapshot.Text == _leased ? _original : ProfileConfigWriter.Remove(snapshot.Text!, Profile.Name);
+        ConfigFileWriter.Save(snapshot, restored, keepBackup: false);
     }
 }

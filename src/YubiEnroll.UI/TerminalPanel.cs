@@ -28,28 +28,34 @@ internal sealed class TerminalPanel : Border
     private readonly string? _captureSerial;
     private readonly bool _enrollment, _addPasskey;
     internal int? CompletedExitCode { get; private set; }
-    private readonly bool _autoCloseOnSuccess, _maskPin;
+    private readonly bool _autoCloseOnSuccess, _single;
     internal TerminalPanel(string title, bool enrollment, bool autoCloseOnSuccess = false, bool addPasskey = false, string? captureSerial = null, bool nfc = false, bool single = false, bool savePin = false, string? profile = null)
     {
         _done.Content = single ? "View registration summary" : enrollment ? "Continue" : autoCloseOnSuccess ? "Continue" : "View reset result";
-        _maskPin = single;
+        _single = single;
         _autoCloseOnSuccess = autoCloseOnSuccess; _captureSerial = captureSerial; _enrollment = enrollment; _addPasskey = addPasskey;
         System.Windows.Documents.TextElement.SetFontSize(this, 14);
-        Background = new SolidColorBrush(Color.FromRgb(245, 247, 250)); Padding = new Thickness(24);
-        var layout = new DockPanel(); Child = layout;
+        Background = new SolidColorBrush(Color.FromRgb(245, 247, 250));
+        var page = new DockPanel(); Child = page;
+        var layout = new DockPanel { Margin = new Thickness(24,24,24,0) };
         var heading = new TextBlock { Text = title + (enrollment && !addPasskey && !string.IsNullOrEmpty(profile) ? " · " + profile : ""), TextWrapping = TextWrapping.Wrap, FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(heading, Dock.Top); layout.Children.Add(heading);
         var help = new TextBlock { Text = autoCloseOnSuccess ? "Complete any confirmation below, then sign in in your browser. This page returns automatically after sign-in." : nfc ? "Follow the Yubico prompts below. Click the terminal to type. Keep the key flat on the NFC reader; remove and replace it only when prompted." : "Follow the Yubico prompts below. Click the terminal to type. Keep the key connected while an operation is running.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         DockPanel.SetDock(help, Dock.Top); layout.Children.Add(help);
-        var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); layout.Children.Add(footer);
+        var footer = new StackPanel();
+        var actionBar = new Border { Style = (Style)FindResource("WizardActionBar"), Child = footer };
+        DockPanel.SetDock(actionBar, Dock.Bottom); page.Children.Add(actionBar); page.Children.Add(layout);
+        _done.Margin = new Thickness(0);
         footer.Children.Add(_status);
         if (enrollment && !addPasskey && (!single || captureSerial != null))
         {
             _pinHint.Text = single ? "If a temporary PIN is generated, you can view it in the registration summary."
                 : savePin ? "Generated initial PINs will be saved in the registration log. Terminal output is not saved."
+                : captureSerial != null ? "Initial PIN logging is off. Record the PIN from the batch results before leaving the batch."
                 : "Record any generated PIN before returning. Terminal output is not saved to the activity log.";
-            footer.Children.Add(_pinHint);
         }
+        else _pinHint.Visibility = Visibility.Collapsed;
+        footer.Children.Add(_pinHint);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(_cancel); buttons.Children.Add(_done); footer.Children.Add(buttons);
         _cancel.Click += async (_, _) =>
@@ -77,8 +83,6 @@ internal sealed class TerminalPanel : Border
         DataObject.AddPastingHandler(Screen, (_, e) => e.CancelCommand());
         _screen.Reply += text => _session?.Write(text);
     }
-    internal static string MaskPin(string output) => System.Text.RegularExpressions.Regex.Replace(output,
-        @"(?m)^([ \t]*(?:Temporary PIN|Generated PIN):)[^\r\n]*", "$1 ••••••");
     internal static string PromptStatus(string output)
     {
         var line = output.TrimEnd().Split('\n').LastOrDefault()?.Trim() ?? "";
@@ -91,14 +95,14 @@ internal sealed class TerminalPanel : Border
 
     internal void SendInput(string text) { if (_running && !_cancelRequested) _session?.Write(text); }
     internal void DismissCompleted() { if (!_running) { _screen.Clear(); Screen.Clear(); _dismissed.TrySetResult(); } }
-    internal Action? NativeFinished { get; set; }
+    internal Func<int, string?, string?, Task<string?>>? NativeFinished { get; set; }
     internal async Task<int> RunAsync(string executable, string[] args)
     {
         using var session = new PseudoConsole(); _session = session;
         session.Output += text => Dispatcher.BeginInvoke(() =>
         {
             _screen.Feed(text); var output = _screen.Text;
-            Screen.Text = _maskPin ? MaskPin(output) : output;
+            Screen.Text = output;
             if (_running && !_autoCloseOnSuccess && !_cancelRequested) _status.Text = PromptStatus(output); Screen.CaretIndex = Screen.Text.Length; Screen.ScrollToEnd();
         });
         _running = true; Screen.Focus(); _status.Text = _autoCloseOnSuccess ? "Connecting · complete browser sign-in when prompted" : "Operation running";
@@ -117,7 +121,7 @@ internal sealed class TerminalPanel : Border
             exit = -1;
             _status.Text = session.HasStarted ? "The terminal connection failed after launch. The operation's outcome is unknown. No retry was started." : "The embedded terminal could not start. Choose external console in Settings before trying again.";
         }
-        finally { _running = false; _session = null; _done.IsEnabled = true; _done.Focus(); }
+        finally { _running = false; _session = null; }
         _cancel.Visibility = Visibility.Collapsed;
         if (_cancelRequested)
         {
@@ -125,14 +129,36 @@ internal sealed class TerminalPanel : Border
             FailureDetail = InteractiveFailure.OperatorInterrupted;
             _status.Text = "Operation interrupted. Check the key and any Entra registration before retrying.";
         }
-        if (_maskPin)
+        if (_single)
         {
             _pinHint.Visibility = exit == 0 && GeneratedPin != null ? Visibility.Visible : Visibility.Collapsed;
             _pinHint.Text = "Your temporary PIN is available in the registration summary.";
         }
-        NativeFinished?.Invoke();
+        string? notice = null;
+        if (NativeFinished != null)
+        {
+            notice = await NativeFinished(exit, GeneratedPin, GeneratedPinSummary.ResetReceiptSerial(_screen.Text));
+        }
+        if (_captureSerial != null && GeneratedPin == null && exit == 0)
+        {
+            const string missingPin = "The expected temporary PIN could not be collected. Check the terminal output before continuing.";
+            notice = notice == null ? missingPin : notice + " " + missingPin;
+        }
         CompletedExitCode = exit;
-        if (_autoCloseOnSuccess && exit == 0) { _screen.Clear(); Screen.Clear(); return exit; }
+        var setupComplete = _enrollment && !_addPasskey && NativeFinished != null;
+        if (exit == 0 && notice == null && (_autoCloseOnSuccess || setupComplete))
+        {
+            _screen.Clear();
+            Screen.Clear();
+            return exit;
+        }
+        if (notice != null)
+        {
+            _pinHint.Text = notice;
+            _pinHint.Visibility = Visibility.Visible;
+        }
+        _done.IsEnabled = true;
+        _done.Focus();
         await _dismissed.Task;
         return exit;
     }

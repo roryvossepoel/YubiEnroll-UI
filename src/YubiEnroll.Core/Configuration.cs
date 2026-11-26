@@ -68,6 +68,13 @@ public static class ConfigReader
     private static string Hash(TomlTable table) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Toml.FromModel((TomlTable)Canonical(table)))));
 
+    internal static bool SameSettings(string original, string updated)
+    {
+        if (original == updated) return true;
+        if (Toml.Parse(original).HasErrors) return false; // An import can replace a damaged file.
+        return Hash(Toml.ToModel(original)) == Hash(Toml.ToModel(updated));
+    }
+
     // YubiEnroll rewrites TOML during provider activation. Compare typed values; table order,
     // comments, quote style and inline vs. expanded notation are not configuration changes.
     private static object Canonical(object value)

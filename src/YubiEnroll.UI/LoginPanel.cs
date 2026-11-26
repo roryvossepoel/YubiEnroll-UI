@@ -30,8 +30,8 @@ internal sealed class LoginPanel : Border
         var actions = new DockPanel(); _cancel.Style = Resource("QuietButton"); _open.Style = Resource("PrimaryButton");
         DockPanel.SetDock(_open, Dock.Right); actions.Children.Add(_open);
         _cancel.HorizontalAlignment = HorizontalAlignment.Left; actions.Children.Add(_cancel);
-        var footer = new Border { Padding = new Thickness(28,16,28,16), BorderThickness = new Thickness(0,1,0,0),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(221,226,228)), Child = actions };
+        _open.Margin = new Thickness(0);
+        var footer = new Border { Style = Resource("WizardActionBar"), Child = actions };
         DockPanel.SetDock(footer,Dock.Bottom); page.Children.Add(footer);
         var frame = new DockPanel { Style = Resource("WizardFrame") }; page.Children.Add(frame);
         var header = new StackPanel(); DockPanel.SetDock(header,Dock.Top); frame.Children.Add(header);

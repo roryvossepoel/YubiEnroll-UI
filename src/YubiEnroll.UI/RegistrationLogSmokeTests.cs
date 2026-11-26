@@ -26,7 +26,7 @@ public partial class MainWindow
         table.UpdateLayout();
     }
 
-    private void TestRegistrationLogView(SettingsWindow settings)
+    private async Task TestRegistrationLogView(SettingsWindow settings)
     {
         var tenant = new Provider("Demo tenant", "ENTRA", "11111111-2222-3333-4444-555555555555", "Managed PIN", "fixture");
         var user = new UserCandidate("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "Synthetic user")
@@ -65,6 +65,7 @@ public partial class MainWindow
         BeginRegistrationRecord(tenant, user with { DisplayName = "Sam Example", UserPrincipalName = "sam@example.test", Email = "" }, target with { Serial = "00456789" }, profile, "New key");
         var view = (RegistrationLogView)settings.RegistrationHost.Content;
         settings.RegistrationTab.IsSelected = true;
+        await view.Loading;
         settings.UpdateLayout();
         Assert(view.PreferenceStatus.Text.StartsWith("Logging on") && view.Records.Items.Count == 3 && view.ExportButton.IsEnabled, "Registration log shows successful, interrupted and unknown attempts");
         view.Search.Text = "alex.mail@example.test";
@@ -91,10 +92,10 @@ public partial class MainWindow
         view.TenantFilter.SelectedIndex = 1;
         var originalFolder = _registrationJournal.Preferences.Directory;
         _registrationJournal.Configure(true, originalFolder + "-empty");
-        view.RefreshRecords();
+        await view.RefreshRecords();
         Assert(view.TenantFilter.SelectedIndex == 1 && view.Records.Items.Count == 0 && !view.ExportButton.IsEnabled, "Refresh cannot silently widen a tenant filter when its records disappear");
         _registrationJournal.Configure(true, originalFolder);
-        view.RefreshRecords();
+        await view.RefreshRecords();
         view.TenantFilter.SelectedIndex = 0;
         view.Records.SelectedIndex = 2;
         var sample = view.Records.Items.Cast<RegistrationRecord>().ToArray();
@@ -125,6 +126,8 @@ public partial class MainWindow
         showFirst.IsChecked = true; settings.UpdateLayout();
         Assert(Equals(showFirst.ToolTip, "Hide PIN") && System.Windows.Automation.AutomationProperties.GetName(showFirst) == "Hide PIN" &&
             ((UIElement)showFirst.Template.FindName("Slash", showFirst)).IsVisible, "Revealed PIN offers the hide icon and label");
+        Assert(Value(first).FontFamily.Equals(TextFor(first, "UserAddress").FontFamily) &&
+            Value(first).FontSize == TextFor(first, "UserAddress").FontSize, "PIN uses the same typography as registration details");
         Assert(Value(first).Text == "001234" && showFirst.TranslatePoint(new Point(), view.Records) == origin,
             "Reveal preserves leading zeroes and keeps the button in place");
         CaptureWindow(settings, "registration-log-initial-pin.png");
@@ -133,7 +136,7 @@ public partial class MainWindow
             "Only one PIN is visible; a long PIN wraps without resizing its row");
         view.Search.Text = "no matches";
         Assert(showOther.IsChecked == false, "Filtering the log hides a revealed PIN");
-        view.Search.Clear(); view.RefreshRecords();
+        view.Search.Clear(); await view.RefreshRecords();
         CaptureWindow(settings, "settings-registration-log.png");
         var width = settings.Width; var height = settings.Height;
         settings.Width = 740; settings.Height = 600;
@@ -150,6 +153,7 @@ public partial class MainWindow
         settings.EnabledChoice.IsChecked = false;
         settings.SaveLogSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         settings.RegistrationTab.IsSelected = true;
+        await view.Loading;
         Assert(view.PreferenceStatus.Text.StartsWith("Logging is off") && view.Records.Items.Count == 3,
             "Returning to the registration log reflects saved preferences and retains history");
         Assert(_registrationJournal.Read().Count == 3, "Turning registration logging off preserves previous records");

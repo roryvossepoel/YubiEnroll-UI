@@ -20,7 +20,22 @@ internal sealed class ActivityLogView : DockPanel
         public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
         public string Text => Heading + (HasDetail ? "\n" + Detail : "");
     }
-    private readonly ObservableCollection<Entry> _entries = new();
+    private sealed class EntryList : ObservableCollection<Entry>
+    {
+        public void Replace(IEnumerable<Entry> rows)
+        {
+            Items.Clear();
+            foreach (var row in rows) Items.Add(row);
+            OnPropertyChanged(new(nameof(Count)));
+            OnPropertyChanged(new("Item[]"));
+            OnCollectionChanged(new(System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
+        }
+    }
+
+    private readonly EntryList _entries = new();
+    private CancellationTokenSource? _read;
+    private readonly Button _export = new() { Content = "Export log…" };
+    internal Task Loading { get; private set; } = Task.CompletedTask;
     private readonly ListCollectionView _view;
     private readonly TextBlock _empty = new() { Text = "No activity yet.", Margin = new Thickness(0, 8, 0, 0) };
     private readonly ActivityJournal _journal;
@@ -47,7 +62,7 @@ internal sealed class ActivityLogView : DockPanel
         var search = new TextBox { ToolTip = "Search messages, levels, dates and details", MinHeight = 34, VerticalContentAlignment = VerticalAlignment.Center };
         System.Windows.Automation.AutomationProperties.SetName(search, "Search activity");
         var field = new Grid(); field.Children.Add(search); var hint = new TextBlock { Text = "Search activity…", Margin = new Thickness(8,0,0,0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false }; field.Children.Add(hint); actions.Children.Add(field);
-        var export = new Button { Content = "Export log…" };
+        var export = _export;
         var folder = new Button { Content = "Open log folder" };
         folder.Click += (_, _) =>
         {
@@ -91,16 +106,36 @@ internal sealed class ActivityLogView : DockPanel
         _empty.HorizontalAlignment = HorizontalAlignment.Center;
         _empty.IsHitTestVisible = false;
         body.Children.Add(_empty); Children.Add(body);
-        Reload(); journal.Changed += Reload;
+        IsVisibleChanged += (_, _) => StartRead();
+        journal.Changed += StartRead;
     }
-    private void Reload()
+
+    private void StartRead()
     {
-        _entries.Clear();
-        var saved = _journal.Read().Select(e => _sessionDetails.TryGetValue((e.Time, e.Level, e.Message), out var live)
-            ? live : new Entry(e.Time.LocalDateTime, e.Level, e.Message, e.Detail));
-        foreach (var e in saved.Concat(_unsaved).OrderByDescending(e => e.Time)) _entries.Add(e);
-        _notice.Text = _journal.Error ?? (_journal.Preferences.Enabled ? "" : "Activity saving is off. New events are visible for this session only.");
-        UpdateEmpty();
+        _read?.Cancel();
+        _read = null;
+        _export.IsEnabled = false;
+        if (IsVisible) Loading = ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        using var request = new CancellationTokenSource();
+        _read = request;
+        _notice.Text = "Loading activity…";
+        try
+        {
+            var result = await _journal.ReadAsync(request.Token);
+            if (request.IsCancellationRequested) return;
+            var saved = result.Events.Select(e => _sessionDetails.TryGetValue((e.Time, e.Level, e.Message), out var live)
+                ? live : new Entry(e.Time.LocalDateTime, e.Level, e.Message, e.Detail));
+            _entries.Replace(saved.Concat(_unsaved).OrderByDescending(e => e.Time).ToArray());
+            _notice.Text = result.Error ?? _journal.Error ?? (_journal.Preferences.Enabled ? "" : "Activity saving is off. New events are visible for this session only.");
+            _export.IsEnabled = result.Error == null;
+            UpdateEmpty();
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        finally { if (ReferenceEquals(_read, request)) _read = null; }
     }
     private void UpdateEmpty()
     {
@@ -115,6 +150,7 @@ internal sealed class ActivityLogView : DockPanel
         if (!_journal.Append(entry)) _unsaved.Add(live);
         else if (!string.IsNullOrWhiteSpace(detail)) _sessionDetails[(entry.Time, level, message)] = live;
         _entries.Insert(0, live);
+        if (_read != null) StartRead();
         if (_journal.Error != null) _notice.Text = _journal.Error;
     }
 }

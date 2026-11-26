@@ -34,7 +34,7 @@ public sealed record ReleaseVersion(int Major, int Minor, int Patch, string Prev
 public sealed record PublishedRelease(string Tag, Uri Url, ReleaseVersion Version, bool Preview);
 public static class ReleaseUpdates
 {
-    public const string Repository = "roryvossepoel/YubiEnroll-UI";
+    public const string Repository = "roryvossepoel/PasskeyDesk";
     public static IReadOnlyList<PublishedRelease> Parse(string json)
     {
         using var document = JsonDocument.Parse(json);

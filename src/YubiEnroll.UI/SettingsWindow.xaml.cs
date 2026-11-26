@@ -10,13 +10,13 @@ public partial class SettingsWindow : Window
 {
     public event Action? PrerequisitesOpened;
     internal event Action<string>? ActivityRecorded;
-    private void SettingsTab_Changed(object sender, SelectionChangedEventArgs e)
+    private async void SettingsTab_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(sender, e.Source)) return;
         if (AppSettingsTab != null && e.RemovedItems.Contains(AppSettingsTab) && !ConfirmLeavePreferences()) { SettingsTabs.SelectedItem = AppSettingsTab; return; }
         if (Feedback != null) Feedback.Text = "";
         if (AboutTab?.IsSelected == true && e.Source == SettingsTabs) PrerequisitesOpened?.Invoke();
-        if (RegistrationTab?.IsSelected == true && RegistrationHost?.Content is RegistrationLogView log) log.RefreshRecords();
+        if (RegistrationTab?.IsSelected == true && RegistrationHost?.Content is RegistrationLogView log) await log.RefreshRecords();
     }
     private readonly RegistrationJournal _journal;
     private readonly DeskPolicy? _policy;

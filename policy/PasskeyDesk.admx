@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
-<policyDefinitions revision="1.4" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+<policyDefinitions revision="1.5" schemaVersion="1.0" xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
   <policyNamespaces>
     <target prefix="pdesk" namespace="PasskeyDesk.Policies" />
   </policyNamespaces>
-  <resources minRequiredRevision="1.4" />
+  <resources minRequiredRevision="1.5" />
   <supportedOn>
     <definitions>
       <definition name="PolicyPreview" displayName="$(string.SupportedVersion)" />
@@ -33,6 +33,113 @@
       <supportedOn ref="PolicyPreview" />
       <elements>
         <text id="TenantsTenantsJson" valueName="TenantsJson" required="true" maxLength="1048576" />
+      </elements>
+    </policy>
+    <policy name="Tenant1" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant1" displayName="$(string.Tenant1Label)" explainText="$(string.Tenant1Help)" presentation="$(presentation.Tenant1)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant1Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant1TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant1ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant1RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant2" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant2" displayName="$(string.Tenant2Label)" explainText="$(string.Tenant2Help)" presentation="$(presentation.Tenant2)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant2Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant2TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant2ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant2RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant3" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant3" displayName="$(string.Tenant3Label)" explainText="$(string.Tenant3Help)" presentation="$(presentation.Tenant3)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant3Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant3TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant3ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant3RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant4" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant4" displayName="$(string.Tenant4Label)" explainText="$(string.Tenant4Help)" presentation="$(presentation.Tenant4)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant4Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant4TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant4ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant4RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant5" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant5" displayName="$(string.Tenant5Label)" explainText="$(string.Tenant5Help)" presentation="$(presentation.Tenant5)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant5Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant5TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant5ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant5RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant6" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant6" displayName="$(string.Tenant6Label)" explainText="$(string.Tenant6Help)" presentation="$(presentation.Tenant6)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant6Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant6TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant6ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant6RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant7" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant7" displayName="$(string.Tenant7Label)" explainText="$(string.Tenant7Help)" presentation="$(presentation.Tenant7)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant7Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant7TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant7ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant7RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant8" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant8" displayName="$(string.Tenant8Label)" explainText="$(string.Tenant8Help)" presentation="$(presentation.Tenant8)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant8Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant8TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant8ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant8RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant9" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant9" displayName="$(string.Tenant9Label)" explainText="$(string.Tenant9Help)" presentation="$(presentation.Tenant9)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant9Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant9TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant9ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant9RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="Tenant10" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Tenants\Tenant10" displayName="$(string.Tenant10Label)" explainText="$(string.Tenant10Help)" presentation="$(presentation.Tenant10)">
+      <parentCategory ref="TenantsCategory" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="Tenant10Name" valueName="Name" required="true" maxLength="80" />
+        <text id="Tenant10TenantId" valueName="TenantId" required="true" maxLength="36" />
+        <text id="Tenant10ClientId" valueName="ClientId" required="true" maxLength="36" />
+        <text id="Tenant10RedirectUri" valueName="RedirectUri" required="true" maxLength="2048" />
+      </elements>
+    </policy>
+    <policy name="ProfileList" class="Machine" key="Software\Policies\PasskeyDesk\YubiEnroll\Profiles" displayName="$(string.ProfileListLabel)" explainText="$(string.ProfileListHelp)" presentation="$(presentation.ProfileList)">
+      <parentCategory ref="Profiles" />
+      <supportedOn ref="PolicyPreview" />
+      <elements>
+        <text id="ProfileListProfilesJson" valueName="ProfilesJson" required="true" maxLength="1048576" />
       </elements>
     </policy>
     <policy name="Activity" class="Machine" key="Software\Policies\PasskeyDesk\AppSettings\Logging\Activity" displayName="$(string.ActivityLabel)" explainText="$(string.ActivityHelp)" presentation="$(presentation.Activity)">

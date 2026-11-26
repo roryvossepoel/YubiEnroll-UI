@@ -22,7 +22,7 @@ public partial class MainWindow
             "Local page opens from Home without tenant sign-in and requires explicit key selection");
         LocalKeys.SelectedIndex = 1;
         LocalView_Click(LocalView, new RoutedEventArgs()); UpdateLayout();
-        Assert(_localStep == 1 && LocalUnlock.IsVisible && !LocalView.IsEnabled && LocalProgress.ColumnDefinitions.Count == 5, "Choosing the key only opens the PIN step");
+        Assert(_localStep == 1 && LocalUnlock.IsVisible && UnlockPinButton.IsVisible && !UnlockPinButton.IsEnabled && !LocalView.IsVisible && LocalProgress.ColumnDefinitions.Count == 5, "Choosing the key only opens the PIN step");
         await LocalOperationAsync(null, (_,_)=>"ci-only",Read);
         Assert(calls == 1 && LocalRows.Items.Count == 2 && LocalTitle.Text == "Passkeys on this YubiKey" && LocalIntro.Text.Contains("87654321"),
             "Unlocked list shows the verified serial and only on-key credentials");

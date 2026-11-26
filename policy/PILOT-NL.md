@@ -1,15 +1,15 @@
-# Passkey Desk voor YubiKeys · 0.11.2
+# Passkey Desk voor YubiKeys · 0.11.8
 
 Vanaf **0.11.0** gebruik je dezelfde Windows x64-build met en zonder machinebeleid. Pak het ZIP-bestand uit in een eigen map en start `PasskeyDesk.exe`. Laat `PasskeyDesk.ConsoleHost.exe` ernaast staan. De templates worden niet automatisch geïnstalleerd. De vereisten voor .NET en de Yubico-tools zijn gelijk aan 0.10.9.
 
-## Indeling van de template (revisie 1.4)
+## Indeling van de template (revisie 1.5)
 
-Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.2 en de meegeleverde ADMX en ADML (revisie 1.4).
+Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze test Passkey Desk 0.11.8 en de meegeleverde ADMX en ADML (revisie 1.5).
 
 | Onderdeel | Wat configureer je? | Waar komt het terecht? |
 | --- | --- | --- |
-| YubiEnroll CLI configuration (TOML) → Tenants | Entra-tenants via JSON | De providers in de TOML van het uitvoerende account. |
-| YubiEnroll CLI configuration (TOML) → Configuration profiles | Vijf mogelijke profielslots, inclusief PIN genereren en wijzigen bij eerste gebruik | De profielen in diezelfde TOML; de zelfstandige CLI kan ze gebruiken. |
+| YubiEnroll CLI configuration (TOML) → Tenants | Tien tenantslots of een JSON-lijst | De providers in de TOML van het uitvoerende account. |
+| YubiEnroll CLI configuration (TOML) → Configuration profiles | Vijf profielslots of een JSON-lijst | De profielen in diezelfde TOML; de zelfstandige CLI kan ze gebruiken. |
 | Passkey Desk app settings → Logging → Activity logging | Activiteit bewaren, bewaartermijn en logmap | Alleen de app. Bij een leeg pad: `Documenten\YubiKey Desk\ActivityLog`. |
 | Passkey Desk app settings → Logging → Registration logging | Registraties bewaren, bewaartermijn, registratiemap en gegenereerde initiële PINs opnemen (standaard uit) | Alleen de app. Bij een leeg pad: `Documenten\YubiKey Desk\RegistrationLog`. PIN-logging geldt ook voor CSV-export van de betreffende records. |
 | Passkey Desk app settings → Terminal preference | Interne of externe terminal | Alleen de app. |
@@ -19,6 +19,8 @@ Onder **Passkey Desk for YubiKeys** staan twee onderdelen. Gebruik voor deze tes
 Met **Documenten** wordt de Windows-map van het uitvoerende account bedoeld, ook als die is omgeleid. Je kunt beide logpaden afzonderlijk instellen. Elke ingestelde policy vergrendelt alleen de bijbehorende groep. Alleen logging of een terminalpolicy maakt of wijzigt geen TOML en laat tenants en profielen bewerkbaar.
 
 Bij het opstarten toont **Before you start → YubiEnroll CLI → Organization policy** de uitkomst: TOML aangemaakt, bijgewerkt of al actueel. Bij een lege tenantpolicy zonder bestand is geen bestand nodig. Bij alleen appbeleid staat er dat app-instellingen zijn toegepast zonder TOML-synchronisatie. Zonder bekende policy ontbreekt de substap. Bij gedetecteerd beleid staat de uitkomst één keer per start in **Settings → Activity log**. Staat het bewaren van activiteit uit, dan is de regel alleen tijdens die sessie zichtbaar. Terugkeren naar dit scherm voert geen nieuwe synchronisatie uit.
+
+**Voorrang per onderdeel.** Stel je voor tenants of profielen JSON in, dan levert die de volledige lijst voor dat onderdeel. Een lege array `[]` maakt de lijst leeg. Verwijder je de JSON-policy en herstart je de app, dan worden de ingevulde slots weer gebruikt. Bij ongeldige actieve JSON meldt de app het onderdeel en blijft de vorige TOML behouden. Tenants via slots en profielen via JSON, of andersom, werken onafhankelijk.
 
 ## Begin met één testapparaat
 
@@ -38,6 +40,8 @@ Bij opstarten leest de app uitsluitend de bekende subsleutels van de **64-bits**
 | Subsleutel onder `PasskeyDesk` | Registerwaarden |
 | --- | --- |
 | `YubiEnroll\Tenants` | `TenantsJson` (REG_SZ), dezelfde JSON-array als voorheen |
+| `YubiEnroll\Tenants\Tenant1` t/m `Tenant10` | Per tenant: `Name`, `TenantId`, `ClientId` en `RedirectUri` (REG_SZ) |
+| `YubiEnroll\Profiles` | `ProfilesJson` (REG_SZ), zie `profiles.example.json` |
 | `YubiEnroll\Profiles\Profile1` t/m `Profile5` | Per profiel: `Name`, `Reset`, `MinPinLength`, `AlwaysUv`, `RequireEa`, `ForcePinChange`, `RandomPin`, `RandomPinLength` |
 | `AppSettings\Logging\Activity` | `Enabled`, `Folder`, `RetentionDays` |
 | `AppSettings\Logging\Registration` | `Enabled`, `Folder`, `RetentionDays`, `SaveGeneratedPin` |
@@ -48,7 +52,7 @@ Op **App settings** staat naast elke beheerde sectie een pill **Policy mode: rea
 | Ingesteld | Effect bij het starten |
 | --- | --- |
 | Geen | De app werkt direct met dezelfde lokale configuratie als 0.10.9. |
-| Entra tenants (JSON) | De array vervangt de volledige lijst Entra-tenants. Vier velden per object: `name`, `tenantId`, `clientId`, `redirectUri`. Geen vast aantal tenantslots; de invoergrootte van het platform geldt wel. Een expliciete lege array `[]` verwijdert de Entra-lijst. |
+| Entra tenants (JSON) | De array vervangt de volledige lijst Entra-tenants. Vier velden per object: `name`, `tenantId`, `clientId`, `redirectUri`. JSON heeft voorrang op alle tien tenantslots. Een expliciete lege array `[]` verwijdert de Entra-lijst. |
 | Eén of meer profielslots | De ingevulde slots vormen samen de **volledige** profielenlijst. Slot 5 kan ook zelfstandig worden gebruikt. Gebruik unieke namen. Een ongebruikte minimum- of gegenereerde PIN-lengte geef je op als 0, anders 4–63. De zelfstandige CLI 1.2.0 vereist numerieke lengtes in de TOML: bij 0 schrijft de app voor het minimum 4 en voor een niet opgegeven gegenereerde lengte het ingestelde minimum (anders 4). Bij minimum 0 blijft Passkey Desk bij uitgifte de actuele minimumlengte van de sleutel gebruiken. Er staat geen PIN-waarde in de policy. |
 | Activity logging / Registration logging | De aangewezen groep loginstellingen geldt zolang de policy aanwezig is. Zonder mappad geldt de standaardmap van het uitvoerende account. Een mappad moet absoluut zijn; omgevingsvariabelen worden voor die gebruiker uitgewerkt. Het loggen van gegenereerde PINs staat standaard uit. |
 | Terminal preference | Bepaalt de terminalvoorkeur. Bestaand gedrag blijft gelden: als bij inschrijving een gegenereerde PIN moet worden vastgelegd, gebruikt de app haar eigen terminal. |
@@ -59,7 +63,7 @@ Zijn alleen tenants beheerd, dan blijven de lokale profielen bewerkbaar en verva
 
 De CLI blijft de gewone TOML van het **Windows-account dat de app uitvoert** gebruiken, doorgaans `%APPDATA%\Yubico\yubienroll\yubienroll.toml`. De app respecteert ook haar bestaande alternatieve zoekpad. Start je verhoogd met een ander account, dan werk je in het profiel van dat account.
 
-De app valideert alle ontvangen instellingen voordat zij de TOML vervangt. Alleen bij een inhoudelijke wijziging wordt er geschreven; bij vervanging van een bestaand bestand komt er een exacte `.bak` naast. Een bestaande geldige actieve provider blijft behouden. Werk met één app/CLI-schrijver tegelijk. Bij invoer van een nieuwe versie van een policy: laat Intune eerst de synchronisatie afronden.
+De app valideert alle ontvangen instellingen voordat zij de TOML vervangt. Alleen bij een inhoudelijke wijziging wordt er geschreven; bij vervanging van een bestaand bestand komt er een exacte `.bak` naast. Per TOML bewaart Passkey Desk de tien nieuwste automatische back-ups. Een bestaande geldige actieve provider blijft behouden. Werk met één app/CLI-schrijver tegelijk. Bij invoer van een nieuwe versie van een policy: laat Intune eerst de synchronisatie afronden.
 
 Lockdown geldt **in Passkey Desk**; het bestand krijgt geen andere toegangsrechten. Je kunt het met de losse CLI blijven lezen en bewerken. Bij de volgende appstart worden afwijkende beheerde waarden opnieuw toegepast. Oudere versies zonder policyondersteuning gebruiken dezelfde per-user TOML en kennen deze vergrendeling niet.
 
@@ -67,5 +71,5 @@ Als je alle policies verwijdert, wordt de laatst toegepaste TOML je lokale uitga
 
 ## Volgende testronde
 
-1. Test 0.11.2 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
+1. Test 0.11.8 eerst met de huidige policies. Controleer de beheerde secties, een registratie en beide logs.
 2. Test daarna dezelfde build op een Windows-testapparaat zonder toegewezen policy. Controleer na opnieuw starten dat lokale instellingen bewerkbaar zijn en doorloop dezelfde registratie.

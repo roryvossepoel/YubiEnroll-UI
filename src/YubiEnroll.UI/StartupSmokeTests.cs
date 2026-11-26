@@ -206,7 +206,7 @@ public partial class MainWindow
                 && bothView.ProfilePolicyBadge.Visibility == Visibility.Visible && bothView.TenantPolicyBadge.Visibility == Visibility.Visible, "Both managed lists show only their badge");
             bothView.Close();
             var settings = new SettingsWindow(path, mockExecutable, "Mock CLI", _registrationJournal) { Owner = this };
-            var settingsOperation = settings.Dispatcher.InvokeAsync(() =>
+            var settingsOperation = settings.Dispatcher.InvokeAsync(async () =>
             {
                 try
                 {
@@ -232,12 +232,12 @@ public partial class MainWindow
                     CaptureWindow(settings, "settings-transfer.png");
                     settings.AboutTab.IsSelected = true;
                     CaptureWindow(settings, "settings-about.png");
-                    TestRegistrationLogView(settings);
+                    await TestRegistrationLogView(settings);
                 }
                 finally { settings.Close(); }
             });
             settings.ShowDialog();
-            await settingsOperation.Task;
+            await settingsOperation.Task.Unwrap();
             await InitializeAsync(root, mockExecutable);
             Assert(!SearchPanel.IsEnabled && !PreparePanel.IsEnabled && ConnectButton.IsEnabled, "Connect gates user search and preparation");
             await TestBatchPageAsync();
@@ -371,6 +371,7 @@ public partial class MainWindow
             _activityView.Add("Synthetic operation failed.", "Error", "HTTP status: 405");
             _activityView.Add("Synthetic summary only.", "Info", "   ");
             OpenSettings(s => s.ActivityTab); UpdateLayout();
+            await _activityView.Loading;
             var activityGrid = VisualDescendants<DataGrid>(_activityView).Single();
             var diagnostic = activityGrid.Items.Cast<object>().Single(x => x.ToString()!.Contains("Synthetic operation failed."));
             activityGrid.ScrollIntoView(diagnostic);
@@ -749,16 +750,36 @@ public partial class MainWindow
         while (!live.IsCompleted) { panel.DismissCompleted(); await Task.Delay(50); }
         Assert(await live == 7 && !panel.Screen.Text.Contains("synthetic-pin"), "Live renderer retains outcome and clears hidden-input session");
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
-        foreach (var capture in new[] { false, true })
+        foreach (var single in new[] { true, false })
         {
-            var pinPanel = new TerminalPanel("Synthetic PIN summary", true, captureSerial: capture ? "00123456" : null, single: true);
+            var pinPanel = new TerminalPanel("Successful setup", true, captureSerial: "00123456", single: single);
             TerminalOverlay.Content = pinPanel; TerminalOverlay.Visibility = System.Windows.Visibility.Visible;
-            var pinRun = pinPanel.RunAsync(mockExecutable, ["--pin-summary-probe"]);
+            var finalized = false;
+            pinPanel.NativeFinished = (exit, pin, _) =>
+            {
+                Assert(exit == 0 && pin == "001234" && pinPanel.Screen.Text.Contains("Temporary PIN: 001234"),
+                    $"Generated PIN is readable in the terminal before handoff (single={single})");
+                finalized = true;
+                return Task.FromResult<string?>(null);
+            };
+            var exitCode = await pinPanel.RunAsync(mockExecutable, ["--pin-summary-probe"]).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert(exitCode == 0 && finalized && pinPanel.Screen.Text.Length == 0,
+                $"Clean setup closes the terminal after finalization without operator input (single={single})");
+        }
+        foreach (var (probe, expectedSerial, notice, exitCode) in new[] {
+            ("--pin-summary-probe", "12340000", (string?)null, 0), // Missing PIN for the targeted key.
+            ("--pin-summary-probe", "00123456", "Check the registration in Entra.", 0),
+            ("--exit-probe", "00123456", (string?)null, 7) })
+        {
+            var review = new TerminalPanel("Setup requiring review", true, captureSerial: expectedSerial);
+            TerminalOverlay.Content = review;
+            review.NativeFinished = (_, _, _) => Task.FromResult(notice);
+            var pending = review.RunAsync(mockExecutable, [probe]);
             var end = DateTime.UtcNow.AddSeconds(10);
-            while (pinPanel.CompletedExitCode == null && DateTime.UtcNow < end) await Task.Delay(50);
-            Assert(pinPanel.CompletedExitCode == 0 && !pinPanel.Screen.Text.Contains("Temporary PIN: 001234") && pinPanel.GeneratedPin == (capture ? "001234" : null),
-                "Published terminal captures the generated summary PIN only with explicit opt-in: " + capture);
-            pinPanel.DismissCompleted(); await pinRun;
+            while (review.CompletedExitCode == null && DateTime.UtcNow < end) await Task.Delay(50);
+            Assert(review.CompletedExitCode == exitCode && !pending.IsCompleted, "Setup requiring review keeps the terminal open");
+            review.DismissCompleted();
+            Assert(await pending == exitCode, "Manual dismissal preserves the native result");
         }
         TerminalOverlay.Content = null; TerminalOverlay.Visibility = System.Windows.Visibility.Collapsed;
         var screen = new TerminalScreen(); screen.Feed(output.ToString());

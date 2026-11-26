@@ -29,6 +29,11 @@ public static class EnrollmentTargetGuard
             : "Connect to the tenant at step 2. You may use another key to sign in; disconnect that key again before starting enrollment.";
     }
 
+    // A reset deliberately reconnects the NFC card. Bind the read-back to the reviewed
+    // reader and serial; in the embedded terminal also require YubiEnroll's final receipt.
+    public static bool ConfirmNfcReset(ResetKey target, KeyInventory inventory, bool hasTranscript, string? receiptSerial) =>
+        target.IsNfc && (!hasTranscript || receiptSerial == target.Serial) && CanStart(target, inventory.Keys, inventory.Unavailable);
+
     public static void Require(ResetKey target, KeyInventory inventory)
     {
         if (!CanStart(target, inventory.Keys, inventory.Unavailable))

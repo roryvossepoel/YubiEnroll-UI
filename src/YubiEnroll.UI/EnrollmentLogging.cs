@@ -18,15 +18,16 @@ public partial class MainWindow
         }
     }
 
-    private void CompleteRegistrationRecord(RegistrationAttempt? attempt, int? code, string? generatedPin = null)
+    private bool CompleteRegistrationRecord(RegistrationAttempt? attempt, int? code, string? generatedPin = null)
     {
         var saved = _registrationJournal.Complete(attempt, code, generatedPin);
         _registrationResultMessage = attempt == null ? "Registration logging was off for this enrollment." : saved ? (code == 0 ? "Enrollment record saved." : "Attempt saved to the registration log.") :
             code == 0 ? "Enrollment succeeded according to YubiEnroll, but its registration record was not saved. Keep the app open and retry saving." :
             "The enrollment outcome could not be saved. Keep the app open and retry saving; do not repeat enrollment without checking Entra.";
         if (saved && attempt?.SaveGeneratedPin == true && !_addPasskey)
-            _registrationResultMessage += generatedPin != null ? " Generated initial PIN saved." : " No generated PIN was reported; the PIN field is empty.";
+            _registrationResultMessage += generatedPin != null ? " Generated initial PIN saved." : " No temporary PIN was saved for this attempt.";
         RenderRegistrationLogStatus();
+        return saved;
     }
 
     private void RenderRegistrationLogStatus()
@@ -37,6 +38,8 @@ public partial class MainWindow
         RegistrationReviewNote.Text = _registrationJournal.SettingsError ?? (_registrationJournal.Preferences.Enabled
             ? (_registrationJournal.Preferences.SaveGeneratedPin && !_addPasskey ? "Registration logging enabled · generated PIN included when available." : "Registration logging enabled.")
             : "Registration logging disabled.");
+        if (!_addPasskey && (Profiles.SelectedItem as ProfileChoice)?.Setup?.RandomPin == true && !InitialPinLogging)
+            RegistrationReviewNote.Text = PinNotSavedWarning;
     }
 
     private void RetryRegistrationLog_Click(object sender, RoutedEventArgs e)

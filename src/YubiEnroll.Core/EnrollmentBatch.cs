@@ -8,7 +8,7 @@ public static class BatchRoster
     public const int Limit = 500;
     public const int MaxCharacters = 256_000;
 
-    public static string[] Import(string text)
+    public static string[] Import(string text, List<int>? sourceLines = null)
     {
         if (text.Length > MaxCharacters) throw new ArgumentException("The list is too large. Import at most 500 users at a time.");
         text = text.TrimStart('\uFEFF');
@@ -21,12 +21,15 @@ public static class BatchRoster
             else if (!quoted && ch is ',' or ';' or '\t') { delimiter = ch.ToString(); break; }
         }
         parser.SetDelimiters(delimiter);
+        var physicalLines = text.ReplaceLineEndings("\n").Split('\n');
         var upns = new List<string>();
         int? column = null; var columns = 1;
         try
         {
             while (!parser.EndOfData)
             {
+                var line = checked((int)parser.LineNumber);
+                while (line > 0 && line <= physicalLines.Length && string.IsNullOrWhiteSpace(physicalLines[line - 1])) line++;
                 var cells = parser.ReadFields() ?? [];
                 if (column == null)
                 {
@@ -39,6 +42,7 @@ public static class BatchRoster
                 var value = cells[column.Value].Trim();
                 if (value.Length == 0 || value.Any(char.IsControl)) throw new ArgumentException($"Missing or invalid sign-in name in entry {upns.Count + 1}.");
                 upns.Add(value);
+                sourceLines?.Add(line);
                 if (upns.Count > Limit) throw new ArgumentException("Split the list into batches of at most 500 users.");
             }
         }
@@ -60,6 +64,13 @@ public static class BatchRoster
 public enum IssueStatus { Pending, InProgress, Registered, Skipped, CheckRequired }
 public sealed record IssuanceRow(UserCandidate User, IssueStatus Status = IssueStatus.Pending, string Serial = "")
 {
+    public string ReviewReason { get; init; } = "";
+    public bool NeedsReview => Status == IssueStatus.CheckRequired;
+    public bool? GeneratesPin { get; init; }
+    public string? GeneratedPin { get; init; }
+    public string PinLayoutSample => new('0', Math.Max(6, GeneratedPin?.Length ?? 0));
+    public string PinUnavailableLabel => Status == IssueStatus.Skipped ? "—" : GeneratesPin == false ? "Not generated" : "Unavailable";
+    public override string ToString() => $"{User.UserPrincipalName} · {Serial} · {StatusLabel}";
     public string StatusLabel => Status switch { IssueStatus.Registered => "Registered", IssueStatus.Skipped => "Skipped",
         IssueStatus.CheckRequired => "Check required", IssueStatus.InProgress => "In progress", _ => "Not started" };
 }
@@ -92,12 +103,28 @@ public sealed class EnrollmentBatch
         if (Current is not { Status: IssueStatus.Pending } row || row.User != user || !key.Serial.All(char.IsAsciiDigit) || key.Serial.Length == 0 ||
             setup.Name != Profile.Name || !AllowsPin(setup.Reset, pin) || !_attempted.Add(key.Serial))
             throw new InvalidOperationException("The recipient, key or profile is no longer eligible. Review this row again.");
-        _rows[Position] = row with { Serial = key.Serial, Status = IssueStatus.InProgress };
+        _rows[Position] = row with { Serial = key.Serial, Status = IssueStatus.InProgress, GeneratesPin = setup.RandomPin };
     }
-    public void Complete(int? exit)
+    public void Complete(int? exit, string? generatedPin = null, string? reason = null)
     {
         if (Current is not { Status: IssueStatus.InProgress } row) throw new InvalidOperationException("No enrollment is running.");
-        _rows[Position] = row with { Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired };
+        _rows[Position] = row with
+        {
+            Status = exit == 0 ? IssueStatus.Registered : IssueStatus.CheckRequired,
+            ReviewReason = exit == 0 ? "" : reason ?? (exit switch
+            {
+                125 => "Registration was interrupted before the outcome could be confirmed.",
+                null or < 0 => "The application could not confirm the registration outcome.",
+                _ => $"YubiEnroll returned exit code {exit}."
+            }),
+            GeneratedPin = exit == 0 && row.GeneratesPin == true && GeneratedPinSummary.IsValid(generatedPin) ? generatedPin : null
+        };
+    }
+
+    public void ClearPins()
+    {
+        for (var i = 0; i < _rows.Length; i++)
+            if (_rows[i].GeneratedPin != null) _rows[i] = _rows[i] with { GeneratedPin = null };
     }
     public void Skip()
     {
@@ -112,7 +139,7 @@ public sealed class EnrollmentBatch
         Position++;
     }
 
-    public string Csv(string separator)
+    public string Csv(string separator, bool includeInitialPins = false)
     {
         static string Cell(string value, bool serial = false)
         {
@@ -120,10 +147,17 @@ public sealed class EnrollmentBatch
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
         var result = new StringBuilder();
-        void Line(params string[] cells) => result.AppendLine(string.Join(separator, cells));
-        Line("Tenant","TenantId","Profile","UserPrincipalName","UserId","DisplayName","Serial","Result");
-        foreach (var r in Rows) Line(Cell(Tenant.Name), Cell(Tenant.TenantId), Cell(Profile.Name), Cell(r.User.UserPrincipalName),
-            Cell(r.User.Id), Cell(r.User.DisplayName), Cell(r.Serial, true), Cell(r.StatusLabel));
+        var header = string.Join(separator, "Tenant", "TenantId", "Profile", "UserPrincipalName", "UserId", "DisplayName", "Serial", "Result");
+        result.Append(header);
+        if (includeInitialPins) result.Append(separator).Append("Initial PIN");
+        result.AppendLine();
+        foreach (var row in Rows)
+        {
+            result.Append(string.Join(separator, Cell(Tenant.Name), Cell(Tenant.TenantId), Cell(Profile.Name),
+                Cell(row.User.UserPrincipalName), Cell(row.User.Id), Cell(row.User.DisplayName), Cell(row.Serial, true), Cell(row.StatusLabel)));
+            if (includeInitialPins) result.Append(separator).Append(Cell(row.GeneratedPin ?? "", true));
+            result.AppendLine();
+        }
         return result.ToString();
     }
 }

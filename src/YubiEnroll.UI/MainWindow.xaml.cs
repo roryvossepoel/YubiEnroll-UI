@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
     private string SetupOrReadyMessage() => _config?.Providers.Count > 0 ? ReadyMessage() : EmptyTenantGuidance;
 
-    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.2" : "Standard user · administrator rights required for key inspection and FIDO reset";
+    private string ReadyMessage() => IsAdministrator() ? "Ready · administrator · 0.11.8" : "Standard user · administrator rights required for key inspection and FIDO reset";
 
     private void LoadConfiguration(string? configPath = null)
     {
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
         {
             var report = FailureReport.Create(ex, operation, _configPath, _exePath);
             StatusText.Text = report.Summary;
-            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.2\n{report.Diagnostic}\n\n");
+            Diagnostics.AppendText($"Application: Passkey Desk for YubiKeys 0.11.8\n{report.Diagnostic}\n\n");
 
             Record($"{operation} failed.", "Error", report.Diagnostic);
             if (showDialog)
@@ -440,8 +440,7 @@ public partial class MainWindow : Window
         ConfigReader.EnsureUnchanged(ConfigReader.Read(_configPath), provider, profile);
         var registration = BeginRegistrationRecord(provider, user, target, setup, name);
         if (batch == null) _receipt = new(target, provider, user, setup, name, _addPasskey);
-        _generatedPin = null;
-        _captureGeneratedPin = registration?.SaveGeneratedPin == true && !_addPasskey && setup.RandomPin == true;
+        _captureGeneratedPin = !_addPasskey && setup.RandomPin == true;
         Record($"Enrollment started · tenant {provider.Name} · user {user.Id} · serial {target.Serial} · profile {setup.Name} · reset {reset}.");
         StatusText.Text = _addPasskey ? "Enter the existing FIDO PIN in the native prompt. No new PIN is generated." : EmbeddedTerminal ? "Follow the prompts below. Record the PIN securely before returning." : "Follow the console prompts. Record the PIN securely, then press Enter to return.";
         int code;
@@ -459,10 +458,32 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException("The active tenant changed. No registration was started.");
             batch?.Start(user, target, fresh.Pin, setup);
             var generation = _deviceGeneration;
-            int? finishedGeneration = null;
-            code = await RunInteractiveAsync(_exePath, arguments, target, () => finishedGeneration = _deviceGeneration, batch == null, setup);
-            targetChanged = batch != null && generation != (finishedGeneration ?? _deviceGeneration);
-            batch?.Complete(targetChanged ? null : code);
+            async Task<string?> FinishEnrollment(int nativeExit, string? pin, string? receiptSerial)
+            {
+                targetChanged = batch != null && generation != _deviceGeneration;
+                if (batch != null && target.IsNfc && reset == true && nativeExit == 0)
+                    targetChanged = !await VerifyReturnedNfcKeyAsync(target, EmbeddedTerminal || _captureGeneratedPin, receiptSerial);
+                int? verifiedExit = targetChanged ? null : nativeExit;
+                var notice = targetChanged ? (target.IsNfc && reset == true && nativeExit == 0
+                    ? "The selected YubiKey could not be verified after the NFC reset."
+                    : "The key connection changed during registration.") : null;
+                batch?.Complete(verifiedExit, pin, notice);
+                if (batch == null && verifiedExit == 0) _receiptPin = pin;
+                var storedPin = verifiedExit == 0 && registration?.SaveGeneratedPin == true ? pin : null;
+                var saved = CompleteRegistrationRecord(registration, verifiedExit, storedPin);
+                if (verifiedExit == 0 && pin != null && registration?.SaveGeneratedPin != true)
+                {
+                    _registrationResultMessage += batch == null
+                        ? " Initial PIN logging is off. Record the temporary PIN before leaving this summary."
+                        : " Initial PIN logging is off. Record or export the temporary PIN before leaving this batch.";
+                    RenderRegistrationLogStatus();
+                }
+                if (notice != null) notice += " Check the registration in Entra.";
+                if (registration != null && !saved)
+                    notice = notice == null ? _registrationResultMessage : notice + " " + _registrationResultMessage;
+                return notice;
+            }
+            code = await RunInteractiveAsync(_exePath, arguments, target, FinishEnrollment, batch == null, setup);
         }
         catch (Exception ex)
         {
@@ -479,10 +500,6 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
             { Record("Temporary enrollment profile could not be removed. The enrollment outcome is unchanged.", "Warning"); }
         }
-        // Commit the native outcome before read-back, UI navigation or a later enrollment can alter its context.
-        if (batch == null && code == 0 && !targetChanged) _receiptPin = _generatedPin;
-        CompleteRegistrationRecord(registration, targetChanged ? null : code, !targetChanged && code == 0 && registration?.SaveGeneratedPin == true ? _generatedPin : null);
-        _generatedPin = null;
         InvalidateDeviceInventory(); // Native enrollment can change PIN state without a device notification.
         if (batch != null) _deviceRefresh?.Start();
         Record((targetChanged ? "Key connection changed; enrollment outcome unknown." : code == 0 ? "Enrollment completed (reported by YubiEnroll)." : "Enrollment failed or was interrupted.") + $" · tenant {provider.Name} · user {user.Id} · serial {target.Serial}", code == 0 && !targetChanged ? "Info" : "Error", $"YubiEnroll exit code: {code}\n{_lastInteractiveFailure}");
@@ -521,13 +538,9 @@ public partial class MainWindow : Window
             e.Cancel = true;
             MessageBox.Show(this, "Finish the active operation and close its console before closing the application.", "Operation in progress");
         }
-        else if (_batchStage == BatchStage.Issue && _batch != null)
-            e.Cancel = MessageBox.Show(this, "Closing will discard this batch queue and its in-memory results. To keep them, end the batch and export the CSV first." +
-                (_registrationJournal.PendingCount > 0 ? " Some registration log results also still need to be saved." : ""),
-                "Close during batch issuance?", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes;
         else if (_registrationJournal.PendingCount > 0)
             e.Cancel = MessageBox.Show(this, $"{_registrationJournal.PendingCount} enrollment result(s) have not been saved. Closing loses their final outcomes; the on-disk attempts will remain unknown. Close anyway?", "Unsaved enrollment records", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes;
         if (!e.Cancel && _hostedWindow is SettingsWindow settings) e.Cancel = !settings.ConfirmLeavePreferences();
-        if (!e.Cancel) { StopPinRead(); ClearReceipt(); }
+        if (!e.Cancel) { StopPinRead(); ClearReceipt(); _batch?.ClearPins(); InitialPinCell.HidePin(); }
     }
 }
